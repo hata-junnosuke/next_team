@@ -36,40 +36,60 @@ description: myteam 第3弾の Next.js 16 実装規約。Server Component での
      return <Table .../>;
    }
    ```
+   詳細・編集ページで `apiGet` が 404（存在しない・他社のデータ）を受けると、`lib/api.ts` が `notFound()` を呼んで not-found 画面になる。ページ側で 404 を判定しない
 3. **Server Action** `lib/actions/worker.ts`
    ```ts
    "use server";
+   import { apiSend, toFormState } from "@/lib/api";       // toFormState は server-only の lib/api.ts にある
+   import type { FormState } from "@/lib/form-state";      // form-state.ts は型だけ
+   // 送る項目は明示する（Object.fromEntries(formData) は $ACTION_ のキーまで送るので使わない）
+   function workerBody(formData: FormData) {
+     return { name: formData.get("name"), email: formData.get("email"), phone: formData.get("phone") };
+   }
    export async function createWorker(_prev: FormState, formData: FormData): Promise<FormState> {
      try {
-       await apiSend("POST", "/api/workers", Object.fromEntries(formData));
+       await apiSend("POST", "/api/workers", workerBody(formData));
      } catch (e) {
-       return toFormState(e);          // 422 → {message, errors}。それ以外は投げ直す
+       return toFormState(e, formData); // 422 → {message, errors, values}。それ以外は投げ直す
      }
      revalidatePath("/workers");
      redirect("/workers");             // redirect は try の外で呼ぶ
    }
+   // id を受ける Action は bind で呼ばれる。引数は信用せず形だけ確かめる（存在・他社は API の 404）
+   export async function updateWorker(id: number, _prev: FormState, formData: FormData): Promise<FormState> {
+     if (!(Number.isSafeInteger(id) && id > 0)) return { ok: false, message: "ワーカーが見つかりませんでした。" };
+     // ...
+   }
    ```
+   - **bind は Server 側で作る**: 一覧・編集の Server Component で `updateWorker.bind(null, worker.id)` を作り、Client のフォームには props で渡す（id は URL ではなく API が返した値）。Client 側で `bind` しない
+   - 削除で 404（既に無い）は成功と同じ扱い（`revalidatePath` して `{ ok: true }`）
+   - 見本は P1-04 の `lib/actions/location.ts` と `app/(admin)/locations/*`
 4. **フォーム**（Client Component） `components/workers/WorkerForm.tsx`
    ```tsx
    "use client";
    const [state, action, pending] = useActionState(createWorker, {});
    return (
      <form action={action}>
-       <Alert state={state} />
-       <Field label="氏名" name="name" errors={state.errors?.name} defaultValue={worker?.name} />
+       <Alert state={state} />          {/* errors が空のときだけ message を出す（判定は Alert の中） */}
+       <Field label="氏名" name="name" errors={state.errors?.name}
+              defaultValue={state.values?.name ?? worker?.name} />  {/* 422 で消えた入力を戻す */}
        <Button pending={pending}>登録する</Button>
      </form>
    );
    ```
+   React 19 の `<form action>` は action が終わるとフォームをリセットする。422 のときに入力が消えないよう、`toFormState` が送った値を `values` に詰めて返す（`password` と `$ACTION_` で始まるキーは除く）
 
 ## 守ること
 - `fetch(` を書いてよいのは `lib/api.ts` と `lib/browser-api.ts` の中だけ
+- API の `message` をそのまま画面に出すのは 422 / 429 / 404 だけ。それ以外（500 系など）は「通信に失敗しました（N）。」の固定文言（`lib/schemas/common.ts` の `toErrorDisplay`）
 - `lib/api.ts` は `import "server-only"`。Client Component から import するとビルドが落ちる（それでよい）
 - レスポンスは必ず zod で `parse`。**API が契約と違う形を返したら、ここで例外になって気づける**。web 側で形を合わせにいかない
 - 型は `z.infer` だけ。`type` や `interface` を手で書くのは props と `FormState` だけ
 - 検証を二重に書かない。必須チェックや範囲チェックは Laravel が 422 で返すものを表示する
-- 業務ルールを書かない。ボタンを出すかどうかは API の `can` を見る。定員に達したかどうかを web で計算しない
-- 状態ボタン（承認・却下・キャンセル）は小さなフォーム + Server Action。成功したら `revalidatePath` だけして同じページに留まる
+- 業務ルールを書かない。ボタンを使えるかどうかは API の `can`（拠点は `deletable`）を見る。定員に達したかどうかを web で計算しない
+- **状態ボタンは非表示ではなく非活性で出し分ける**: `can.*` / `deletable` が false なら `<Button disabled>`。最終的な判定は API の 422
+- 状態ボタン（承認・却下・キャンセル・削除）は小さなフォーム + Server Action。成功したら `revalidatePath` だけして同じページに留まる。表のセル内に Alert を出すときは包む要素に `whitespace-normal` と `max-w-*` を付ける
+- 必須項目に HTML の `required` を付けない（ブラウザが止めると API の 422 が入力欄の下に出ることを確かめられない）
 - 数値の入力は `FormData` では文字列で届く。Laravel 側の検証（`integer`）が数値文字列を受け付けるので、web で変換しない
 
 ## ログイン（`app/(auth)/login/page.tsx` と `lib/browser-api.ts`）
@@ -87,7 +107,7 @@ const res = await fetch(`${API}/login`, {
 ログアウトも同じ形で `POST /logout`、成功したら `/login` へ。
 
 ## `proxy.ts`
-セッション Cookie（`next_team_session`）がなければ `/login` へ送るだけ。Cookie があっても期限切れのことがあるので、本当の判定は `lib/api.ts` が 401 を受けたときの `redirect("/login")`。
+セッション Cookie（`next-team-session`）がなければ `/login` へ送るだけ。Cookie があっても期限切れのことがあるので、本当の判定は `lib/api.ts` が 401 を受けたときの `redirect("/login")`。
 
 ## 共通部品（`components/ui/`）
 | 部品 | 役割 |
@@ -95,7 +115,7 @@ const res = await fetch(`${API}/login`, {
 | `Table` | 見出しと行。セルは `whitespace-nowrap` |
 | `Field` | ラベル + 入力 + その項目のエラー。`type` は text / email / number / date / time / select |
 | `Button` | `pending` で無効化と文言の切り替え。`variant`: primary / secondary / danger |
-| `Alert` | `FormState` の `message` を表示（成功 / エラー） |
+| `Alert` | `FormState` の `message` を表示（成功 / エラー）。`errors` に項目があるときは出さない（項目エラーは `Field`、業務ルール違反は `Alert`） |
 | `Badge` | 状態の表示。色は `lib/status.ts` |
 | `Pagination` | `meta` を受けて前後のリンク |
 

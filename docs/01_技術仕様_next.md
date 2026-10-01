@@ -60,7 +60,7 @@ UI コンポーネントライブラリ、状態管理ライブラリ、デー�
 
 | キー | 値 | いつ | 理由 |
 |---|---|---|---|
-| `APP_NAME` | `next_team` | P1 | セッション Cookie 名が `next_team_session` になり、他の弾（同じ `localhost`）と混ざらない |
+| `APP_NAME` | `next_team` | P1 | セッション Cookie 名が `next-team-session` になり（`Str::slug(APP_NAME)` なのでハイフン区切り。P1-03 で実物を確認）、他の弾（同じ `localhost`）と混ざらない |
 | `APP_URL` | `http://localhost:8002` | P1 | 署名付きURL の生成に使われる |
 | `FRONTEND_URL` | `http://localhost:3002` | P1 | CORS の許可オリジン、メール本文のリンク先 |
 | `APP_LOCALE` / `APP_FALLBACK_LOCALE` | `ja` / `en` | P1 | エラーメッセージを日本語に |
@@ -370,9 +370,9 @@ sequenceDiagram
 
     Note over B,L: ログイン（ブラウザから直接。Cookie を受け取る操作だから）
     B->>L: GET /sanctum/csrf-cookie（credentials: include）
-    L-->>B: Set-Cookie: XSRF-TOKEN, next_team_session
+    L-->>B: Set-Cookie: XSRF-TOKEN, next-team-session
     B->>L: POST /login + X-XSRF-TOKEN
-    L-->>B: 200 + Set-Cookie: next_team_session（再発行）
+    L-->>B: 200 + Set-Cookie: next-team-session（再発行）
     B->>N: /dashboard へ遷移（Cookie は localhost 共通なので付く）
 
     Note over B,L: 表示（Server Component。Cookie は自動では付かないので転送する）
@@ -561,14 +561,14 @@ web/
 │       ├── reports/monthly/      page.tsx / csv/route.ts（F-18 の中継。Route Handler）
 │       ├── reports/exports/      page.tsx（P4）
 │       └── notifications/        page.tsx（P5・Could）
-├── components/ui/                Table / Field / Button / Alert / Badge / Pagination
+├── components/ui/                Table / Field / Button / Alert / Badge / Pagination / LogoutButton（ログアウトだけは Client Component が要るため）
 ├── components/<機能>/            フォームなど機能ごとの Client Component
 └── lib/
-    ├── api.ts                    サーバ側の唯一の fetch 入口（server-only）
+    ├── api.ts                    サーバ側の唯一の fetch 入口（server-only）。422 → FormState の変換 toFormState もここ
     ├── browser-api.ts            ブラウザ側（login / logout だけ）
     ├── schemas/                  zod スキーマ（機能ごとに 1 ファイル）
     ├── actions/                  Server Action（機能ごとに 1 ファイル。先頭に "use server"）
-    ├── form-state.ts             FormState 型と 422 → FormState の変換
+    ├── form-state.ts             FormState 型だけ（Client から import できるように）
     ├── status.ts                 状態の value → バッジの色（唯一の対応表）
     └── format.ts                 金額・日付・分 → 表示文字列
 ```
@@ -598,10 +598,12 @@ export async function apiSend<T>(method: "POST" | "PUT" | "PATCH" | "DELETE", pa
 ### 7.3 Server Action と `FormState`
 
 ```ts
-export type FormState = { ok?: boolean; message?: string; errors?: Record<string, string[]> };
+export type FormState = { ok?: boolean; message?: string; errors?: Record<string, string[]>; values?: Record<string, string> };
 ```
 
 - フォームは `useActionState(action, {})` で組む。422 は `FormState` にして返し、`Field` が `errors[name]` を表示する
+- 422 のときは送った値を `values` に入れて返し、入力欄は `defaultValue={state.values?.[name] ?? 元の値}` にする（React 19 の `<form action>` は終了時にフォームをリセットするため。P1-03 のレビューで決定）。`password` と `$ACTION_` で始まるキーは返さない
+- 項目に紐づかないエラー（`errors` が空の 422、業務ルール違反）は `Alert`、項目エラーは `Field` に出す。判定は `Alert` の中の 1 箇所
 - 検証はサーバ（Laravel）を正とする。**クライアント側に同じ検証を二重に書かない**（HTML の `required` 程度は可）
 - 成功したら `revalidatePath()` して `redirect()`。状態ボタン（承認・却下など）は `redirect` せず同じページを再検証する
 - Server Action は公開エンドポイントと同じ扱い。認可は Laravel の 401 / 404 / 422 に任せ、Action 側で勝手に判定しない
@@ -770,5 +772,5 @@ B と C の境界: C の `AttendanceService::save()` は B の `Application`（�
 | 2 | `actingAs($user)` で `auth:sanctum` を通る | 同上 |
 | 3 | `transaction_mode=IMMEDIATE` が `DB::transaction()` に効く | `php artisan tinker` で `DB::enableQueryLog()` か、2 つのターミナルで待たされるのを見る |
 | 4 | `Context` に入れた値がキューのジョブに引き継がれる | P4 の最初のジョブのテストで確認 |
-| 5 | Next 16 のサーバ側 fetch に付けた `Origin` ヘッダがそのまま Laravel に届く | P1 で Telescope なしなら `Log::info(request()->headers->all())` を一時的に入れて確認（終わったら消す） |
+| 5 | **確認済み（P1-03）: 届く。** `Cookie` だけだと 401、`Origin` か `Referer` のどちらかがあれば 200。更新系は `X-XSRF-TOKEN` がないと 419 | Next 16 のサーバ側 fetch に付けた `Origin` ヘッダがそのまま Laravel に届く | P1 で Telescope なしなら `Log::info(request()->headers->all())` を一時的に入れて確認（終わったら消す） |
 | 6 | 同じブラウザで第2弾（`localhost:8001`）を開いていると `XSRF-TOKEN` Cookie が上書きし合う | 手動確認のときは第2弾のタブを閉じるか、別のブラウザプロファイルを使う |
