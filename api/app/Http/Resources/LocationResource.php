@@ -22,9 +22,11 @@ class LocationResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'address' => $this->address,
-            // P1 では募集（job_postings）がまだないので固定値。P2-02 で withCount の実値と「0 件なら削除可」にする
-            'job_postings_count' => 0,
-            'deletable' => true,
+            // コントローラが withCount('jobPostings') / loadCount で数えた値を使う（Resource でクエリを発行しない = N+1 にしない）。
+            // 件数を読み込まないとキーが消えるので、このリソースを返す箇所では必ず withCount / loadCount する。
+            // 削除できるのは募集が 0 件のときだけ（docs/01 4.6）
+            'job_postings_count' => $this->whenCounted('jobPostings'),
+            'deletable' => $this->whenCounted('jobPostings', fn (int $count) => $count === 0),
         ];
     }
 }
