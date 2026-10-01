@@ -38,3 +38,4 @@
 - 2026-10-01 | フェーズ 2 | loop | git worktree に `api/vendor` をシンボリックリンクで置くと、Composer の `$baseDir` がメインになり App\ / Tests\ / Database\ のクラスはメイン（や他の worktree）から読まれる。worktree で「緑」でも worktree のコードを検証していない → worktree ごとの bootstrap（worktree の app/ tests/ database/ を先に探す autoloader）を `--bootstrap` で渡す。最終判定は epic ブランチへ統合後のメインで行う | 信頼度 0.9 | P2-02 / P2-05 の担当が発見
 - 2026-10-01 | フェーズ 2 | api | ファクトリの `fake()->optional()` の列を、テストが「送らなければ null」と期待すると、Faker の乱数で 2 回に 1 回だけ赤になる（「再実行で緑」は合格ではない）→ 期待値に関わる列はテストで明示して作る | 信頼度 0.9 | P2-04 / P2-06 の担当が全件テストで発見
 - 2026-10-01 | フェーズ 3 | loop | web の git worktree は `node_modules` をシンボリックリンクにすればよいが、`LayoutProps` などの型は `.next/types`（gitignore）に生成されるので、worktree ごとに `next typegen` を先に回さないと tsc が赤になる | 信頼度 0.9 | P3 の worktree 準備
+- 2026-10-01 | フェーズ 3 | web | 共通部品 `Field` が id を `field-${name}` で作るので、同じページに同じ name のフォームが 2 つあると id が重なり、ラベルと aria-describedby が別の欄に結び付く → `id` prop を足し、行ごと・フォームごとに重ならない id を渡す | 信頼度 0.9 | P3-02 code-reviewer（重大）

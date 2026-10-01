@@ -644,6 +644,9 @@ export type FormState = { ok?: boolean; message?: string; errors?: Record<string
 - 金額は `9,600円`、労働時間は `7時間00分`、日付は `2026/09/20（日）`
 - 表のセル・バッジ・ボタンは `whitespace-nowrap`（第2弾の教訓: 折り返しで崩れた）
 - 状態の色は `lib/status.ts` の 1 箇所。ラベルは API の `label` をそのまま出す
+- 例外（P3-02 で決定）: 一覧の「状態で絞り込む」選択肢だけは、API に Enum の一覧を返す口がないので、ラベルを `lib/status.ts` の隣（絞り込み部品）に置く。値は docs/01 4.1 と同じ。表のバッジは API の label を出す
+- 例外（P3-02 で決定）: 入力欄のない項目の 422（例: 複製フォームの `errors.hourly_wage`）は、そのフォームの下にまとめて出す（Alert は項目エラーがあると出さないため）
+- 拠点の選択肢は `per_page=100` の 1 ページ分（101 件以上は想定しない）
 
 ---
 
