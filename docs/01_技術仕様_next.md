@@ -316,7 +316,7 @@ final class CurrentCompany
 | | `cancel(Application $a, CancelReason $reason): Application` | | 遷移不可（確定済みのみ） |
 | `AttendanceService` | `save(Application $a, string $clockIn, string $clockOut, int $breakMinutes): Attendance` | 作成または更新 | 確定済みの応募にだけ勤怠を入力できます。／出勤と退勤が同じ時刻です。（`field: clock_out`）／休憩が労働時間を超えています。（`field: break_minutes`） |
 | `PayrollCalculator` | `calculate(int $workedMinutes, int $hourlyWage, int $transport): PayrollResult` | `PayrollResult{workedMinutes, wagePay, totalPay}`（readonly） | |
-| `MonthlyReportService` | `build(string $month): MonthlyReport` | `MonthlyReport{month, byWorker[], byLocation[], totalShifts, totalPay}` | |
+| `MonthlyReportService` | `build(string $month): MonthlyReport` | `MonthlyReport{month, byWorker[], byLocation[], totalShifts, totalWorkedMinutes, totalPay}` | |
 | | `csvRows(string $month, ?int $locationId = null): iterable` | CSV の行（ヘッダなし） | |
 | `DashboardService` | `summary(): array` | 6 章の形 | |
 | `ReportExportService`（P4） | `request(User $u, string $month): ReportExport` | `queued` の行 | 同じ月の出力が生成中です。 |
@@ -334,8 +334,8 @@ final class CurrentCompany
 | 報酬（F-16） | 労働分 = 退勤 − 出勤 − 休憩。賃金 = `intdiv(労働分 × 時給 + 59, 60)`（円未満切り上げ）。合計 = 賃金 + 交通費 |
 | 深夜跨ぎ（F-15） | 入力は `HH:MM`。退勤 ≤ 出勤なら翌日扱い、同時刻はエラー。判定は `AttendanceService` の 1 箇所 |
 | 月の範囲（F-17） | 勤務日（`job_postings.work_date`）が対象月に入る勤怠を集計。範囲は**半開区間**（`>= 月初 AND < 翌月初`）。`whereBetween` と `whereDate` は使わない |
-| 集計の方法 | SQL の join + GROUP BY + SUM。`attendances` の保存済みの値を合計する。join 先にはグローバルスコープが効かないので `company_id` 条件を明示する |
-| CSV（F-18 / F-23） | 列: ワーカー名, 拠点名, 勤務日, 労働分, 賃金, 交通費, 合計。UTF-8（BOM つき）。`=` `+` `-` `@` で始まるセルは先頭に `'` を付ける |
+| 集計の方法 | （実測 P2-06: 統計なしの SQLite では起点が `applications (company_id, status)`、そこから `attendances.application_id` の UNIQUE と各表の主キーでたどる。全表走査はない。`job_postings (company_id, work_date)` は統計がないと使われなかった）SQL の join + GROUP BY + SUM。`attendances` の保存済みの値を合計する。join 先にはグローバルスコープが効かないので `company_id` 条件を明示する |
+| CSV（F-18 / F-23） | 列: ワーカー名, 拠点名, 勤務日, 労働分, 賃金, 交通費, 合計。UTF-8（BOM つき）。`=` `+` `-` `@` タブ CR で始まるセルは先頭に `'` を付ける（タブと CR は OWASP の推奨で P2-06 に追加。全角記号は Excel が数式にしないので対象外）。`shifts` は「確定の応募のうち勤怠が入力済みのもの」の件数 |
 | 最低賃金（F-05） | `config('myteam.min_wage')` 以上 |
 | 無効ワーカー（F-03） | 新規応募できない。既存の確定・応募は影響を受けない |
 
@@ -501,7 +501,7 @@ sequenceDiagram
 | メソッド | パス | 入力 | 成功 |
 |---|---|---|---|
 | GET | `/api/reports/monthly` | `month`（`YYYY-MM`。必須） | 200 |
-| GET | `/api/reports/monthly/csv` | `month` | 200 `text/csv`（同期。F-18） |
+| GET | `/api/reports/monthly/csv` | `month` | 200 `text/csv; charset=UTF-8`（同期。F-18）。`Content-Disposition: attachment; filename=monthly-report-{month}.csv` |
 
 ```json
 {"data": {
@@ -526,7 +526,7 @@ sequenceDiagram
 }}
 ```
 
-`upcoming_postings` は今日以降の募集中・締切の募集（勤務日の昇順、最大 20 件）。`fill_rate` は整数の％（四捨五入）。P4 でキャッシュします（8 章）。`generated_at` はキャッシュされた時刻なので、画面で「いつの値か」が分かります。
+`pending_applications_count` は自社の応募中の応募すべて（勤務日・募集の状態を問わない。勤務日が過ぎて応募中のまま残った応募も「未処理」として数える）。`fill_rate` は四捨五入だが、確定数 < 定員なら上限 99（満員でないのに 100% と出さない。P2-06 で決定）。`upcoming_postings` は今日以降の募集中・締切の募集（勤務日の昇順、最大 20 件）。`fill_rate` は整数の％（四捨五入）。P4 でキャッシュします（8 章）。`generated_at` はキャッシュされた時刻なので、画面で「いつの値か」が分かります。
 
 ### 6.9 非同期出力（F-23。P4）
 
