@@ -482,6 +482,8 @@ sequenceDiagram
 
 `ApplicationResource`: `{id, worker: {id, name}, status: {value, label}, confirmed_at, confirmed_hourly_wage, confirmed_transport_allowance, cancel_reason: {value, label} | null, cancelled_at, attendance: AttendanceResource | null, can: {confirm, reject, cancel, attend}}`
 
+422 の文言（P2-04 で決定。遷移できないときはすべて 422）: 応募は「締め切られた募集には応募できません。」「中止された募集には応募できません。」「無効のワーカーは応募できません。」（`errors.worker_id`）「このワーカーはすでにこの募集に応募しています。」（`errors.worker_id`）。承認は「この応募はすでに確定しています。」「却下された応募は承認できません。」「キャンセルされた応募は承認できません。」「中止された募集の応募は承認できません。」「定員に達しているため承認できません。」。却下は「確定した応募は却下できません。」「この応募はすでに却下されています。」「キャンセルされた応募は却下できません。」。キャンセルは「確定済みの応募だけキャンセルできます。」「この応募はすでにキャンセルされています。」。業務ルール違反は `errors` が空（`worker_id` のものを除く）。入力の検証エラー（`worker_id` / `reason`）は項目のキーに入る。
+
 `can` は「状態として可能か」だけを返します（定員は見ない）。画面はこれでボタンを出し分け、定員エラーは 422 のメッセージで表示します。
 
 ### 6.6 勤怠・報酬（F-15、F-16）
