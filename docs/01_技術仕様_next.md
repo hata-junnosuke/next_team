@@ -160,7 +160,7 @@ INDEX: `(company_id, work_date)`、`(company_id, status)`、`(location_id)`。
 | cancel_reason | string | NULL（`company` / `worker`） |
 | cancelled_at | datetime | NULL |
 
-**UNIQUE `(job_posting_id, worker_id)`**（F-09: 二重応募の禁止を DB でも守る）。INDEX: `(job_posting_id, status)`、`(company_id, status)`。
+**UNIQUE `(job_posting_id, worker_id)`**（F-09: 二重応募の禁止を DB でも守る）。INDEX: `(job_posting_id, status)`、`(company_id, status)`、`(worker_id)`（SQLite は FK に索引を作らないので、ワーカー側からの参照と restrictOnDelete の検査用。P2-01 の database-reviewer で決定）。
 
 **attendances**（勤怠）
 
@@ -175,7 +175,9 @@ INDEX: `(company_id, work_date)`、`(company_id, status)`、`(location_id)`。
 | wage_pay | unsigned int | NOT NULL（同上。交通費を含まない） |
 | total_pay | unsigned int | NOT NULL（同上。交通費を含む） |
 
-INDEX: `(company_id, clock_in)`（月次集計の絞り込み）。
+INDEX: `(company_id, clock_in)`（勤怠の日時での参照用。月次集計の絞り込みは 4.6 のとおり `job_postings (company_id, work_date)` が効く）。
+
+`work_date` はモデル経由でも `Y-m-d`（時刻なし）で保存する。SQLite は文字列で比べるので、書式が混ざると半開区間や等号の比較から漏れる（P2-01 の database-reviewer の指摘）。
 
 ### 3.2 非同期用のテーブル（P4・P5 で足す。新しいマイグレーションファイルとして追加）
 
@@ -312,9 +314,9 @@ final class CurrentCompany
 | | `confirm(Application $a): Application` | | 定員に達しているため承認できません。／遷移不可。コミット後に `ApplicationConfirmed` を発火 |
 | | `reject(Application $a): Application` | | 遷移不可 |
 | | `cancel(Application $a, CancelReason $reason): Application` | | 遷移不可（確定済みのみ） |
-| `AttendanceService` | `save(Application $a, string $clockIn, string $clockOut, int $breakMinutes): Attendance` | 作成または更新 | 確定済みの応募のみ／出勤と退勤が同時刻／休憩が労働時間を超える |
+| `AttendanceService` | `save(Application $a, string $clockIn, string $clockOut, int $breakMinutes): Attendance` | 作成または更新 | 確定済みの応募にだけ勤怠を入力できます。／出勤と退勤が同じ時刻です。（`field: clock_out`）／休憩が労働時間を超えています。（`field: break_minutes`） |
 | `PayrollCalculator` | `calculate(int $workedMinutes, int $hourlyWage, int $transport): PayrollResult` | `PayrollResult{workedMinutes, wagePay, totalPay}`（readonly） | |
-| `MonthlyReportService` | `build(string $month): MonthlyReport` | `MonthlyReport{month, byWorker[], byLocation[], totalShifts, totalPay}` | |
+| `MonthlyReportService` | `build(string $month): MonthlyReport` | `MonthlyReport{month, byWorker[], byLocation[], totalShifts, totalWorkedMinutes, totalPay}` | |
 | | `csvRows(string $month, ?int $locationId = null): iterable` | CSV の行（ヘッダなし） | |
 | `DashboardService` | `summary(): array` | 6 章の形 | |
 | `ReportExportService`（P4） | `request(User $u, string $month): ReportExport` | `queued` の行 | 同じ月の出力が生成中です。 |
@@ -332,8 +334,8 @@ final class CurrentCompany
 | 報酬（F-16） | 労働分 = 退勤 − 出勤 − 休憩。賃金 = `intdiv(労働分 × 時給 + 59, 60)`（円未満切り上げ）。合計 = 賃金 + 交通費 |
 | 深夜跨ぎ（F-15） | 入力は `HH:MM`。退勤 ≤ 出勤なら翌日扱い、同時刻はエラー。判定は `AttendanceService` の 1 箇所 |
 | 月の範囲（F-17） | 勤務日（`job_postings.work_date`）が対象月に入る勤怠を集計。範囲は**半開区間**（`>= 月初 AND < 翌月初`）。`whereBetween` と `whereDate` は使わない |
-| 集計の方法 | SQL の join + GROUP BY + SUM。`attendances` の保存済みの値を合計する。join 先にはグローバルスコープが効かないので `company_id` 条件を明示する |
-| CSV（F-18 / F-23） | 列: ワーカー名, 拠点名, 勤務日, 労働分, 賃金, 交通費, 合計。UTF-8（BOM つき）。`=` `+` `-` `@` で始まるセルは先頭に `'` を付ける |
+| 集計の方法 | （実測 P2-06: 統計なしの SQLite では起点が `applications (company_id, status)`、そこから `attendances.application_id` の UNIQUE と各表の主キーでたどる。全表走査はない。`job_postings (company_id, work_date)` は統計がないと使われなかった）SQL の join + GROUP BY + SUM。`attendances` の保存済みの値を合計する。join 先にはグローバルスコープが効かないので `company_id` 条件を明示する |
+| CSV（F-18 / F-23） | 列: ワーカー名, 拠点名, 勤務日, 労働分, 賃金, 交通費, 合計。UTF-8（BOM つき）。`=` `+` `-` `@` タブ CR で始まるセルは先頭に `'` を付ける（タブと CR は OWASP の推奨で P2-06 に追加。全角記号は Excel が数式にしないので対象外）。`shifts` は「確定の応募のうち勤怠が入力済みのもの」の件数 |
 | 最低賃金（F-05） | `config('myteam.min_wage')` 以上 |
 | 無効ワーカー（F-03） | 新規応募できない。既存の確定・応募は影響を受けない |
 
@@ -445,6 +447,8 @@ sequenceDiagram
 
 `WorkerResource`: `{id, name, email, phone, is_active}`
 
+一覧の絞り込み: `q` は前後の空白を除いて氏名の部分一致（`%` `_` も文字として扱う。空白だけなら絞り込まない）。`is_active` は `1` / `0` / `true` / `false` のいずれか（空・未指定なら絞り込まない。それ以外は 422）。登録・更新（POST / PUT）では `is_active` を受け付けず、切り替えは PATCH だけ（P2-02 で決定）。
+
 ### 6.4 募集（F-05〜F-08）
 
 | メソッド | パス | 入力 | 成功 |
@@ -460,7 +464,11 @@ sequenceDiagram
 
 `JobPostingResource`: `{id, location: {id, name}, job_title, work_date, start_time, end_time, capacity, hourly_wage, transport_allowance, status: {value, label}, applications_count, confirmed_count, can: {edit, close, cancel, apply}}`
 
-検証: 終了は開始より後。`capacity >= 1`。`hourly_wage >= config('myteam.min_wage')`。`location_id` は自社の拠点。
+`applications_count` は却下・キャンセルを含む全件の応募数、`confirmed_count` は確定の数（P2-03 で決定）。`can.edit` は中止以外、`can.apply` は募集中のときだけ（`JobPostingStatus::isEditable()` / `acceptsApplications()` の 1 箇所）。
+
+複製（duplicate）: 勤務日は元の募集と別の日（同じ日は 422）。元の時給が今の最低賃金未満なら 422。
+
+検証: 終了は開始より後。`capacity` は 1〜1000、`hourly_wage` と `transport_allowance` は 100000 以下。`hourly_wage >= config('myteam.min_wage')`。`location_id` は自社の拠点（`Rule::exists()` はグローバルスコープを通らないので `->where('company_id', CurrentCompany::id())` を必ず付ける。`worker_id`（6.5）も同じ。ルートに含まれる親の ID はリクエスト本文から取らずルートモデルバインディングの値を使う）。モデルの `saving` でも、親が自社でなければ例外にする（P2-01 の二重の守り）。
 
 ### 6.5 応募・確定（F-09〜F-14）
 
@@ -474,6 +482,8 @@ sequenceDiagram
 
 `ApplicationResource`: `{id, worker: {id, name}, status: {value, label}, confirmed_at, confirmed_hourly_wage, confirmed_transport_allowance, cancel_reason: {value, label} | null, cancelled_at, attendance: AttendanceResource | null, can: {confirm, reject, cancel, attend}}`
 
+422 の文言（P2-04 で決定。遷移できないときはすべて 422）: 応募は「締め切られた募集には応募できません。」「中止された募集には応募できません。」「無効のワーカーは応募できません。」（`errors.worker_id`）「このワーカーはすでにこの募集に応募しています。」（`errors.worker_id`）。承認は「この応募はすでに確定しています。」「却下された応募は承認できません。」「キャンセルされた応募は承認できません。」「中止された募集の応募は承認できません。」「定員に達しているため承認できません。」。却下は「確定した応募は却下できません。」「この応募はすでに却下されています。」「キャンセルされた応募は却下できません。」。キャンセルは「確定済みの応募だけキャンセルできます。」「この応募はすでにキャンセルされています。」。業務ルール違反は `errors` が空（`worker_id` のものを除く）。入力の検証エラー（`worker_id` / `reason`）は項目のキーに入る。
+
 `can` は「状態として可能か」だけを返します（定員は見ない）。画面はこれでボタンを出し分け、定員エラーは 422 のメッセージで表示します。
 
 ### 6.6 勤怠・報酬（F-15、F-16）
@@ -484,12 +494,16 @@ sequenceDiagram
 
 `AttendanceResource`: `{clock_in, clock_out, is_overnight, break_minutes, worked_minutes, wage_pay, transport_allowance, total_pay}`（`clock_in` / `clock_out` は日時）
 
+422 の項目: 形式エラーは `errors.clock_in` / `errors.clock_out` / `errors.break_minutes`（`break_minutes` は必須・0〜1440 の整数）。同時刻は `errors.clock_out`、休憩超過は `errors.break_minutes`、確定済みでない応募は `errors` が空で `message` だけ。`transport_allowance` は保存済みの `total_pay - wage_pay`（保存時に「合計 = 賃金 + 交通費」で決めているので確定時の交通費と同じ値。P2-05 で決定）。
+
+月次集計（6.7）に含めるのは、応募が `confirmed` の勤怠だけ（勤怠の後にキャンセルされた応募の勤怠は行が残るが集計しない。P2-05 のレビューで決定）。
+
 ### 6.7 月次集計（F-17、F-18）
 
 | メソッド | パス | 入力 | 成功 |
 |---|---|---|---|
 | GET | `/api/reports/monthly` | `month`（`YYYY-MM`。必須） | 200 |
-| GET | `/api/reports/monthly/csv` | `month` | 200 `text/csv`（同期。F-18） |
+| GET | `/api/reports/monthly/csv` | `month` | 200 `text/csv; charset=UTF-8`（同期。F-18）。`Content-Disposition: attachment; filename=monthly-report-{month}.csv` |
 
 ```json
 {"data": {
@@ -514,7 +528,7 @@ sequenceDiagram
 }}
 ```
 
-`upcoming_postings` は今日以降の募集中・締切の募集（勤務日の昇順、最大 20 件）。`fill_rate` は整数の％（四捨五入）。P4 でキャッシュします（8 章）。`generated_at` はキャッシュされた時刻なので、画面で「いつの値か」が分かります。
+`pending_applications_count` は自社の応募中の応募すべて（勤務日・募集の状態を問わない。勤務日が過ぎて応募中のまま残った応募も「未処理」として数える）。`fill_rate` は四捨五入だが、確定数 < 定員なら上限 99（満員でないのに 100% と出さない。P2-06 で決定）。`upcoming_postings` は今日以降の募集中・締切の募集（勤務日の昇順、最大 20 件）。`fill_rate` は整数の％（四捨五入）。P4 でキャッシュします（8 章）。`generated_at` はキャッシュされた時刻なので、画面で「いつの値か」が分かります。
 
 ### 6.9 非同期出力（F-23。P4）
 

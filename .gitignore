@@ -1,1 +1,3 @@
 .DS_Store
+# 並列担当の git worktree（P2 の A/B/C、P3 の WA/WB/WC）
+.worktrees/

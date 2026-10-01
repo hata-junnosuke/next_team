@@ -22,26 +22,31 @@ class LocationController extends Controller
 {
     public function index(Request $request): AnonymousResourceCollection
     {
-        return LocationResource::collection(Location::query()->orderBy('id')->paginate($this->perPage($request)));
+        // withCount は拠点の SELECT にサブクエリで件数を足し、各行に job_postings_count を付ける。
+        // Rails なら locations.left_joins(:job_postings).select('locations.*, COUNT(job_postings.id)').group(...) を 1 本で書くのに当たる
+        // https://readouble.com/laravel/13.x/ja/eloquent-relationships.html#counting-related-models
+        return LocationResource::collection(
+            Location::query()->withCount('jobPostings')->orderBy('id')->paginate($this->perPage($request))
+        );
     }
 
     public function store(StoreLocationRequest $request): JsonResponse
     {
-        $location = Location::create($request->validated());
+        $location = Location::create($request->validated())->loadCount('jobPostings');
 
         return (new LocationResource($location))->response()->setStatusCode(201);
     }
 
     public function show(Location $location): LocationResource
     {
-        return new LocationResource($location);
+        return new LocationResource($location->loadCount('jobPostings'));
     }
 
     public function update(UpdateLocationRequest $request, Location $location): LocationResource
     {
         $location->update($request->validated());
 
-        return new LocationResource($location);
+        return new LocationResource($location->loadCount('jobPostings'));
     }
 
     public function destroy(Location $location, LocationService $service): Response

@@ -40,6 +40,8 @@
         <env name="SESSION_DRIVER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
+        <!-- F-05 の最低賃金。.env の値に左右されずに検証できるよう明示する -->
+        <env name="MYTEAM_MIN_WAGE" value="1226"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
     </php>
 </phpunit>

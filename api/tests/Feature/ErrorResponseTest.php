@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Exceptions\DomainException;
 use App\Support\CurrentCompany;
+use Illuminate\Session\TokenMismatchException;
 use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
@@ -22,6 +23,9 @@ class ErrorResponseTest extends TestCase
             Route::get('/_test/domain-field', fn () => throw new DomainException('すでに応募しています。', field: 'worker_id'));
             Route::get('/_test/company', fn () => ['company_id' => CurrentCompany::id()]);
         });
+
+        // テスト中は CSRF の検査が無効なので（runningUnitTests）、不一致の例外はルートから直接投げて変換だけを確かめる
+        Route::post('/_test/csrf', fn () => throw new TokenMismatchException('CSRF token mismatch.'));
     }
 
     public function test_業務ルール違反は422でmessageと空のerrorsを返す(): void
@@ -97,5 +101,17 @@ class ErrorResponseTest extends TestCase
     {
         $this->assertSame('Asia/Tokyo', config('app.timezone'));
         $this->assertSame('Asia/Tokyo', now()->timezoneName);
+    }
+
+    public function test_csrfトークンの不一致は419で日本語のメッセージ(): void
+    {
+        $response = $this->postJson('/_test/csrf');
+
+        $response->assertStatus(419)
+            ->assertExactJson([
+                'message' => 'ページの有効期限が切れました。もう一度お試しください。',
+                'errors' => [],
+            ]);
+        $this->assertStringContainsString('"errors":{}', $response->getContent());
     }
 }
