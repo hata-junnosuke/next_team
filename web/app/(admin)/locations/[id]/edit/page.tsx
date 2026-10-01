@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation";
 import { LocationForm } from "@/components/locations/LocationForm";
 import { updateLocation } from "@/lib/actions/location";
 import { apiGet } from "@/lib/api";
@@ -12,6 +13,10 @@ type Props = {
 
 export default async function EditLocationPage({ params }: Props) {
   const { id } = await params;
+  // 形の確認だけ（数字以外は API を呼ばずに not-found）。存在・他社の判定は API の 404
+  if (!/^\d+$/.test(id)) {
+    notFound();
+  }
   const { data: location } = await apiGet(
     `/api/locations/${encodeURIComponent(id)}`,
     locationResponse,

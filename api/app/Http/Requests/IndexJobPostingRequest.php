@@ -32,6 +32,21 @@ class IndexJobPostingRequest extends FormRequest
     }
 
     /**
+     * date_format の既定の文言（「:attributeの形式が'Y-m-d'と一致しません。」）は PHP の書式記号が画面に出るので、
+     * 人が読める書式（YYYY-MM-DD）で案内する。:attribute は attributes() の日本語名に置き換わる
+     * https://readouble.com/laravel/13.x/ja/validation.html#customizing-the-error-messages
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'date_from.date_format' => ':attributeは YYYY-MM-DD の形式で指定してください。',
+            'date_to.date_format' => ':attributeは YYYY-MM-DD の形式で指定してください。',
+        ];
+    }
+
+    /**
      * @return array<string, string>
      */
     public function attributes(): array

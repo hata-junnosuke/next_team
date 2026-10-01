@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { ApiError, apiSend, toFormState } from "@/lib/api";
+import { isValidId } from "@/lib/actions/helpers";
 import type { FormState } from "@/lib/form-state";
 
 // 拠点の登録・編集・削除（docs/01 6.2、7.3）。
@@ -14,11 +15,6 @@ const invalidId: FormState = {
   ok: false,
   message: "拠点が見つかりませんでした。",
 };
-
-/** bind で渡された id の形だけを確かめる（正の整数でなければ API を呼ばない） */
-function isValidId(id: unknown): id is number {
-  return typeof id === "number" && Number.isSafeInteger(id) && id > 0;
-}
 
 /** 送る項目だけを明示して取り出す（Next が付ける $ACTION_ のキーなどは送らない） */
 function locationBody(formData: FormData) {

@@ -2,7 +2,6 @@ import { Fragment } from "react";
 import { ActionButton } from "@/components/job-postings/ActionButton";
 import { AttendanceForm } from "@/components/job-postings/AttendanceForm";
 import { CancelApplicationForm } from "@/components/job-postings/CancelApplicationForm";
-import { clock } from "@/components/job-postings/clock";
 import { Badge } from "@/components/ui/Badge";
 import { Td } from "@/components/ui/Table";
 import {
@@ -11,7 +10,7 @@ import {
   rejectApplication,
 } from "@/lib/actions/application";
 import { saveAttendance } from "@/lib/actions/attendance";
-import { dateTime, minutes, yen } from "@/lib/format";
+import { dateTime, minutes, time, yen } from "@/lib/format";
 import type { Application } from "@/lib/schemas/application";
 import type { Attendance } from "@/lib/schemas/attendance";
 
@@ -48,14 +47,14 @@ type ApplicationRowProps = {
 /** 出勤〜退勤。深夜跨ぎ（API の is_overnight）は退勤に「翌」を付ける */
 function workedRange(attendance: Attendance): string {
   const prefix = attendance.is_overnight ? "翌" : "";
-  return `${clock(attendance.clock_in)}〜${prefix}${clock(attendance.clock_out)}`;
+  return `${time(attendance.clock_in)}〜${prefix}${time(attendance.clock_out)}`;
 }
 
 function attendanceInitial(attendance: Attendance | null) {
   return attendance
     ? {
-        clock_in: clock(attendance.clock_in),
-        clock_out: clock(attendance.clock_out),
+        clock_in: time(attendance.clock_in),
+        clock_out: time(attendance.clock_out),
         break_minutes: attendance.break_minutes,
       }
     : null;

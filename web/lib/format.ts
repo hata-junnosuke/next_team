@@ -47,3 +47,8 @@ export function dateTime(iso: string): string {
   const d = new Date(iso);
   return `${formatDate(d)} ${timeFormat.format(d)}`;
 }
+
+/** `2026-09-20T09:00:00+09:00` → `09:00`（日本時間・24 時間表記）。勤怠の時刻の表示とフォームの初期値に使う */
+export function time(iso: string): string {
+  return timeFormat.format(new Date(iso));
+}

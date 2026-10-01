@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { ApiError, apiSend, toFormState } from "@/lib/api";
+import { isValidId, toInPageFormState } from "@/lib/actions/helpers";
 import type { FormState } from "@/lib/form-state";
 
 // ワーカーの登録・編集・有効/無効の切替（docs/01 6.3、7.3）。
@@ -14,11 +15,6 @@ const invalidTarget: FormState = {
   ok: false,
   message: "ワーカーが見つかりませんでした。",
 };
-
-/** bind で渡された id の形だけを確かめる（正の整数でなければ API を呼ばない） */
-function isValidId(id: unknown): id is number {
-  return typeof id === "number" && Number.isSafeInteger(id) && id > 0;
-}
 
 /**
  * 送る項目だけを明示して取り出す（Next が付ける $ACTION_ のキーなどは送らない）。
@@ -98,10 +94,7 @@ export async function setWorkerActive(
     });
   } catch (e) {
     // 404（別のタブで消えた・他社）は一覧の行の中で API の message を出す。画面全体をエラーにしない
-    if (e instanceof ApiError && e.status === 404) {
-      return { ok: false, message: e.message };
-    }
-    return toFormState(e, formData);
+    return toInPageFormState(e, formData);
   }
   revalidatePath("/workers");
   return { ok: true };
