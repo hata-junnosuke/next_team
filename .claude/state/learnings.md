@@ -32,3 +32,4 @@
 - 2026-10-01 | フェーズ 1 | api | Fortify は `features=[]` でも `user/confirm-password` 系を登録し、429 は英語 → `Fortify::ignoreRoutes()` で login / logout だけを自前登録、`ThrottleRequestsException` を日本語の JSON に | 信頼度 0.8 | P1-01 security / code レビュー
 - 2026-10-01 | フェーズ 1 | api | SQLite は外部キーに索引を自動で張らず、`foreignId()->constrained()` も INDEX を作らない（MySQL の InnoDB とは違う）→ `company_id` には `->index()` を明示する。テスト名に英大文字を入れると Pint が `_inde_x` のように崩すので小文字で書く | 信頼度 0.9 | P1-02 code-reviewer
 - 2026-10-01 | フェーズ 1 | api | シーダーに雛形の `WithoutModelEvents` があると `BelongsToCompany` の creating が動かず company_id が埋まらない → 外す | 信頼度 0.9 | P1-02 implementer
+- 2026-10-01 | フェーズ 1 | web | React 19 の `<form action>`（useActionState）は終了時にフォームをリセットするので 422 で入力が消える → FormState に `values` を持たせ `defaultValue={state.values?.x ?? 元の値}`。Laravel のセッション Cookie 名は `Str::slug(APP_NAME)` で `next-team-session`（アンダースコアではない） | 信頼度 0.9 | P1-03 レビュー

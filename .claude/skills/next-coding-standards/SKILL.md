@@ -36,14 +36,17 @@ description: myteam 第3弾の Next.js 16 実装規約。Server Component での
      return <Table .../>;
    }
    ```
+   詳細・編集ページで `apiGet` が 404（存在しない・他社のデータ）を受けると、`lib/api.ts` が `notFound()` を呼んで not-found 画面になる。ページ側で 404 を判定しない
 3. **Server Action** `lib/actions/worker.ts`
    ```ts
    "use server";
+   import { apiSend, toFormState } from "@/lib/api";       // toFormState は server-only の lib/api.ts にある
+   import type { FormState } from "@/lib/form-state";      // form-state.ts は型だけ
    export async function createWorker(_prev: FormState, formData: FormData): Promise<FormState> {
      try {
        await apiSend("POST", "/api/workers", Object.fromEntries(formData));
      } catch (e) {
-       return toFormState(e);          // 422 → {message, errors}。それ以外は投げ直す
+       return toFormState(e, formData); // 422 → {message, errors, values}。それ以外は投げ直す
      }
      revalidatePath("/workers");
      redirect("/workers");             // redirect は try の外で呼ぶ
@@ -55,15 +58,18 @@ description: myteam 第3弾の Next.js 16 実装規約。Server Component での
    const [state, action, pending] = useActionState(createWorker, {});
    return (
      <form action={action}>
-       <Alert state={state} />
-       <Field label="氏名" name="name" errors={state.errors?.name} defaultValue={worker?.name} />
+       <Alert state={state} />          {/* errors が空のときだけ message を出す（判定は Alert の中） */}
+       <Field label="氏名" name="name" errors={state.errors?.name}
+              defaultValue={state.values?.name ?? worker?.name} />  {/* 422 で消えた入力を戻す */}
        <Button pending={pending}>登録する</Button>
      </form>
    );
    ```
+   React 19 の `<form action>` は action が終わるとフォームをリセットする。422 のときに入力が消えないよう、`toFormState` が送った値を `values` に詰めて返す（`password` と `$ACTION_` で始まるキーは除く）
 
 ## 守ること
 - `fetch(` を書いてよいのは `lib/api.ts` と `lib/browser-api.ts` の中だけ
+- API の `message` をそのまま画面に出すのは 422 / 429 / 404 だけ。それ以外（500 系など）は「通信に失敗しました（N）。」の固定文言（`lib/schemas/common.ts` の `toErrorDisplay`）
 - `lib/api.ts` は `import "server-only"`。Client Component から import するとビルドが落ちる（それでよい）
 - レスポンスは必ず zod で `parse`。**API が契約と違う形を返したら、ここで例外になって気づける**。web 側で形を合わせにいかない
 - 型は `z.infer` だけ。`type` や `interface` を手で書くのは props と `FormState` だけ
@@ -87,7 +93,7 @@ const res = await fetch(`${API}/login`, {
 ログアウトも同じ形で `POST /logout`、成功したら `/login` へ。
 
 ## `proxy.ts`
-セッション Cookie（`next_team_session`）がなければ `/login` へ送るだけ。Cookie があっても期限切れのことがあるので、本当の判定は `lib/api.ts` が 401 を受けたときの `redirect("/login")`。
+セッション Cookie（`next-team-session`）がなければ `/login` へ送るだけ。Cookie があっても期限切れのことがあるので、本当の判定は `lib/api.ts` が 401 を受けたときの `redirect("/login")`。
 
 ## 共通部品（`components/ui/`）
 | 部品 | 役割 |
@@ -95,7 +101,7 @@ const res = await fetch(`${API}/login`, {
 | `Table` | 見出しと行。セルは `whitespace-nowrap` |
 | `Field` | ラベル + 入力 + その項目のエラー。`type` は text / email / number / date / time / select |
 | `Button` | `pending` で無効化と文言の切り替え。`variant`: primary / secondary / danger |
-| `Alert` | `FormState` の `message` を表示（成功 / エラー） |
+| `Alert` | `FormState` の `message` を表示（成功 / エラー）。`errors` に項目があるときは出さない（項目エラーは `Field`、業務ルール違反は `Alert`） |
 | `Badge` | 状態の表示。色は `lib/status.ts` |
 | `Pagination` | `meta` を受けて前後のリンク |
 
