@@ -3,15 +3,17 @@
 namespace Tests\Feature;
 
 use App\Models\Company;
+use App\Models\JobPosting;
 use App\Models\Location;
 use App\Support\CurrentCompany;
 use Illuminate\Support\Facades\Context;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 /**
  * F-01 拠点の登録・一覧・編集・削除（docs/01 6.2）。
- * P1 では募集（job_postings）がまだないので job_postings_count は 0、deletable は true（P2-02 で実値にする）。
+ * job_postings_count は withCount('jobPostings') の実値、deletable は「募集が 0 件なら true」（P2-02）。
  */
 class LocationTest extends TestCase
 {
@@ -396,5 +398,177 @@ class LocationTest extends TestCase
             ->assertJsonPath('data.address', null);
 
         $this->assertDatabaseHas('locations', ['id' => $location->id, 'address' => null]);
+    }
+
+    public function test_募集に使われている拠点は削除できず422(): void
+    {
+        $location = Location::factory()->create();
+        JobPosting::factory()->for($location)->create();
+
+        $this->actingAsAdmin()
+            ->deleteJson("/api/locations/{$location->id}")
+            ->assertUnprocessable()
+            ->assertExactJson(['message' => '募集に使われている拠点は削除できません。', 'errors' => []]);
+
+        $this->assertDatabaseHas('locations', ['id' => $location->id]);
+    }
+
+    public function test_募集があればdeletableがfalseでjob_postings_countが入る(): void
+    {
+        $used = Location::factory()->create(['name' => '渋谷店']);
+        JobPosting::factory()->count(2)->for($used)->create();
+        $unused = Location::factory()->create(['name' => '新宿店']);
+
+        $this->actingAsAdmin()
+            ->getJson('/api/locations')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $used->id)
+            ->assertJsonPath('data.0.job_postings_count', 2)
+            ->assertJsonPath('data.0.deletable', false)
+            ->assertJsonPath('data.1.id', $unused->id)
+            ->assertJsonPath('data.1.job_postings_count', 0)
+            ->assertJsonPath('data.1.deletable', true);
+
+        $this->getJson("/api/locations/{$used->id}")
+            ->assertOk()
+            ->assertJsonPath('data.job_postings_count', 2)
+            ->assertJsonPath('data.deletable', false);
+
+        // 更新後の応答も実値（固定値の 0 / true に戻らない）
+        $this->putJson("/api/locations/{$used->id}", ['name' => '渋谷本店'])
+            ->assertOk()
+            ->assertJsonPath('data.job_postings_count', 2)
+            ->assertJsonPath('data.deletable', false);
+    }
+
+    public function test_拠点一覧は件数の取得でn_plus_1にならない(): void
+    {
+        foreach (Location::factory()->count(5)->create() as $location) {
+            JobPosting::factory()->for($location)->create();
+        }
+        $this->actingAsAdmin();
+
+        DB::enableQueryLog();
+        $this->getJson('/api/locations')->assertOk()->assertJsonPath('data.0.job_postings_count', 1);
+        $queries = collect(DB::getQueryLog())->pluck('query')
+            ->filter(fn (string $sql) => str_contains($sql, 'job_postings'));
+        DB::disableQueryLog();
+
+        // 拠点の一覧取得 1 本に件数のサブクエリが入る（拠点ごとに job_postings を数えない）
+        $this->assertCount(1, $queries);
+    }
+
+    public function test_締切や中止の募集だけでも使用中として削除できず422(): void
+    {
+        $closed = Location::factory()->create();
+        JobPosting::factory()->closed()->for($closed)->create();
+        $cancelled = Location::factory()->create();
+        JobPosting::factory()->cancelled()->for($cancelled)->create();
+
+        $this->actingAsAdmin();
+        foreach ([$closed, $cancelled] as $location) {
+            $this->deleteJson("/api/locations/{$location->id}")
+                ->assertUnprocessable()
+                ->assertExactJson(['message' => '募集に使われている拠点は削除できません。', 'errors' => []]);
+            $this->assertDatabaseHas('locations', ['id' => $location->id]);
+        }
+
+        $this->getJson("/api/locations/{$cancelled->id}")
+            ->assertJsonPath('data.job_postings_count', 1)
+            ->assertJsonPath('data.deletable', false);
+    }
+
+    public function test_contextを消した本番相当の状態でも使用中の拠点は422で件数も実値(): void
+    {
+        $location = Location::factory()->create();
+        JobPosting::factory()->count(3)->for($location)->create();
+        Context::forget('company_id');
+
+        $this->actingAsAdmin()
+            ->getJson('/api/locations')
+            ->assertOk()
+            ->assertJsonPath('data.0.job_postings_count', 3)
+            ->assertJsonPath('data.0.deletable', false);
+
+        $this->deleteJson("/api/locations/{$location->id}")
+            ->assertUnprocessable()
+            ->assertJsonPath('message', '募集に使われている拠点は削除できません。');
+
+        $this->assertDatabaseHas('locations', ['id' => $location->id]);
+        $this->assertDatabaseCount('job_postings', 3);
+    }
+
+    public function test_削除できなかった拠点は一覧でもdeletableがfalseのまま(): void
+    {
+        $location = Location::factory()->create();
+        JobPosting::factory()->for($location)->create();
+
+        $this->actingAsAdmin()->deleteJson("/api/locations/{$location->id}")->assertUnprocessable();
+
+        $this->getJson('/api/locations')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.deletable', false);
+    }
+
+    public function test_募集の件数は自社の募集だけを数える(): void
+    {
+        $mine = Location::factory()->create();
+        JobPosting::factory()->for($mine)->create();
+        $other = Company::factory()->create();
+        CurrentCompany::runAs($other->id, function () {
+            $theirs = Location::factory()->create();
+            JobPosting::factory()->count(2)->for($theirs)->create();
+        });
+        Context::forget('company_id');
+
+        $this->actingAsAdmin()
+            ->getJson('/api/locations')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $mine->id)
+            ->assertJsonPath('data.0.job_postings_count', 1);
+    }
+
+    public function test_他社の使用中の拠点の削除も404で本文に理由を漏らさない(): void
+    {
+        $other = Company::factory()->create();
+        $theirs = CurrentCompany::runAs($other->id, function () {
+            $location = Location::factory()->create();
+            JobPosting::factory()->for($location)->create();
+
+            return $location;
+        });
+        Context::forget('company_id');
+
+        $this->actingAsAdmin()
+            ->deleteJson("/api/locations/{$theirs->id}")
+            ->assertNotFound()
+            ->assertExactJson(['message' => '見つかりませんでした。', 'errors' => []]);
+
+        $this->assertDatabaseHas('locations', ['id' => $theirs->id]);
+    }
+
+    public function test_拠点一覧のクエリ数は拠点と募集の件数に比例しない(): void
+    {
+        $this->actingAsAdmin();
+        $count = function (): int {
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $this->getJson('/api/locations')->assertOk();
+            $n = count(DB::getQueryLog());
+            DB::disableQueryLog();
+
+            return $n;
+        };
+
+        JobPosting::factory()->for(Location::factory()->create())->create();
+        $few = $count();
+        foreach (Location::factory()->count(8)->create() as $location) {
+            JobPosting::factory()->count(2)->for($location)->create();
+        }
+        $many = $count();
+
+        $this->assertSame($few, $many);
     }
 }

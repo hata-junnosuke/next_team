@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\BelongsToCompany;
 use Database\Factories\WorkerFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -46,5 +47,20 @@ class Worker extends Model
     public function applications(): HasMany
     {
         return $this->hasMany(Application::class);
+    }
+
+    /**
+     * 氏名の部分一致（F-04）。Rails の scope :name_like に相当し、Worker::query()->nameLike('山田') で呼ぶ。
+     * SQLite の LIKE は既定のエスケープ文字がないので ESCAPE を明示し、% と _ を文字として扱う（learnings）。
+     * 列は qualifyColumn で workers.name にする（join しても曖昧にならない）。
+     * https://readouble.com/laravel/13.x/ja/eloquent.html#local-scopes
+     *
+     * @param  Builder<Worker>  $query
+     */
+    public function scopeNameLike(Builder $query, string $keyword): void
+    {
+        $escaped = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $keyword);
+
+        $query->whereRaw($query->qualifyColumn('name')." LIKE ? ESCAPE '!'", ['%'.$escaped.'%']);
     }
 }
