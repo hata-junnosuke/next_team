@@ -303,6 +303,18 @@ class MonthlyReportTest extends TestCase
             ->assertJsonValidationErrors(['month']);
     }
 
+    public function test_monthの形式エラーは書式記号ではなく年と月の日本語で案内する(): void
+    {
+        // 既定の文言は「対象月の形式が'Y-m'と一致しません。」で、PHP の書式記号が画面に出てしまう
+        $this->actingAsAdmin()->getJson('/api/reports/monthly?month=2026-13')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['month' => '対象月は YYYY-MM の形式で指定してください。']);
+
+        $this->actingAsAdmin()->get('/api/reports/monthly/csv?month=2026-9')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['month' => '対象月は YYYY-MM の形式で指定してください。']);
+    }
+
     public function test_拠点idの一覧はその月に集計対象の勤怠がある自社の拠点だけ(): void
     {
         $tokyo = Location::factory()->create();

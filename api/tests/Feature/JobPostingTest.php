@@ -142,9 +142,14 @@ class JobPostingTest extends TestCase
     public function test_時刻と日付の形式が違うと422(): void
     {
         $this->actingAsAdmin()
-            ->postJson('/api/job-postings', $this->payload(['work_date' => '2026/10/20', 'start_time' => '9時']))
+            ->postJson('/api/job-postings', $this->payload(['work_date' => '2026/10/20', 'start_time' => '9時', 'end_time' => '1700']))
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['work_date', 'start_time']);
+            // 既定の文言（「勤務日の形式が'Y-m-d'と一致しません。」）は書式記号が見えるので、日本語の案内に差し替えている
+            ->assertJsonValidationErrors([
+                'work_date' => '勤務日は YYYY-MM-DD の形式で入力してください。',
+                'start_time' => '開始時刻は HH:MM の形式で入力してください。',
+                'end_time' => '終了時刻は HH:MM の形式で入力してください。',
+            ]);
     }
 
     public function test_他社の拠点は指定できず422(): void
@@ -283,9 +288,13 @@ class JobPostingTest extends TestCase
     public function test_絞り込みの値が不正だと422(): void
     {
         $this->actingAsAdmin()
-            ->getJson('/api/job-postings?date_from=abc&status=unknown')
+            ->getJson('/api/job-postings?date_from=abc&date_to=2026/10/31&status=unknown')
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['date_from', 'status']);
+            ->assertJsonValidationErrors([
+                'date_from' => '勤務日（から）は YYYY-MM-DD の形式で指定してください。',
+                'date_to' => '勤務日（まで）は YYYY-MM-DD の形式で指定してください。',
+                'status',
+            ]);
     }
 
     public function test_締め切ると状態がclosedになる(): void
@@ -869,7 +878,7 @@ class JobPostingTest extends TestCase
         $this->actingAsAdmin()
             ->postJson("/api/job-postings/{$posting->id}/duplicate", ['work_date' => '2026/12/01'])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['work_date']);
+            ->assertJsonValidationErrors(['work_date' => '勤務日は YYYY-MM-DD の形式で入力してください。']);
 
         $this->assertDatabaseCount('job_postings', 1);
     }

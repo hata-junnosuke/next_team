@@ -57,7 +57,7 @@ description: myteam 第3弾の Next.js 16 実装規約。Server Component での
    }
    // id を受ける Action は bind で呼ばれる。引数は信用せず形だけ確かめる（存在・他社は API の 404）
    export async function updateWorker(id: number, _prev: FormState, formData: FormData): Promise<FormState> {
-     if (!(Number.isSafeInteger(id) && id > 0)) return { ok: false, message: "ワーカーが見つかりませんでした。" };
+     if (!isValidId(id)) return { ok: false, message: "ワーカーが見つかりませんでした。" };
      // ...
    }
    ```
@@ -92,6 +92,17 @@ description: myteam 第3弾の Next.js 16 実装規約。Server Component での
 - 必須項目に HTML の `required` を付けない（ブラウザが止めると API の 422 が入力欄の下に出ることを確かめられない）
 - 数値の入力は `FormData` では文字列で届く。Laravel 側の検証（`integer`）が数値文字列を受け付けるので、web で変換しない
 
+## P3 で決まった型
+- **スキーマ**: 日付・時刻は `z.iso.date()` / `z.iso.time({ precision: -1 })`（`HH:MM:SS`）/ `z.iso.datetime({ offset: true })`（`+09:00` 付き）。整数は `z.number().int()`（id・金額・分・件数）。`z.string()` で受けて形を見逃さない
+- **`lib/actions/helpers.ts`**（`"use server"` にしない）: `isValidId(id)`（bind の id の形）、`text(formData, name)`（文字列でなければ null）、`toInPageFormState(e, formData)`（同じページに留まる操作の catch。404 は API の message を Alert に、422 は `toFormState`、それ以外は投げ直す）。Action ごとに同じ関数を書かない
+- **表の中の操作の 404**（別のタブで消えた・他社）は not-found 画面に飛ばさず、`toInPageFormState` で行の Alert に出す。画面全体を壊すのはページの `apiGet` の 404 だけ
+- **`Field` の `id`**: 同じ `name` の `Field` が 1 ページに並ぶとき（応募ごとの勤怠フォームなど）は `` id={`field-attendance-${application.id}-clock_in`} `` のように重ならない id を渡す（エラーの id は `${id}-error`）
+- **状態ボタンの `key`**: 再検証で行の状態が変わったら、`key` に状態（と確定数など他の行に効く値）を入れてフォームを作り直し、古い 422 の Alert を消す（例: `` key={`confirm-${application.status.value}-${confirmedCount}`} ``）
+- **まとめて非活性**: セレクトとボタンを一緒に止めるときは `<fieldset disabled={!can.xxx}>` で包む（判定は API の `can`、最終的には 422）
+- **URL の id**: 詳細・編集ページは `if (!/^\d+$/.test(id)) notFound();` で形だけ確かめてから `apiGet`（存在・他社は API の 404）
+- **時刻の表示**: ISO 日時 → `HH:MM` は `lib/format.ts` の `time()`。画面ごとに `Intl.DateTimeFormat` を作らない
+- **エラー画面**: `app/(admin)/error.tsx`（再試行。`retry()` を呼ぶ。エラーの中身は出さない）と `app/(admin)/not-found.tsx`、URL に当たらないときの `app/not-found.tsx`
+
 ## ログイン（`app/(auth)/login/page.tsx` と `lib/browser-api.ts`）
 ここだけブラウザから Laravel を直接叩く。Cookie を受け取る操作だから。
 ```ts
@@ -120,7 +131,7 @@ const res = await fetch(`${API}/login`, {
 | `Pagination` | `meta` を受けて前後のリンク |
 
 ## 表示（`lib/format.ts`）
-- `yen(9600)` → `9,600円` / `minutes(420)` → `7時間00分` / `date("2026-09-20")` → `2026/09/20（日）`
+- `yen(9600)` → `9,600円` / `minutes(420)` → `7時間00分` / `date("2026-09-20")` → `2026/09/20（日）` / `dateTime(iso)` → `2026/10/01（木） 10:00` / `time(iso)` → `09:00`
 - `Intl.NumberFormat("ja-JP")` と `Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo" })` を使う。日付ライブラリは入れない
 
 ## 確認の仕方

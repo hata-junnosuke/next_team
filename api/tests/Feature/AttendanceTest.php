@@ -220,6 +220,19 @@ class AttendanceTest extends TestCase
         $this->assertDatabaseCount('attendances', 0);
     }
 
+    public function test_時刻の形式エラーは書式記号ではなく時と分の日本語で案内する(): void
+    {
+        $application = $this->confirmedApplication();
+
+        // 既定の文言は「出勤の形式が'H:i'と一致しません。」で、PHP の書式記号が画面に出てしまう
+        $this->putAttendance($application, ['clock_in' => '9:00', 'clock_out' => '24:00'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'clock_in' => '出勤は HH:MM の形式で入力してください。',
+                'clock_out' => '退勤は HH:MM の形式で入力してください。',
+            ]);
+    }
+
     public function test_金額は送っても無視されサーバーで計算される(): void
     {
         $application = $this->confirmedApplication();

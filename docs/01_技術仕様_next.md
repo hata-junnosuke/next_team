@@ -644,6 +644,11 @@ export type FormState = { ok?: boolean; message?: string; errors?: Record<string
 - 金額は `9,600円`、労働時間は `7時間00分`、日付は `2026/09/20（日）`
 - 表のセル・バッジ・ボタンは `whitespace-nowrap`（第2弾の教訓: 折り返しで崩れた）
 - 状態の色は `lib/status.ts` の 1 箇所。ラベルは API の `label` をそのまま出す
+- 例外（P3-02 で決定）: 一覧の「状態で絞り込む」選択肢だけは、API に Enum の一覧を返す口がないので、ラベルを `lib/status.ts` の隣（絞り込み部品）に置く。値は docs/01 4.1 と同じ。表のバッジは API の label を出す
+- 例外（P3-02 で決定）: 入力欄のない項目の 422（例: 複製フォームの `errors.hourly_wage`）は、そのフォームの下にまとめて出す（Alert は項目エラーがあると出さないため）
+- 拠点の選択肢は `per_page=100` の 1 ページ分（101 件以上は想定しない）
+- 例外（P3-03 で決定）: キャンセル理由の選択肢（company 企業都合 / worker ワーカー都合）のラベルも、状態の絞り込みと同じ理由で web に置く。表示は API の label を出す
+- 表の中の操作（承認・却下・キャンセル・勤怠・締切・中止）の 404 は not-found 画面にせず、行の Alert に API の message を出す
 
 ---
 
@@ -728,7 +733,7 @@ B と C の境界: C の `AttendanceService::save()` は B の `Application`（�
 |---|---|---|
 | 基盤（直列。P1） | 共通部品・ログイン・拠点 | `proxy.ts` `app/layout.tsx` `app/page.tsx` `app/(auth)/*` `app/(admin)/layout.tsx` `app/(admin)/locations/*` `components/ui/*` `lib/api.ts` `lib/browser-api.ts` `lib/form-state.ts` `lib/status.ts` `lib/format.ts` `lib/schemas/{common,user,location}.ts` `lib/actions/location.ts` |
 | WA | ワーカー | `app/(admin)/workers/*` `components/workers/*` `lib/schemas/worker.ts` `lib/actions/worker.ts` |
-| WB | 募集・応募・勤怠 | `app/(admin)/job-postings/*` `components/job-postings/*` `lib/schemas/{job-posting,application,attendance}.ts` `lib/actions/{job-posting,application,attendance}.ts` |
+| WB | 募集・応募・勤怠 | `app/(admin)/job-postings/*` `components/job-postings/*` `lib/schemas/{job-posting,application,attendance}.ts` `lib/actions/{job-posting,application,attendance}.ts` `lib/actions/helpers.ts`（P3-03 で追加。Action の共通の小関数。"use server" ではない） |
 | WC | 集計・ダッシュボード | `app/(admin)/dashboard/*` `app/(admin)/reports/*` `components/reports/*` `lib/schemas/{report,dashboard}.ts` |
 
 `components/ui/*` と `lib/api.ts` は基盤の所有です。WA〜WC が変えたくなったらリードに報告して止まります。

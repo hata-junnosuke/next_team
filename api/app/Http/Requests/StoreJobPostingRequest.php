@@ -56,11 +56,18 @@ class StoreJobPostingRequest extends FormRequest
     }
 
     /**
+     * date_format の既定の文言（「:attributeの形式が'Y-m-d'と一致しません。」や 'H:i' の同様の文言）は PHP の書式記号が画面に出るので、
+     * 人が読める書式（YYYY-MM-DD / HH:MM）で案内する。:attribute は attributes() の日本語名に置き換わる
+     * https://readouble.com/laravel/13.x/ja/validation.html#customizing-the-error-messages
+     *
      * @return array<string, string>
      */
     public function messages(): array
     {
         return [
+            'work_date.date_format' => ':attributeは YYYY-MM-DD の形式で入力してください。',
+            'start_time.date_format' => ':attributeは HH:MM の形式で入力してください。',
+            'end_time.date_format' => ':attributeは HH:MM の形式で入力してください。',
             'end_time.after' => '終了時刻は開始時刻より後にしてください。',
             'hourly_wage.min' => "時給は最低賃金（{$this->minWage()}円）以上にしてください。",
         ];

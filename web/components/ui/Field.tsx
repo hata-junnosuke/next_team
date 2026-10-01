@@ -6,6 +6,12 @@ type Option = { value: string | number; label: string };
 type FieldProps = {
   label: string;
   name: string;
+  /**
+   * 入力欄の id（エラーの id は `${id}-error`）。既定は `field-${name}`。
+   * 同じ name の Field が 1 ページに複数並ぶとき（例: P3-03 の応募ごとの勤怠フォーム）は
+   * `field-attendance-${application.id}-clock_in` のように重ならない id を渡す
+   */
+  id?: string;
   type?:
     | "text"
     | "email"
@@ -32,6 +38,7 @@ const inputClass =
 export function Field({
   label,
   name,
+  id: idProp,
   type = "text",
   defaultValue,
   errors,
@@ -41,7 +48,7 @@ export function Field({
   options = [],
   emptyOption,
 }: FieldProps) {
-  const id = `field-${name}`;
+  const id = idProp ?? `field-${name}`;
   const hasError = (errors?.length ?? 0) > 0;
   const stateClass = hasError
     ? "border-red-400 focus:ring-red-200"
