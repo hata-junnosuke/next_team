@@ -347,7 +347,8 @@ class WorkerTest extends TestCase
 
     public function test_更新と切り替えの応答はworker_resourceの形そのもの(): void
     {
-        $worker = Worker::factory()->create();
+        // 電話番号は Faker の optional で入ったり入らなかったりするので、期待値の null に固定する（P2-04 で揺れを発見）
+        $worker = Worker::factory()->create(['phone' => null]);
 
         $this->actingAsAdmin()
             ->putJson("/api/workers/{$worker->id}", ['name' => '新氏名', 'email' => 'new@example.com'])
