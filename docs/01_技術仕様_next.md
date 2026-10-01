@@ -447,6 +447,8 @@ sequenceDiagram
 
 `WorkerResource`: `{id, name, email, phone, is_active}`
 
+一覧の絞り込み: `q` は前後の空白を除いて氏名の部分一致（`%` `_` も文字として扱う。空白だけなら絞り込まない）。`is_active` は `1` / `0` / `true` / `false` のいずれか（空・未指定なら絞り込まない。それ以外は 422）。登録・更新（POST / PUT）では `is_active` を受け付けず、切り替えは PATCH だけ（P2-02 で決定）。
+
 ### 6.4 募集（F-05〜F-08）
 
 | メソッド | パス | 入力 | 成功 |
