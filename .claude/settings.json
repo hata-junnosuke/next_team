@@ -1,0 +1,94 @@
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(make help)",
+      "Bash(make ps)",
+      "Bash(make ports)",
+      "Bash(make api-test:*)",
+      "Bash(make api-pint:*)",
+      "Bash(make api-pint-test)",
+      "Bash(make api-routes)",
+      "Bash(make web-typecheck)",
+      "Bash(make web-lint)",
+      "Bash(make web-format:*)",
+      "Bash(make web-format-check)",
+      "Bash(make web-build)",
+      "Bash(make verify:*)",
+      "Bash(make fresh)",
+      "Bash(php artisan test:*)",
+      "Bash(php artisan route:list:*)",
+      "Bash(php artisan migrate:*)",
+      "Bash(php artisan db:seed:*)",
+      "Bash(php artisan make:*)",
+      "Bash(php -l:*)",
+      "Bash(vendor/bin/pint:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npx prettier:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git switch:*)"
+    ],
+    "deny": [
+      "Read(api/.env)",
+      "Edit(api/.env)",
+      "Write(api/.env)",
+      "Read(web/.env.local)",
+      "Edit(web/.env.local)",
+      "Write(web/.env.local)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|compact",
+        "hooks": [
+          { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-context.sh", "timeout": 10 }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-bash.sh", "timeout": 5 }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/protect-files.sh", "timeout": 5 }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/format.sh", "timeout": 30 },
+          { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/detect-debug.sh", "timeout": 5 }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/subagent-check.sh", "timeout": 90 }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/verify-loop.sh", "timeout": 300 }
+        ]
+      }
+    ]
+  }
+}

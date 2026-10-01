@@ -1,0 +1,24 @@
+# 第3弾の周辺サービス。DB は SQLite（api/database/database.sqlite）なのでここには置かない。
+# 起動: docker compose up -d / 停止: docker compose down
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # 開発用メールサーバ。SMTP は 1025、受信箱の画面は http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+volumes:
+  redis-data:
