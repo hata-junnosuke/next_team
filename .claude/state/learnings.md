@@ -33,3 +33,5 @@
 - 2026-10-01 | フェーズ 1 | api | SQLite は外部キーに索引を自動で張らず、`foreignId()->constrained()` も INDEX を作らない（MySQL の InnoDB とは違う）→ `company_id` には `->index()` を明示する。テスト名に英大文字を入れると Pint が `_inde_x` のように崩すので小文字で書く | 信頼度 0.9 | P1-02 code-reviewer
 - 2026-10-01 | フェーズ 1 | api | シーダーに雛形の `WithoutModelEvents` があると `BelongsToCompany` の creating が動かず company_id が埋まらない → 外す | 信頼度 0.9 | P1-02 implementer
 - 2026-10-01 | フェーズ 1 | web | React 19 の `<form action>`（useActionState）は終了時にフォームをリセットするので 422 で入力が消える → FormState に `values` を持たせ `defaultValue={state.values?.x ?? 元の値}`。Laravel のセッション Cookie 名は `Str::slug(APP_NAME)` で `next-team-session`（アンダースコアではない） | 信頼度 0.9 | P1-03 レビュー
+- 2026-10-01 | フェーズ 2 | api | SQLite の `transaction_mode=IMMEDIATE` は PHP 8.4 以上でしか `BEGIN IMMEDIATE` にならない（8.3 では黙って DEFERRED）。また date cast の列はモデル経由だと `Y-m-d 00:00:00` で保存され、文字列比較の半開区間から漏れる → composer.json を `^8.4`、`work_date` は set の Attribute で `Y-m-d` に | 信頼度 0.9 | P2-01 database-reviewer
+- 2026-10-01 | フェーズ 2 | api | `transitionTo()` がルートモデルバインディングで読んだ古いインスタンスで判定すると、中止で却下済みになった応募を承認できてしまう → 先頭で `refresh()`、サービスは DB::transaction の中で呼ぶ | 信頼度 0.8 | P2-01 code-reviewer

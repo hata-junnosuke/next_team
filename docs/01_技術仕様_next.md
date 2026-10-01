@@ -160,7 +160,7 @@ INDEX: `(company_id, work_date)`、`(company_id, status)`、`(location_id)`。
 | cancel_reason | string | NULL（`company` / `worker`） |
 | cancelled_at | datetime | NULL |
 
-**UNIQUE `(job_posting_id, worker_id)`**（F-09: 二重応募の禁止を DB でも守る）。INDEX: `(job_posting_id, status)`、`(company_id, status)`。
+**UNIQUE `(job_posting_id, worker_id)`**（F-09: 二重応募の禁止を DB でも守る）。INDEX: `(job_posting_id, status)`、`(company_id, status)`、`(worker_id)`（SQLite は FK に索引を作らないので、ワーカー側からの参照と restrictOnDelete の検査用。P2-01 の database-reviewer で決定）。
 
 **attendances**（勤怠）
 
@@ -175,7 +175,9 @@ INDEX: `(company_id, work_date)`、`(company_id, status)`、`(location_id)`。
 | wage_pay | unsigned int | NOT NULL（同上。交通費を含まない） |
 | total_pay | unsigned int | NOT NULL（同上。交通費を含む） |
 
-INDEX: `(company_id, clock_in)`（月次集計の絞り込み）。
+INDEX: `(company_id, clock_in)`（勤怠の日時での参照用。月次集計の絞り込みは 4.6 のとおり `job_postings (company_id, work_date)` が効く）。
+
+`work_date` はモデル経由でも `Y-m-d`（時刻なし）で保存する。SQLite は文字列で比べるので、書式が混ざると半開区間や等号の比較から漏れる（P2-01 の database-reviewer の指摘）。
 
 ### 3.2 非同期用のテーブル（P4・P5 で足す。新しいマイグレーションファイルとして追加）
 
@@ -460,7 +462,7 @@ sequenceDiagram
 
 `JobPostingResource`: `{id, location: {id, name}, job_title, work_date, start_time, end_time, capacity, hourly_wage, transport_allowance, status: {value, label}, applications_count, confirmed_count, can: {edit, close, cancel, apply}}`
 
-検証: 終了は開始より後。`capacity >= 1`。`hourly_wage >= config('myteam.min_wage')`。`location_id` は自社の拠点。
+検証: 終了は開始より後。`capacity >= 1`。`hourly_wage >= config('myteam.min_wage')`。`location_id` は自社の拠点（`Rule::exists()` はグローバルスコープを通らないので `->where('company_id', CurrentCompany::id())` を必ず付ける。`worker_id`（6.5）も同じ。ルートに含まれる親の ID はリクエスト本文から取らずルートモデルバインディングの値を使う）。モデルの `saving` でも、親が自社でなければ例外にする（P2-01 の二重の守り）。
 
 ### 6.5 応募・確定（F-09〜F-14）
 

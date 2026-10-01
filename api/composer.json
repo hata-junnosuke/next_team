@@ -6,7 +6,7 @@
     "keywords": ["laravel", "framework"],
     "license": "MIT",
     "require": {
-        "php": "^8.3",
+        "php": "^8.4",
         "laravel-lang/common": "^6.8",
         "laravel/fortify": "^1.40",
         "laravel/framework": "^13.17",

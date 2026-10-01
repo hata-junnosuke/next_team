@@ -7,6 +7,8 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Routing\Middleware\SubstituteBindings;
+use Illuminate\Session\TokenMismatchException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -50,6 +52,20 @@ return Application::configure(basePath: dirname(__DIR__))
         // 存在しない・他社のデータはどちらも同じ 404。モデル名を出さない（docs/01 6.1 のエラー形式）
         $exceptions->render(function (NotFoundHttpException $e) {
             return response()->json(['message' => '見つかりませんでした。', 'errors' => (object) []], 404);
+        });
+
+        // CSRF トークンの不一致（Sanctum の SPA 認証で X-XSRF-TOKEN が古い・ない）。既定の英語 "CSRF token mismatch." を日本語にする。
+        // TokenMismatchException は render のコールバックより前に HttpException(419) へ変換される（Handler::prepareException）ので、
+        // HttpException で受けて「元が TokenMismatchException か」で見分ける。それ以外の HttpException は null を返して既定の処理に任せる
+        $exceptions->render(function (HttpException $e) {
+            if (! $e->getPrevious() instanceof TokenMismatchException) {
+                return null;
+            }
+
+            return response()->json([
+                'message' => 'ページの有効期限が切れました。もう一度お試しください。',
+                'errors' => (object) [],
+            ], 419);
         });
 
         // 試行回数の超過（throttle:login の 6 回目）。既定の英語 "Too Many Attempts." を日本語にする。
