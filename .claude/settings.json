@@ -33,7 +33,9 @@
       "Bash(git log:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git switch:*)"
+      "Bash(git switch:*)",
+      "Bash(git merge:*)",
+      "Bash(git branch:*)"
     ],
     "deny": [
       "Read(api/.env)",
