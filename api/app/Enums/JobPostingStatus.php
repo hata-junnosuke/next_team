@@ -34,4 +34,20 @@ enum JobPostingStatus: string
             self::Cancelled => [],
         }, true);
     }
+
+    /**
+     * 編集できるか（F-05）。中止した募集だけは編集できない。締切は受付を止めただけなので編集できる
+     */
+    public function isEditable(): bool
+    {
+        return $this !== self::Cancelled;
+    }
+
+    /**
+     * 新規の応募を受け付けるか（F-09）。募集中だけ。締切・中止には応募できない
+     */
+    public function acceptsApplications(): bool
+    {
+        return $this === self::Open;
+    }
 }
