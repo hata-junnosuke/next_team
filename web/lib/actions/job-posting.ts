@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { apiSend, toFormState } from "@/lib/api";
+import { isValidId, text, toInPageFormState } from "@/lib/actions/helpers";
 import type { FormState } from "@/lib/form-state";
 import { jobPostingResponse } from "@/lib/schemas/job-posting";
 
@@ -15,17 +16,6 @@ const invalidId: FormState = {
   ok: false,
   message: "募集が見つかりませんでした。",
 };
-
-/** bind で渡された id の形だけを確かめる（正の整数でなければ API を呼ばない） */
-function isValidId(id: unknown): id is number {
-  return typeof id === "number" && Number.isSafeInteger(id) && id > 0;
-}
-
-/** formData の値が文字列でなければ（未送信・ファイル）null にする */
-function text(formData: FormData, name: string): string | null {
-  const value = formData.get(name);
-  return typeof value === "string" ? value : null;
-}
 
 /**
  * 送る項目だけを明示して取り出す（Next が付ける $ACTION_ のキーや status などは送らない）。
@@ -125,4 +115,49 @@ export async function duplicateJobPosting(
   }
   revalidatePath("/job-postings");
   redirect(`/job-postings/${newId}`);
+}
+
+/**
+ * 締切（close）・中止（cancel）（F-07）。詳細ページで closeJobPosting.bind(null, posting.id) にして渡す。
+ * 本文は送らない。遷移できない（中止済みなど）は errors が空の 422 を Alert に出す。
+ * 中止すると確定は企業都合キャンセル、応募中は却下になる（API の処理）ので、応募一覧ごと再検証する。
+ * 詳細ページに留まるので redirect しない
+ */
+async function changePostingStatus(
+  id: number,
+  verb: "close" | "cancel",
+  formData: FormData,
+): Promise<FormState> {
+  if (!isValidId(id)) {
+    return invalidId;
+  }
+  try {
+    await apiSend(
+      "POST",
+      `${jobPostingPath(id)}/${verb}`,
+      undefined,
+      jobPostingResponse,
+    );
+  } catch (e) {
+    return toInPageFormState(e, formData);
+  }
+  revalidatePath("/job-postings");
+  revalidatePath(`/job-postings/${id}`);
+  return { ok: true };
+}
+
+export async function closeJobPosting(
+  id: number,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  return changePostingStatus(id, "close", formData);
+}
+
+export async function cancelJobPosting(
+  id: number,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  return changePostingStatus(id, "cancel", formData);
 }
