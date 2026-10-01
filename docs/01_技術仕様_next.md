@@ -314,7 +314,7 @@ final class CurrentCompany
 | | `confirm(Application $a): Application` | | 定員に達しているため承認できません。／遷移不可。コミット後に `ApplicationConfirmed` を発火 |
 | | `reject(Application $a): Application` | | 遷移不可 |
 | | `cancel(Application $a, CancelReason $reason): Application` | | 遷移不可（確定済みのみ） |
-| `AttendanceService` | `save(Application $a, string $clockIn, string $clockOut, int $breakMinutes): Attendance` | 作成または更新 | 確定済みの応募のみ／出勤と退勤が同時刻／休憩が労働時間を超える |
+| `AttendanceService` | `save(Application $a, string $clockIn, string $clockOut, int $breakMinutes): Attendance` | 作成または更新 | 確定済みの応募にだけ勤怠を入力できます。／出勤と退勤が同じ時刻です。（`field: clock_out`）／休憩が労働時間を超えています。（`field: break_minutes`） |
 | `PayrollCalculator` | `calculate(int $workedMinutes, int $hourlyWage, int $transport): PayrollResult` | `PayrollResult{workedMinutes, wagePay, totalPay}`（readonly） | |
 | `MonthlyReportService` | `build(string $month): MonthlyReport` | `MonthlyReport{month, byWorker[], byLocation[], totalShifts, totalPay}` | |
 | | `csvRows(string $month, ?int $locationId = null): iterable` | CSV の行（ヘッダなし） | |
@@ -464,7 +464,11 @@ sequenceDiagram
 
 `JobPostingResource`: `{id, location: {id, name}, job_title, work_date, start_time, end_time, capacity, hourly_wage, transport_allowance, status: {value, label}, applications_count, confirmed_count, can: {edit, close, cancel, apply}}`
 
-検証: 終了は開始より後。`capacity >= 1`。`hourly_wage >= config('myteam.min_wage')`。`location_id` は自社の拠点（`Rule::exists()` はグローバルスコープを通らないので `->where('company_id', CurrentCompany::id())` を必ず付ける。`worker_id`（6.5）も同じ。ルートに含まれる親の ID はリクエスト本文から取らずルートモデルバインディングの値を使う）。モデルの `saving` でも、親が自社でなければ例外にする（P2-01 の二重の守り）。
+`applications_count` は却下・キャンセルを含む全件の応募数、`confirmed_count` は確定の数（P2-03 で決定）。`can.edit` は中止以外、`can.apply` は募集中のときだけ（`JobPostingStatus::isEditable()` / `acceptsApplications()` の 1 箇所）。
+
+複製（duplicate）: 勤務日は元の募集と別の日（同じ日は 422）。元の時給が今の最低賃金未満なら 422。
+
+検証: 終了は開始より後。`capacity` は 1〜1000、`hourly_wage` と `transport_allowance` は 100000 以下。`hourly_wage >= config('myteam.min_wage')`。`location_id` は自社の拠点（`Rule::exists()` はグローバルスコープを通らないので `->where('company_id', CurrentCompany::id())` を必ず付ける。`worker_id`（6.5）も同じ。ルートに含まれる親の ID はリクエスト本文から取らずルートモデルバインディングの値を使う）。モデルの `saving` でも、親が自社でなければ例外にする（P2-01 の二重の守り）。
 
 ### 6.5 応募・確定（F-09〜F-14）
 
@@ -487,6 +491,10 @@ sequenceDiagram
 | PUT | `/api/applications/{id}/attendance` | `clock_in`（`HH:MM`）`clock_out`（`HH:MM`）`break_minutes` | 200（作成でも更新でも） |
 
 `AttendanceResource`: `{clock_in, clock_out, is_overnight, break_minutes, worked_minutes, wage_pay, transport_allowance, total_pay}`（`clock_in` / `clock_out` は日時）
+
+422 の項目: 形式エラーは `errors.clock_in` / `errors.clock_out` / `errors.break_minutes`（`break_minutes` は必須・0〜1440 の整数）。同時刻は `errors.clock_out`、休憩超過は `errors.break_minutes`、確定済みでない応募は `errors` が空で `message` だけ。`transport_allowance` は保存済みの `total_pay - wage_pay`（保存時に「合計 = 賃金 + 交通費」で決めているので確定時の交通費と同じ値。P2-05 で決定）。
+
+月次集計（6.7）に含めるのは、応募が `confirmed` の勤怠だけ（勤怠の後にキャンセルされた応募の勤怠は行が残るが集計しない。P2-05 のレビューで決定）。
 
 ### 6.7 月次集計（F-17、F-18）
 
