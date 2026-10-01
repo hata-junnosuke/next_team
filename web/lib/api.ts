@@ -9,7 +9,7 @@ import { toErrorDisplay } from "./schemas/common";
 // サーバ側（Server Component / Server Action / Route Handler）から Laravel を叩く唯一の入口（docs/01 7.2）。
 // ブラウザの Cookie は Next サーバの fetch には自動で付かないので、ここで転送する。
 
-/** 401 以外の失敗。422 の項目別エラーは errors に入る */
+/** 401 以外の失敗。422 の項目別エラーは errors に入る。タイムアウトは status 0 */
 export class ApiError extends Error {
   status: number;
   errors: Record<string, string[]>;
@@ -27,6 +27,9 @@ export class ApiError extends Error {
 }
 
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+
+/** Laravel の応答を待つ上限（ミリ秒） */
+const REQUEST_TIMEOUT_MS = 15_000;
 
 function env(name: "API_URL" | "WEB_ORIGIN"): string {
   const value = process.env[name];
@@ -65,13 +68,24 @@ export async function apiFetch(
     headers["Content-Type"] = "application/json";
   }
 
-  const res = await fetch(`${env("API_URL")}${path}`, {
-    method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-    // 管理画面は常に最新を見る
-    cache: "no-store",
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${env("API_URL")}${path}`, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+      // 管理画面は常に最新を見る
+      cache: "no-store",
+      // API が応答しないときに画面やフォームが待ち続けないよう打ち切る
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (e) {
+    // AbortSignal.timeout は TimeoutError（DOMException）で打ち切る。中身は出さず固定文言にする
+    if (e instanceof DOMException && e.name === "TimeoutError") {
+      throw new ApiError(0, "通信に失敗しました（タイムアウト）。");
+    }
+    throw e;
+  }
 
   if (res.status === 401) {
     // redirect は例外を投げる。Server Action の catch で受けても toFormState が投げ直す

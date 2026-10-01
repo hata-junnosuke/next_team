@@ -29,6 +29,7 @@ function readCookie(name: string): string {
 async function postWithCsrf(
   path: string,
   body?: unknown,
+  redirect: RequestRedirect = "follow",
 ): Promise<Response | null> {
   const api = apiUrl();
   try {
@@ -43,6 +44,7 @@ async function postWithCsrf(
         "X-XSRF-TOKEN": readCookie("XSRF-TOKEN"),
       },
       body: body === undefined ? undefined : JSON.stringify(body),
+      redirect,
     });
   } catch (e) {
     if (e instanceof TypeError) {
@@ -61,14 +63,21 @@ async function toFailure(res: Response): Promise<FormState> {
   return { ok: false, message, errors };
 }
 
-/** 200 → ok。422 → errors.email、429 → 日本語の message（どちらも API の文言をそのまま返す） */
+/** 200 → ok。302（既にログイン済み）→ ok。422 → errors.email、429 → 日本語の message（どちらも API の文言をそのまま返す） */
 export async function login(
   email: string,
   password: string,
 ): Promise<FormState> {
-  const res = await postWithCsrf("/login", { email, password });
+  // ログイン済みのセッションで POST /login すると、Fortify の guest 判定が 302（API のトップへ）を返す。
+  // 既定の redirect: "follow" だと fetch がその先を追って CORS で失敗し「通信に失敗しました。」になるので、
+  // "manual" で止めて opaqueredirect（= 既にログイン済み）を成功として扱い /dashboard へ進ませる。
+  // このとき入力した資格情報は確かめられず、今のセッションのまま進む（別アカウントへの切り替えはログアウトが先）
+  const res = await postWithCsrf("/login", { email, password }, "manual");
   if (!res) {
     return NETWORK_ERROR;
+  }
+  if (res.type === "opaqueredirect") {
+    return { ok: true };
   }
   if (!res.ok) {
     return toFailure(res);

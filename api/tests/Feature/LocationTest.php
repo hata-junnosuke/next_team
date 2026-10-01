@@ -380,4 +380,21 @@ class LocationTest extends TestCase
         $this->assertDatabaseCount('locations', 1);
         $this->assertDatabaseHas('locations', ['id' => $location->id, 'name' => '旧名称']);
     }
+
+    public function test_住所に空文字を送るとnullで保存され更新で住所を消せる(): void
+    {
+        // web のフォームは住所が空でも address: "" を送る（FormData の空欄は空文字）。null として扱われることを確かめる
+        $this->actingAsAdmin()
+            ->postJson('/api/locations', ['name' => '渋谷店', 'address' => ''])
+            ->assertCreated()
+            ->assertJsonPath('data.address', null);
+
+        $location = Location::factory()->create(['name' => '新宿店', 'address' => '東京都新宿区']);
+
+        $this->putJson("/api/locations/{$location->id}", ['name' => '新宿店', 'address' => ''])
+            ->assertOk()
+            ->assertJsonPath('data.address', null);
+
+        $this->assertDatabaseHas('locations', ['id' => $location->id, 'address' => null]);
+    }
 }
