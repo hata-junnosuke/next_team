@@ -14,10 +14,27 @@ format_pint() {
   fi
 }
 ROOT="${CLAUDE_PROJECT_DIR:-$PWD}"
-COUNTER="$ROOT/.claude/.subagent-loop-count"
 MAX=2
 INPUT="$(cat)"
 ACTIVE="$(printf '%s' "$INPUT" | jq -r '.stop_hook_active // false')"
+AGENT_ID="$(printf '%s' "$INPUT" | jq -r '.agent_id // empty' 2>/dev/null | tr -cd 'A-Za-z0-9_-')"
+# 差し戻し回数は担当ごとに数える（並列の担当が互いの回数を 0 に戻さないように）
+COUNTER="$ROOT/.claude/.subagent-loop-count${AGENT_ID:+.$AGENT_ID}"
+
+# 稼働中の印（subagent-start.sh が置く）は、まず消す。差し戻す（block）ときだけ置き直す。
+#   「消すのが既定、残すのが例外」にしておくと、このフックが timeout で殺されても印が残らない
+#   （印が残ると、リードの Stop フックが検査を飛ばし続ける）
+RUNNING_DIR="$ROOT/.claude/.running"
+MARK=""
+if [ -n "$AGENT_ID" ]; then
+  MARK="$RUNNING_DIR/$AGENT_ID"
+else
+  # agent_id が取れないときに限り、id なしで置かれた印（unknown-*）のいちばん古いものを対応させる
+  OLDEST="$(ls -tr "$RUNNING_DIR" 2>/dev/null | grep '^unknown-' | head -1)"
+  [ -n "$OLDEST" ] && MARK="$RUNNING_DIR/$OLDEST"
+fi
+[ -n "$MARK" ] && rm -f "$MARK"
+
 cd "$ROOT" || exit 0
 git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
@@ -62,6 +79,8 @@ fi
 
 if [ -n "$FAIL" ]; then
   COUNT=$((COUNT + 1)); echo "$COUNT" > "$COUNTER"
+  # 担当は直すために動き続けるので、印を置き直す
+  [ -n "$MARK" ] && mkdir -p "$RUNNING_DIR" && : > "$MARK"
   jq -n --arg r "担当の終了前チェック ${COUNT}/${MAX}: 以下を直してから終了してください。
 ${FAIL}" '{decision:"block", reason:$r}'
   exit 0

@@ -1,3 +1,5 @@
 .loop-count
 .subagent-loop-count
 .dirty-web
+.running/
+.subagent-loop-count.*

@@ -49,6 +49,23 @@ if [ "$HAS_API" = 0 ] && [ "$HAS_WEB" = 0 ]; then
   rm -f "$COUNTER"; exit 0
 fi
 
+# (0.5) 担当（サブエージェント）が動いている間は検査しない。
+#   リードは担当の完了通知を待つために応答を終えるので、ここで全テストを回すと TDD の途中の赤で差し戻してしまう。
+#   最後の担当が終わるとリードが通知で再開し、その応答の終わりには印がないので必ず検査される。
+#   印は subagent-start.sh が置き、subagent-check.sh が消す。
+#   数えるのは「60 分以内に置かれた通常ファイル」だけ（ディレクトリやリンク、異常終了で残った古い印では飛ばさない）。
+#   飛ばしたことは systemMessage で必ず見えるようにする（黙って通さない）
+RUNNING_DIR="$ROOT/.claude/.running"
+if [ -d "$RUNNING_DIR" ]; then
+  find "$RUNNING_DIR" -maxdepth 1 -type f -mmin +60 -delete 2>/dev/null
+  RUNNING="$(find "$RUNNING_DIR" -maxdepth 1 -type f -mmin -60 2>/dev/null | sed 's|.*/||' | tr '\n' ' ')"
+  if [ -n "$RUNNING" ]; then
+    N="$(printf '%s' "$RUNNING" | wc -w | tr -d ' ')"
+    jq -n --arg m "検証ループ: 担当 ${N} 体が稼働中のため検査を保留しました（${RUNNING% }）。最後の担当が終わった後の終了で検査します。担当が中断されて印が残った場合は .claude/.running/ を消してください。" '{systemMessage:$m}'
+    exit 0
+  fi
+fi
+
 # web を検査するか: 編集の印がある / git が web/ の変更を報告している
 CHECK_WEB=0
 if [ "$HAS_WEB" = 1 ]; then

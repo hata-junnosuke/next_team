@@ -22,3 +22,9 @@
 
 - 2026-10-01 | フェーズ 0 | loop | bash で `"$VAR（"` のように変数名の直後に日本語が続くと、変数名の一部と解釈されて unbound variable になった → フックでは日本語の直前の変数を必ず `${VAR}` と書く | 信頼度 0.7 | session-context.sh の初回実行
 - 2026-10-01 | フェーズ 0 | loop | ポート 3000 は別プロジェクトの Docker コンテナが使っていた → web は 3002、api は 8002。Sanctum の stateful ドメインもこれに合わせる | 信頼度 0.7 | `make ports`、docs/01 1 章
+- 2026-10-01 | フェーズ 0 | api | テスト名に英大文字と日本語を混ぜる（`test_Acceptヘッダなしでも_JSONで返る`）と、Pint の snake_case 変換が `jso_nで返る` のように崩した → テスト名の英字は小文字にして `_` で区切る | 信頼度 0.7 | G-6 の tester
+- 2026-10-01 | フェーズ 0 | loop | SubagentStop と Stop は緑のとき痕跡を残さないので「発火したか」が画面では分からない → `~/.claude/projects/<プロジェクト>/<セッションID>/subagents/*.jsonl` の `"hookEvent":"SubagentStop"` を数えて確かめる（G-6 では 5 体すべて 1 回ずつ） | 信頼度 0.9 | ゲート G-6
+- 2026-10-01 | フェーズ 0 | api | `config/cors.php` がない間はフレームワーク既定の CORS（`api/*` に `*`）が効く。`api:` ルーティングを足した時点で有効になる → P1 で Sanctum を入れる前に `config/cors.php` を公開して `FRONTEND_URL` だけに絞る | 信頼度 0.7 | G-6 の security-reviewer
+- 2026-10-01 | フェーズ 0 | loop | `guard-bash.sh` はコマンド文字列全体を grep するので、記録文やコミットメッセージに禁止コマンドの名前を書いただけでも拒否される → 文中では「git の強制リセット」のように言い換える | 信頼度 0.9 | ゲートの記録を書く Bash が拒否された
+- 2026-10-01 | フェーズ 0 | loop | 担当はバックグラウンドで動くので、リードは待つたびに応答を終え、そのたびに Stop フックが全テストを回していた（G-6 では偶然ずっと緑だった） → SubagentStart で `.claude/.running/<agent_id>` に印を置き、印がある間は検査を飛ばす。最後の担当の終了後に必ず検査される | 信頼度 0.9 | subagent-start.sh、verify-loop.sh (0.5)
+- 2026-10-01 | フェーズ 0 | loop | 「検査を飛ばす印」は抜け道になりやすい（印を置くだけで逃れられる、timeout で印が残る、圧縮で印が消える、黙って飛ばすと気づけない） → 数えるのは 60 分以内の通常ファイルだけ、消すのが既定で差し戻すときだけ置き直す、compact では消さない、飛ばしたら systemMessage を出す | 信頼度 0.9 | security-reviewer の指摘（推奨 4 件）

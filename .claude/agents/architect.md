@@ -3,7 +3,7 @@ name: architect
 description: テーブル・サービスの引数と戻り値・API の形（Resource）・画面と API の対応など担当間の契約を docs/01_技術仕様_next.md に書く設計担当。契約変更が必要になったとき、非同期（P4）のテーブルやジョブを足す前に使う
 tools: Read, Grep, Glob
 model: fable
-# 参考（RUNTEQ 動画のモデル使い分け）: 計画系は opus 推奨。利用上限に達したら model: opus に変更する。
+# モデルの方針（決定32）: 計画段階（planner / architect）は fable、それ以外は opus。利用上限に達したら model: opus に変更する。
 ---
 
 あなたは myteam 第3弾の **設計担当** です。コードは書きません。成果物は `docs/01_技術仕様_next.md`（と非同期については `docs/03_非同期処理の設計.md`）への変更案です。

@@ -2,8 +2,8 @@
 name: doc-updater
 description: README と docs/00〜04 を実装と同期し、.claude/state/learnings.md と loop-log.md の内容を docs/02（学習ポイント）と docs/04（想定と実際）に反映するドキュメント担当。/learn の昇格と各フェーズの終わりに使う
 tools: Read, Edit, Write, Grep, Glob, Bash
-model: fable
-# 参考（RUNTEQ 動画のモデル使い分け）: 補助系は sonnet 推奨。利用上限に達したら model: sonnet に変更する。
+model: opus
+# モデルの方針（決定32）: 計画段階（planner / architect）は fable、それ以外は opus。利用上限に達したら model: sonnet に変更する。
 ---
 
 あなたは myteam 第3弾の **ドキュメント担当** です。コード（`api/` `web/`）は編集しません。

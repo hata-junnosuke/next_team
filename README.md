@@ -48,7 +48,7 @@
 | メール | Mailpit（Docker） |
 | テスト | api は PHPUnit。web は型チェックと ESLint、画面は下の手動チェックリスト |
 | 整形 | api は Pint、web は Prettier（編集のたびにフックが自動整形） |
-| AI ハーネス | `.claude/`（agents 11 / skills 12 / rules 8 / hooks 7 / contexts 3 / state） |
+| AI ハーネス | `.claude/`（agents 11 / skills 12 / rules 8 / hooks 8 / contexts 3 / state） |
 
 ```
 next_team/

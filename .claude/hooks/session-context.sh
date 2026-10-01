@@ -19,7 +19,11 @@ case "$PHASE" in
 esac
 
 # 新しいセッションでは検証ループの回数を 0 に戻す（前セッションの途中状態を引きずらない）
-rm -f .claude/.loop-count .claude/.subagent-loop-count
+rm -f .claude/.loop-count .claude/.subagent-loop-count .claude/.subagent-loop-count.*
+# 担当が動いている印も消す（前セッションの異常終了で残ると、Stop フックの検査が飛ばされ続ける）。
+# ただし圧縮（compact）のときは消さない。担当がまだ動いている最中に圧縮されることがあるため
+SOURCE="$(jq -r '.source // "startup"' 2>/dev/null || echo startup)"
+[ "$SOURCE" = "compact" ] || rm -rf .claude/.running
 
 TEST_COUNT="$(grep -rhoE 'function test_[^ (]+' api/tests 2>/dev/null | wc -l | tr -d ' ')"
 DIRTY="$(git status --short 2>/dev/null | wc -l | tr -d ' ')"

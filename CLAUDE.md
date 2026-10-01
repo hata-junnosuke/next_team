@@ -32,7 +32,7 @@
 知識スキル: `tdd-workflow` `myteam-domain-rules` `laravel-api-standards` `next-coding-standards` `async-rules` `myteam-acceptance`
 
 ## エージェント（`.claude/agents/`）
-planner, architect, implementer-api, implementer-web, tester, spec-reviewer, code-reviewer, security-reviewer, database-reviewer, build-error-resolver, doc-updater。使い分けは `.claude/rules/common/agents.md`。全員 `model: fable`。**同時に実装 3 体・レビュー 4 体まで。issue-flow の工程は直列**
+planner, architect, implementer-api, implementer-web, tester, spec-reviewer, code-reviewer, security-reviewer, database-reviewer, build-error-resolver, doc-updater。使い分けは `.claude/rules/common/agents.md`。モデルは **計画段階（planner・architect）が `fable`、それ以外は `opus`**。リード（このセッション）は `fable` で進め、利用上限に達したら `/model` で `opus` に切り替える。**同時に実装 3 体・レビュー 4 体まで。issue-flow の工程は直列**
 
 ## よく使うコマンド（`make help` で一覧）
 ```bash
