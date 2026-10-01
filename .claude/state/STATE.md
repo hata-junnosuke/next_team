@@ -10,7 +10,7 @@
 | p1-skeleton | 1 | `epic/p1-skeleton` | 完了（main にマージ。手動確認は最後にまとめて） | Sanctum + Fortify、エラー形式、拠点（F-01）を API → 画面まで縦に 1 本 |
 | p2-domain | 2 | `epic/p2-domain` | 完了（main にマージ） | api の基盤 → A / B / C。F-01〜F-19 |
 | p3-front | 3 | `epic/p3-front` | 完了（main にマージ。手動確認 M-1〜M-13 は最後にまとめて） | web の WA / WB / WC。動線 10 ステップが画面で通る（前半完了） |
-| p4-async | 4 | `epic/p4-async`（未作成） | 未着手 | F-20 → F-21 → F-22 → F-23 → F-19 キャッシュ。直列。着手前に人が `.env` を P4 の値に切り替える |
+| p4-async | 4 | `epic/p4-async` | 進行中 | F-20 → F-21 → F-22 → F-23 → F-19 キャッシュ。直列。着手前に人が `.env` を P4 の値に切り替える |
 | p5-finish | 5 | `epic/p5-finish`（未作成） | 未着手 | F-24、README、docs の「想定と実際」 |
 | p6-reverb | 6 | `epic/p6-reverb`（未作成） | 未着手（Could） | F-25 Broadcasting |
 
