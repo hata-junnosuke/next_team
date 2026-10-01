@@ -3,16 +3,17 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\DashboardService;
 use Illuminate\Http\JsonResponse;
 
 /**
- * ダッシュボード（F-19、docs/01 6.8）。担当 C（P2-06）が実装する。今は 501。
+ * ダッシュボード（F-19、docs/01 6.8）。形は DashboardService::summary() が 6.8 のとおりに作る。
  */
 class DashboardController extends Controller
 {
     // GET /api/dashboard
-    public function show(): JsonResponse
+    public function show(DashboardService $service): JsonResponse
     {
-        return $this->notImplemented();
+        return response()->json(['data' => $service->summary()]);
     }
 }
