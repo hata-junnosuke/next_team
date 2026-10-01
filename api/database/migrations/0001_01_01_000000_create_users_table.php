@@ -14,7 +14,8 @@ return new class extends Migration
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('company_id')->constrained()->restrictOnDelete();
+            // SQLite は外部キーに索引を自動で作らないので index() を明示する（ログイン後の企業の絞り込みで使う）
+            $table->foreignId('company_id')->index()->constrained()->restrictOnDelete();
             $table->string('name');
             $table->string('email')->unique();
             $table->string('password');

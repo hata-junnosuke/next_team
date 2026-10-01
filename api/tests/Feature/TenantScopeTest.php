@@ -81,6 +81,29 @@ class TenantScopeTest extends TestCase
         $this->assertDatabaseHas('tenant_records', ['id' => $record->id, 'company_id' => $this->company->id]);
     }
 
+    public function test_更新でcompany_idを他社に付け替えるとlogic_exceptionで保存されない(): void
+    {
+        $record = TenantRecord::create(['name' => '自社']);
+
+        try {
+            $record->update(['company_id' => $this->other->id]);
+            $this->fail('company_id の付け替えが通ってしまった');
+        } catch (LogicException) {
+            // 期待どおり
+        }
+
+        $this->assertDatabaseHas('tenant_records', ['id' => $record->id, 'company_id' => $this->company->id]);
+    }
+
+    public function test_company_id以外の更新はできる(): void
+    {
+        $record = TenantRecord::create(['name' => '旧']);
+
+        $record->update(['name' => '新']);
+
+        $this->assertDatabaseHas('tenant_records', ['id' => $record->id, 'name' => '新']);
+    }
+
     public function test_企業が未設定のまま検索すると全件を返さずlogic_exception(): void
     {
         $this->insertFor($this->company, '自社');

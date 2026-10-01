@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\LocationController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -9,4 +10,7 @@ use Illuminate\Support\Facades\Route;
  */
 Route::middleware(['auth:sanctum', 'company'])->group(function () {
     Route::get('/user', [UserController::class, 'show'])->name('user.show');
+
+    // F-01 拠点: locations.index / store / show / update / destroy
+    Route::apiResource('locations', LocationController::class);
 });
