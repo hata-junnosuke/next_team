@@ -100,6 +100,7 @@ class SendApplicationConfirmedMail implements ShouldQueue
 | 業務ルールをジョブに書かない | 定員・状態遷移はサービスにある。ジョブは読んで送るだけ |
 | メールのジョブは `$tries = 0` + `$maxExceptions = 3` + `retryUntil()`（`$tries = 3` にしない） | `RateLimited` などでキューへ戻された回も tries に数えるので、戻されるだけで failed になり、claim の前なので `notification_logs` に何も残らず「届いていない」が見えない（P4-03 で再現）。打ち切りは例外の回数と期限で行う |
 | `failed()` は `markFailedByKey` → 行がなく `target()` が非 null なら `recordFailure`、全体を try / `report()` で包む | claim の前に打ち切られた通知も「届いていない」と記録に残す（P4-03 のレビュー）。failed() から例外を漏らさない |
+| F-23 の仕上げのジョブ（`FinalizeReportExport`）は例外: 流量制限なし・`$tries = 3`、ロック（`WithoutOverlapping` + `dontRelease()`）は仕上げ全体（連結 + 通知）にかけ、期限は `retry_after` より短く（60 秒、`$timeout` 50） | 管理者が自分で依頼した 1 件ごとの 1 通で、流量で戻すと連結の再試行の回数を食う。期限が retry_after より長いと、落ちた実行の再実行がロックで捨てられる（P4-05） |
 | Markdown に差し込む利用者の入力は `App\Mail\Concerns\FormatsMarkdownText` の `singleLine()`（本文）/ `tableCell()`（表） | `withSecuredEncoding()` は改行と `\|` を残す。見出しや表の列を作らせない |
 | `claim → 送信 → markSent` の順 | 再実行しても 2 通目を送らない（冪等性） |
 | `claim()` は 3 引数（種類・宛先・対象）。宛先のアドレスは渡さない | アドレスは宛先のモデルの `email` から決まる。呼び出し側が別のアドレスを渡せないようにする（P4-01） |

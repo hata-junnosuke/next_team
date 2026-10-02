@@ -18,4 +18,9 @@ return [
     // F-22: 前日リマインドを積む時刻（"HH:MM"、Asia/Tokyo）。routes/console.php のスケジュールが読む。.env の MYTEAM_REMINDER_TIME で変える
     'reminder_time' => env('MYTEAM_REMINDER_TIME', '18:00'),
 
+    // F-23: 集計出力が queued / processing のまま止まったとみなす分数。これより古い生成中は、同じ月の新しい依頼を受けたときに failed にする
+    // （ワーカーが落ちた・ジョブが消えた出力で、その月が 422 のまま塞がらないように）。.env の MYTEAM_REPORT_EXPORT_STALE_MINUTES で変える
+    // 下限 5 分: 0 や小さすぎる値だと、動いている出力まで同じ月の依頼で failed にしてしまう
+    'report_export_stale_minutes' => max(5, (int) env('MYTEAM_REPORT_EXPORT_STALE_MINUTES', 30)),
+
 ];

@@ -6,6 +6,8 @@ use App\Enums\CancelReason;
 use App\Enums\JobPostingStatus;
 use App\Enums\NotificationKind;
 use App\Enums\NotificationStatus;
+use App\Enums\ReportExportStatus;
+use App\Jobs\FinalizeReportExport;
 use App\Jobs\SendApplicationConfirmedMail;
 use App\Jobs\SendPostingCancelledMail;
 use App\Jobs\SendShiftReminderMail;
@@ -15,15 +17,24 @@ use App\Mail\ShiftReminderMail;
 use App\Models\Application;
 use App\Models\JobPosting;
 use App\Models\NotificationLog;
+use App\Models\ReportExport;
 use App\Models\Worker;
+use App\Notifications\ReportExportReady;
 use App\Services\NotificationLogService;
+use App\Services\ReportExportService;
+use Illuminate\Notifications\ChannelManager;
+use Illuminate\Notifications\Channels\MailChannel;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
+use RuntimeException;
 use Tests\TestCase;
 
 /**
  * 同じ通知を二重に送らない（要件 7 章「4.7 を実装する弾のみ」、docs/03 4 章。docs/01 9.1 の必須テスト）。
  * ジョブの handle() を直接呼び、「実行したら何通送られたか」を Mail::fake() で数える。
- * 出力完了（P4-05）はそのタスクで追記する。
+ * 出力完了（P4-05）は FinalizeReportExport の handle() を直接呼び、Notification::fake() で数える。
  */
 class NotificationIdempotencyTest extends TestCase
 {
@@ -119,10 +130,10 @@ class NotificationIdempotencyTest extends TestCase
     public function test_送信中に失敗してから再実行すると合わせて1通でsentになる(): void
     {
         $application = Application::factory()->confirmed()->create();
-        Mail::shouldReceive('to')->once()->andThrow(new \RuntimeException('timeout'));
+        Mail::shouldReceive('to')->once()->andThrow(new RuntimeException('timeout'));
         try {
             $this->runConfirmedJob($application->id);
-        } catch (\RuntimeException) {
+        } catch (RuntimeException) {
             // 1 回目の試行は失敗（記録は pending のまま）
         }
 
@@ -215,6 +226,62 @@ class NotificationIdempotencyTest extends TestCase
 
         Mail::assertSent(ShiftReminderMail::class, 1);
         $this->assertSame(NotificationStatus::Sent, NotificationLog::query()->sole()->status);
+    }
+
+    // ---- F-23 出力完了（P4-05） ----
+
+    public function test_出力完了通知は2回実行しても1通(): void
+    {
+        // then の二重実行・手動の再実行。2 回目は出力がもう completed なので連結をやり直さず、claim が送信済みで止める
+        Notification::fake();
+        Storage::fake('local');
+        $export = ReportExport::factory()->processing()->create(['month' => '2026-09', 'user_id' => $this->admin->id]);
+        $run = fn () => (new FinalizeReportExport($export->id))->handle(app(ReportExportService::class), app(NotificationLogService::class));
+
+        $run();
+        $run();
+
+        Notification::assertSentToTimes($this->admin, ReportExportReady::class, 1);
+        $log = NotificationLog::query()->sole();
+        $this->assertSame(NotificationStatus::Sent, $log->status);
+        $this->assertSame("export_ready:report_export:{$export->id}", $log->dedupe_key);
+        $this->assertSame(['user', $this->admin->id], [$log->recipient_type, $log->recipient_id]);
+    }
+
+    public function test_出力完了通知の送信に失敗してから再実行するとアプリ内通知も含めて1件ずつ(): void
+    {
+        Storage::fake('local');
+        $export = ReportExport::factory()->processing()->create(['month' => '2026-09', 'user_id' => $this->admin->id]);
+        $job = new FinalizeReportExport($export->id);
+        $handle = fn () => $job->handle(app(ReportExportService::class), app(NotificationLogService::class));
+
+        // メールのチャネルだけを落とす（database より先に送るので、アプリ内通知も作られない）
+        $channels = app(ChannelManager::class);
+        $channels->extend('mail', fn () => new class
+        {
+            public function send(): void
+            {
+                throw new RuntimeException('SMTP に繋がらない');
+            }
+        });
+        try {
+            $handle();
+            $this->fail('メールの送信で例外になるはず');
+        } catch (RuntimeException $e) {
+            $this->assertSame('SMTP に繋がらない', $e->getMessage()); // 再試行に任せる
+        }
+        $this->assertSame(0, DB::table('notifications')->count());
+        $this->assertSame(NotificationStatus::Pending, NotificationLog::query()->sole()->status);
+
+        // 復旧した（本物のメールチャネルに戻す。MAIL_MAILER=array）
+        $channels->extend('mail', fn ($app) => $app->make(MailChannel::class));
+        $channels->forgetDrivers();
+        $handle();
+        $handle();
+
+        $this->assertSame(1, DB::table('notifications')->count());
+        $this->assertSame(NotificationStatus::Sent, NotificationLog::query()->sole()->status);
+        $this->assertSame(ReportExportStatus::Completed, $export->fresh()->status);
     }
 
     private function runCancelledJob(int $applicationId): void

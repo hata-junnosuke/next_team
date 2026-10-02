@@ -14,7 +14,7 @@
 - `/horizon` と `/telescope` は Gate でログイン済み管理者・ローカル環境に限定する
 
 ## web
-- ブラウザから Laravel を直接叩くのはログインとログアウトだけ。それ以外は `lib/api.ts` 経由（`server-only`）
+- ブラウザから Laravel を直接叩くのはログインとログアウトと、F-23 の署名付きダウンロード URL を開くことだけ。それ以外は `lib/api.ts` 経由（`server-only`）
 - Server Action は公開エンドポイントと同じ。引数を信用しない。認可は Laravel の応答（401 / 404 / 422）に任せる
 - `dangerouslySetInnerHTML` を使わない
 - `NEXT_PUBLIC_` を付けてよい環境変数は `NEXT_PUBLIC_API_URL` だけ
