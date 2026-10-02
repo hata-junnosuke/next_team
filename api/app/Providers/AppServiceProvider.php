@@ -22,7 +22,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Telescope は開発用（composer の require-dev）なので、ローカル環境で、かつパッケージが入っているときだけ登録する。
+        // 本番は composer install --no-dev でクラスが無いので class_exists で守る。自動登録は composer.json の
+        // extra.laravel.dont-discover で止めてある（Rails で言えば Gemfile の group :development の gem を development だけで読む形）。
+        // https://readouble.com/laravel/13.x/ja/telescope.html#local-only-installation
+        if ($this->app->environment('local') && class_exists(\Laravel\Telescope\TelescopeServiceProvider::class)) {
+            $this->app->register(\Laravel\Telescope\TelescopeServiceProvider::class);
+            $this->app->register(TelescopeServiceProvider::class);
+        }
     }
 
     /**
