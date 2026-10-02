@@ -594,6 +594,7 @@ web/
 │       ├── reports/exports/      page.tsx（P4）
 │       └── notifications/        page.tsx（P5・Could）
 ├── components/ui/                Table / Field / Button / Alert / Badge / Pagination / LogoutButton（ログアウトだけは Client Component が要るため）
+│                                 Pagination: 範囲外の page では 1 ページ目へのリンクだけを出す。itemCount（data.length）は必須。空の文言は emptyText() で差し替える
 ├── components/<機能>/            フォームなど機能ごとの Client Component
 └── lib/
     ├── api.ts                    サーバ側の唯一の fetch 入口（server-only）。422 → FormState の変換 toFormState もここ
@@ -811,7 +812,7 @@ B と C の境界: C の `AttendanceService::save()` は B の `Application`（�
 |---|---|---|
 | 1 | **確認済み（P1-01）: 前提どおり。** Fortify の `/login` は `Accept: application/json` なら 200 の JSON、`/logout` は 204 を返す | P1 で `LoginTest` を書いて確認 |
 | 2 | **確認済み（P1-01）: 前提どおり。** `actingAs($user)` で `auth:sanctum` を通る | 同上 |
-| 3 | **確認済み（P2-01）: 効く（PHP 8.4 以上）。** `transaction_mode=IMMEDIATE` が `DB::transaction()` に効く | `php artisan tinker` で `DB::enableQueryLog()` か、2 つのターミナルで待たされるのを見る |
+| 3 | **確認済み（P2-01）: 効く（PHP 8.4 以上）。2026-10-02 に Horizon 2 + 2 プロセスと 4 ワーカーの組み込みサーバーで同時に承認しても、確定は定員ちょうどで `database is locked` は 0 件（docs/03 10 章）。** `transaction_mode=IMMEDIATE` が `DB::transaction()` に効く | `php artisan tinker` で `DB::enableQueryLog()` か、2 つのターミナルで待たされるのを見る |
 | 4 | **確認済み（P4-02）: `queue:work` で引き継がれ、`failed()` の中でも戻る。** `Context` に入れた値がキューのジョブに引き継がれる | P4 の最初のジョブのテストで確認 |
 | 5 | **確認済み（P1-03）: 届く。** `Cookie` だけだと 401、`Origin` か `Referer` のどちらかがあれば 200。更新系は `X-XSRF-TOKEN` がないと 419。前提: Next 16 のサーバ側 fetch に付けた `Origin` ヘッダがそのまま Laravel に届く | P1 で Telescope なしなら `Log::info(request()->headers->all())` を一時的に入れて確認（終わったら消す） |
 | 6 | 同じブラウザで第2弾（`localhost:8001`）を開いていると `XSRF-TOKEN` Cookie が上書きし合う | 手動確認のときは第2弾のタブを閉じるか、別のブラウザプロファイルを使う |

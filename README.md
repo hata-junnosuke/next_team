@@ -20,16 +20,16 @@
 | 範囲 | 状態 |
 |---|---|
 | P1 API 骨格・P2 ドメイン・P3 フロント | 完了。`main` にマージ済み |
-| P4 非同期（F-20〜F-23、F-19 のキャッシュ） | 完了。`main` にマージ済み。Horizon / Telescope（P4-01b）は 2026-10-02 に人が承認して導入済み。ただし画面での実物の確認はまだ |
+| P4 非同期（F-20〜F-23、F-19 のキャッシュ） | 完了。`main` にマージ済み。Horizon / Telescope（P4-01b）は 2026-10-02 に人が承認して導入済み。2026-10-02 の夕方にリードが Redis・Horizon・Telescope・Mailpit の実物で、確定通知・失敗と再実行・非同期 CSV・同時実行・キャッシュ・リマインドを API 経由で確かめた（[`docs/03`](docs/03_非同期処理の設計.md) 10 章）。画面での手動確認は人が行う |
 | P5 仕上げ（F-24 通知履歴、この README と docs） | 完了。`main` にマージ済み（人の指示でリードがマージ） |
 | P6 F-25 Broadcasting（Could） | 未着手 |
-| 自動テスト | api の PHPUnit 834 件・4122 アサーションが緑（2026-10-02、`make api-test`） |
+| 自動テスト | api の PHPUnit 836 件・4140 アサーションが緑（2026-10-02、`make api-test`） |
 
 ### 人の作業（残っているもの）
 
 `.claude/state/STATE.md` の末尾「人への引き継ぎ」と同じ内容です。
 
-1. **Horizon と Telescope を実物で確かめる（P4-01b は導入済み）**: 2026-10-02 に人が承認し、`laravel/horizon` v5.50.0 と `laravel/telescope` v5.25.0（dev）を入れた。`make horizon` は動く。まだ確かめていないのは、Horizon の画面で P4-02〜P4-05 のジョブが見えること、Redis での同時書き込み、`failed_jobs` の再実行（A-4）、Telescope と SQLite の相性（docs/03 10 章）。ローカルの DB に `telescope_entries` を作るため、先に `make fresh` を 1 回流す
+1. **Horizon と Telescope の実物の確認は、リードが API 経由で済ませた**（2026-10-02 の夕方）。`api/.env` は変えず、起動時の環境変数で P4 の値を渡して、Horizon でのジョブの処理、Redis での同時書き込み（`database is locked` は 0 件）、`failed_jobs` の再実行、Telescope と SQLite の相性を確かめた。結果は [`docs/03`](docs/03_非同期処理の設計.md) 10 章。人がやるのは、下の 2 番の `.env` の切り替えと、5 番の画面での手動確認（Horizon と Telescope の画面もそこで見る）。ローカルの DB に `telescope_entries` を作るため、先に `make fresh` を 1 回流す
 2. **`api/.env` を P4 の値に切り替える**（`api/.env.example` の P4 の行。docs/01 2 章）。2026-10-02 時点の `php artisan about --only=drivers` は Queue = database、Cache = database、Mail = log で、まだ P1〜P3 の値です。この状態ではジョブは DB のキューに積まれ、メールは Mailpit ではなくログに出ます。Horizon は Redis のキューしか見ない（`api/config/horizon.php` のスーパーバイザが `connection => redis`）ので、切り替えるまでは `make horizon` を起動してもジョブを拾いません
 3. マイグレーションのロック: `touch .claude/.migrations-locked`
 4. `.claude/.phase` の更新（今は 0 のまま。人の判断）
@@ -111,6 +111,7 @@ make schedule      # ターミナル 4: スケジューラ（F-22 の前日リ�
 ```
 
 - ログインは http://localhost:3002/login で **`admin@example.com` / `password`**（`make fresh` のシード。企業「株式会社サンプル」の管理者）
+- **P4 の値は `api/.env` に書きます。`make api-serve`（`php artisan serve`）を起動するときに環境変数で `QUEUE_CONNECTION=redis` などを渡しても効きません。** `php artisan serve` は、実際にリクエストを処理する子プロセスに、`ServeCommand::$passthroughVariables` にある変数（`APP_ENV`・`PATH` など）しか渡さないためです。2026-10-02 にこれでジョブが DB のキューに積まれました。`.env` を変えずに環境変数で試したいときは、`cd api/public && QUEUE_CONNECTION=redis ... php -S 127.0.0.1:8002 ../vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php` のように組み込みサーバーを直接起動します（`make horizon` など artisan の他のコマンドは環境変数がそのまま効きます）
 - `api/.env` がまだ P1〜P3 の値（`QUEUE_CONNECTION=database`）のときは、`make horizon` の代わりに `cd api && php artisan queue:work --queue=mails,default` を動かします。Horizon は Redis のキューしか処理しないためです。どちらのワーカーも動かさないと、確定通知・中止通知・リマインド・CSV の非同期出力はキューに積まれたまま実行されません
 - Horizon と Telescope の画面は、管理画面にログインした同じブラウザで開きます（ローカル環境かつログイン済み管理者だけ。未ログインは 403）。Telescope の記録テーブル `telescope_entries` は `make fresh` で作られます
 - メールは Mailpit（http://localhost:8025）で見ます。`api/.env` が P4 の値（`MAIL_MAILER=smtp` / `MAIL_PORT=1025`）になっている必要があります
@@ -134,7 +135,7 @@ make down                       # redis / mailpit を止める（データは残
 
 web の自動テストは書かない方針です（決定9）。**画面と、非同期の実物（Redis・Horizon・Mailpit）は人が手で確かめます。** 確かめたら日付を書きます。対応する API の自動テストは `.claude/skills/myteam-acceptance/SKILL.md` の表にあります。
 
-A-1〜A-4・A-9・A-11 の「Horizon」「Telescope」の部分は、P4-01b（2026-10-02 導入）の後まだ誰も実物で確かめていません。`api/.env` を P4 の値に切り替え、`make fresh` を流してから確かめます。アクセス制御（A-11 の 403）は `api/tests/Feature/HorizonAccessTest.php` が自動テストで示しています。
+A 項目の多くは、2026-10-02 の夕方にリードが実物（Redis・Horizon・Telescope・Mailpit）を API 経由で動かして確かめました。その内容を表の「備考」に書いています。**画面で見たわけではないので、確認日の欄は空のままです。** 人が画面で確かめてから記入します。手順は `api/.env` を P4 の値に切り替え、`make fresh` を流してからです。アクセス制御（A-11 の 403）は `api/tests/Feature/HorizonAccessTest.php` が自動テストでも示しています。
 
 確認の前に: `make ports` で 8002 と 3002 が `next_team` のプロセスであること。同じブラウザで第2弾（`localhost:8001`）を開いていると `XSRF-TOKEN` Cookie が上書きし合うので、閉じるか別プロファイルを使います。
 
@@ -158,19 +159,19 @@ A-1〜A-4・A-9・A-11 の「Horizon」「Telescope」の部分は、P4-01b（20
 
 ### 後半（P4・P5 の終わり）— 非同期
 
-| # | 手順 | 期待 | 確認日 |
-|---|---|---|---|
-| A-1 | 応募を承認する | 画面はすぐ返る。Mailpit に確定通知（日時・拠点・職種・時給）。Horizon の `mails` に完了ジョブ | |
-| A-2 | `make horizon` を止めて承認 → Horizon を起動 | 画面は返る。起動した後にメールが届く | |
-| A-3 | 確定 3 名の募集を中止する | 中止通知が 3 通。Horizon に 3 ジョブ | |
-| A-4 | `docker compose stop mailpit` → 募集を中止 → 失敗を待つ → `docker compose start mailpit` → Horizon から再実行 | `failed_jobs` に残る。通知履歴が「失敗」。再実行で届く | |
-| A-5 | 翌日勤務の確定応募を作り `cd api && php artisan app:send-reminders` を 2 回実行 | リマインドは 1 通だけ | |
-| A-6 | `make schedule` を動かし、`MYTEAM_REMINDER_TIME` を数分後にして待つ | 時刻になると届く | |
-| A-7 | 月次集計の画面で CSV を非同期で生成する | すぐ「受付」。進捗が進み「完了」。Mailpit に完了通知。ダウンロードできる | |
-| A-8 | ダウンロード URL の `signature` を 1 文字変えて開く | 403 | |
-| A-9 | ダッシュボードを開く → 応募を承認 → 開き直す | 充足率が変わる。Telescope に cache の hit / forget | |
-| A-10 | 通知履歴の画面（`/notifications`）を開き、種別と状態で絞り込む | A-1〜A-7 の送信が成功／失敗つきで並ぶ | |
-| A-11 | ログアウトして http://localhost:8002/horizon を開く | 403 | |
+| # | 手順 | 期待 | 備考（2026-10-02 にリードが API 経由で確かめたこと） | 確認日 |
+|---|---|---|---|---|
+| A-1 | 応募を承認する | 画面はすぐ返る。Mailpit に確定通知（日時・拠点・職種・時給）。Horizon の `mails` に完了ジョブ | `mails` キュー → Horizon が処理 → Mailpit に「【確定】レジの勤務が確定しました」→ 通知履歴が sent。Horizon の `/horizon/api/jobs/completed` に出た | |
+| A-2 | `make horizon` を止めて承認 → Horizon を起動 | 画面は返る。起動した後にメールが届く | 未確認 | |
+| A-3 | 確定 3 名の募集を中止する | 中止通知が 3 通。Horizon に 3 ジョブ | リードが API 経由で確認済み（2026-10-02。確定 3 名の募集を中止 → Mailpit に「【中止】」が 3 通、notification_logs の posting_cancelled が 3 行とも sent） | |
+| A-4 | `docker compose stop mailpit` → 募集を中止 → 失敗を待つ → `docker compose start mailpit` → Horizon から再実行 | `failed_jobs` に残る。通知履歴が「失敗」。再実行で届く | 中止ではなく承認で確かめた。3 回失敗（10 秒・60 秒の間隔）→ `failed_jobs` に 1 行、通知履歴が failed（「TransportException: メールの送信に失敗しました。」）→ Mailpit を戻して Horizon の再実行 API → 届いて同じ行が sent に | |
+| A-5 | 翌日勤務の確定応募を作り `cd api && php artisan app:send-reminders` を 2 回実行 | リマインドは 1 通だけ | 翌日の確定 2 件に届き、2 回目で増えなかった（Mailpit の件数 6 のまま） | |
+| A-6 | `make schedule` を動かし、`MYTEAM_REMINDER_TIME` を数分後にして待つ | 時刻になると届く | `schedule:list` に `app:send-reminders`（18:00）と `telescope:prune`（0:00、ローカルだけ）が出ることまで。時刻を待って届くことは未確認 | |
+| A-7 | 月次集計の画面で CSV を非同期で生成する | すぐ「受付」。進捗が進み「完了」。Mailpit に完了通知。ダウンロードできる | 202（processing）→ チャンク → 完了（progress 100）→ 署名付き URL で 200（`text/csv`、`no-store`、BOM 付き）→「【出力完了】2026-10 の月次集計 CSV」が届いた | |
+| A-8 | ダウンロード URL の `signature` を 1 文字変えて開く | 403 | 403 になった | |
+| A-9 | ダッシュボードを開く → 応募を承認 → 開き直す | 充足率が変わる。Telescope に cache の hit / forget | Redis の DB 1 に `next-team-database-next-team-cache-dashboard:1`（TTL 287 秒）。拠点名を変えるとキーが消えた。Telescope に cache が記録された。見るときは `redis-cli -n 1` | |
+| A-10 | 通知履歴の画面（`/notifications`）を開き、種別と状態で絞り込む | A-1〜A-7 の送信が成功／失敗つきで並ぶ | 画面の確認なので未確認 | |
+| A-11 | ログアウトして http://localhost:8002/horizon を開く | 403 | 未ログインは `/horizon` `/telescope` とも 403、ログイン済み管理者は 200 | |
 
 ---
 
@@ -264,9 +265,9 @@ A-1〜A-4・A-9・A-11 の「Horizon」「Telescope」の部分は、P4-01b（20
 | 1 | **git worktree の `vendor` をシンボリックリンクにしない。worktree ごとに `composer install` するか、最初から worktree 用の autoload を用意する** | P2 の並列（A / B / C）で `api/vendor` をシンボリックリンクにしたところ、Composer の autoload の基準ディレクトリがメインのフォルダになり、`App\` `Tests\` `Database\` のクラスがメイン（や他の worktree）から読まれていました。worktree で「緑」でも worktree のコードを検証していなかったことになります。担当が気づき、worktree の `app/` `tests/` `database/` を先に探す bootstrap を `--bootstrap` で渡して回避し、最終判定は epic ブランチへ統合した後のメインで行いました。web の worktree では `node_modules` のリンクで足りましたが、`.next/types` が生成されないので `next typegen` を先に回す必要がありました |
 | 2 | **テスト名に英大文字を入れない、を最初の規約にする** | Pint の `php_unit_method_casing` がテスト名を snake_case に直し、`test_Acceptヘッダなしでも_JSONで返る` → `jso_nで返る`、`DBが` → `dbが`、`Context` → `_context` のように崩しました。英字は小文字で `_` 区切り（`test_ジョブはcontextから企業を引き継ぐ`）にしています。計画のテスト名にも英大文字が混ざっていたので、planner のテンプレートの段階で直す |
 | 3 | **日付に依存するテストは最初から `travelTo()` で固定する** | P4-04 で「勤務日が過ぎたら送らない」を足すと、固定の日付（2026-10-10 など）を使うテストが、実際の日付がその日を過ぎた時点で赤になる作りでした。`$this->travelTo()`（Rails の `travel_to`）で時刻を固定するのを tdd-workflow の既定にする |
-| 4 | **範囲外のページの空表示の文言を分ける** | 一覧で `?page=99` のように範囲外を開くと、データがあっても「拠点がまだ登録されていません。」「通知の履歴はまだありません。」のように「まだない」と出ます。`meta.total` が 0 より大きいのに `data` が空なら「このページには項目がありません」と出すか、最後のページへ誘導する |
+| 4 | **範囲外のページの空表示の文言を分ける** | 一覧で `?page=99` のように範囲外を開くと、データがあっても「拠点がまだ登録されていません。」「通知の履歴はまだありません。」のように「まだない」と出ます。`epic/p5-followup` で、`web/components/ui/Pagination.tsx` に必須の `itemCount` と `emptyText()` を足し、範囲外のときは「このページには表示する項目がありません。」と「1 ページ目へ」のリンクだけを出す形に直している最中です。最初から共通部品の契約に入れておけば、一覧ごとに後から直さずに済んだ |
 | 5 | **ファクトリの `fake()->optional()` を、期待値に関わる列で使わない** | 「送らなければ null」を期待するテストが、Faker の乱数で 2 回に 1 回だけ赤になりました（P2-04 / P2-06）。「再実行で緑」は合格にせず原因を調べ、テストで列を明示して作る形に直しました |
-| 6 | **パッケージの導入は人がいる時間に前倒しする** | Horizon / Telescope は P4 の最初に入れる計画でしたが、人が不在の夜間だったので後回しにしました（P4-01b）。その結果、P4 の「Horizon の画面で見える」「Telescope で cache を見る」の確認がすべて最後に残りました。結局、導入は P5 の最後（2026-10-02 の朝に人が承認した後）になり、画面での確認は導入後もまだ残っています。フェーズの開始前に、要るパッケージの承認を人にまとめて取る |
+| 6 | **パッケージの導入は人がいる時間に前倒しする** | Horizon / Telescope は P4 の最初に入れる計画でしたが、人が不在の夜間だったので後回しにしました（P4-01b）。その結果、P4 の「Horizon の画面で見える」「Telescope で cache を見る」の確認がすべて最後に残りました。結局、導入は P5 の最後（2026-10-02 の朝に人が承認した後）になり、実物の確認はその日の夕方にリードが API 経由で行いました。画面での確認はまだ残っています。フェーズの開始前に、要るパッケージの承認を人にまとめて取る |
 | 7 | **`.claude/.phase` をフェーズに合わせて進める** | 今回は人の判断で 0 のまま進めたので、Stop フックの「必須テストファイルの存在検査」が一度も効かず、リードが P2-07 と P4-05 の後に `ls` で確かめました。機械的な判定を手作業に戻した形です |
 | 8 | **手動確認をフェーズの終わりごとに行う** | M-1〜M-13、A-1〜A-11 はすべて最後にまとめる形になりました。画面の崩れや実物の Redis・Mailpit での差は手動確認でしか見つからないので、まとめるほど見つかるのが遅くなる |
 | 9 | **ポリモーフィックな関連を持つテーブルには、最初から企業の検査を計画に入れる** | `notification_logs` の他社チェック漏れ（P4-01 の重大指摘）は、「親が自社か」を保存時に確かめる既存の仕組みがポリモーフィックには効かないことから起きました。docs/01 の契約の段階で書いておけた |

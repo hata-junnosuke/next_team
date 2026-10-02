@@ -78,14 +78,14 @@ P5（直列）      P5-01 → P5-02 → P5-03
 
 ### 終わったこと
 - P1〜P5 の全タスクが完了し、`main` にマージ済み。P4-01b（Horizon / Telescope）は 2026-10-02 に人が承認して導入した
-- `make verify-full` 緑: Pint、PHPUnit 834 件・4122 アサーション、tsc、ESLint、Prettier、`next build`
+- `make verify-full` 緑: Pint、PHPUnit 836 件・4140 アサーション、tsc、ESLint、Prettier、`next build`
 - 必須テスト 6 本（ApplicationTest / PayrollCalculatorTest / ApplicationStatusTest / AcceptanceScenarioTest / NotificationIdempotencyTest / FailedJobTest）はすべてある（`.phase` が 0 なので Stop フックは存在を検査しない。リードが ls で確認）
 - README・docs/00〜04 を実装に合わせて更新した（P5-03）
 
 ### 人の作業（残り）
 1. `api/.env` を P4 の値に切り替える（`api/.env.example` の P4 の行。docs/01 2 章）。今は Queue / Cache = database、Mail = log。`QUEUE_CONNECTION=redis` にしないと `make horizon` はジョブを拾わない（それまでは `cd api && php artisan queue:work --queue=mails,default`）。`CACHE_PREFIX` / `REDIS_PREFIX` / `HORIZON_PREFIX`、`TELESCOPE_ENABLED=true` も入れる
 2. `make fresh` で telescope_entries を作る（開発用 DB は P5-03 の起動確認でシード状態に戻っている）
-3. `make up` → `make api-serve` / `make web-dev` / `make horizon` → 管理画面にログインして `http://localhost:8002/horizon` と `/telescope` を開き、P4-02〜P4-05 のジョブ・failed_jobs の再実行・Telescope と SQLite の相性を確かめる（docs/03 10 章の「未確認」の行）
+3. Horizon / Telescope の実物の確認は、**リードが実物で確認済み**（2026-10-02 夕方。`.env` は変えず起動時の環境変数で P4 の値を渡し、API 経由で確定通知・失敗と再実行・非同期 CSV・同時実行・キャッシュ・リマインド・入口の 403 を確かめた。docs/03 10 章）。Horizon と Telescope の画面で見るのは 4 の手動確認のとき
 4. 画面の手動確認: `myteam-acceptance` の M-1〜M-13、A-1〜A-11。README の確認日の欄を記入
 5. マイグレーションのロック: `touch .claude/.migrations-locked`（telescope のマイグレーションを足した後）
 6. `.claude/.phase` の判断（今は 0 のまま）
@@ -101,6 +101,6 @@ P5（直列）      P5-01 → P5-02 → P5-03
    - 出力一覧の自動更新（F-25 の先取り）は外し、「最新の状態に更新」リンクにした
 
 ### 残課題（軽微）
-- 通知履歴などで範囲外の page を URL に手で書くと「履歴はまだありません」と出る
-- Telescope の記録に F-23 の署名付き URL（30 分有効）が応答本文として残る（ローカル専用）
+- 通知履歴などで範囲外の page を URL に手で書くと「履歴はまだありません」と出る → `epic/p5-followup` で対応
+- Telescope の記録に F-23 の署名付き URL（30 分有効）が応答本文として残る（ローカル専用）→ `epic/p5-followup` で対応
 - `.claude/.running/` に終わった担当の印が残ることがある（フックの不具合の候補。60 分で捨てられる。フックは触っていない）
