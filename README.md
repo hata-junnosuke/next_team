@@ -20,17 +20,17 @@
 | 範囲 | 状態 |
 |---|---|
 | P1 API 骨格・P2 ドメイン・P3 フロント | 完了。`main` にマージ済み |
-| P4 非同期（F-20〜F-23、F-19 のキャッシュ） | 完了。`main` にマージ済み。ただし Horizon / Telescope の導入（P4-01b）は人の承認待ち |
+| P4 非同期（F-20〜F-23、F-19 のキャッシュ） | 完了。`main` にマージ済み。Horizon / Telescope（P4-01b）は 2026-10-02 に人が承認して導入済み（`epic/p5-finish`）。ただし画面での実物の確認はまだ |
 | P5 仕上げ（F-24 通知履歴、この README と docs） | 完了。`epic/p5-finish` にあり、`main` へのマージは人の確認待ち |
 | P6 F-25 Broadcasting（Could） | 未着手 |
-| 自動テスト | api の PHPUnit 827 件・4100 アサーションが緑（2026-10-02、`make api-test`） |
+| 自動テスト | api の PHPUnit 834 件・4122 アサーションが緑（2026-10-02、`make api-test`） |
 
 ### 人の作業（残っているもの）
 
 `.claude/state/STATE.md` の末尾「人への引き継ぎ」と同じ内容です。
 
-1. **Horizon と Telescope の導入（P4-01b）**: `composer require laravel/horizon` と `composer require --dev laravel/telescope` を承認する。その後に担当が `config/horizon.php`・Gate・`HorizonAccessTest` を足す。それまでは `make horizon` が動かない（`Command "horizon" is not defined.`）ので、代わりに `cd api && php artisan queue:work --queue=mails,default` でジョブを処理する
-2. **`api/.env` を P4 の値に切り替える**（`api/.env.example` の P4 の行。docs/01 2 章）。2026-10-02 時点の `php artisan about --only=drivers` は Queue = database、Cache = database、Mail = log で、まだ P1〜P3 の値です。この状態でもジョブは DB のキューに積まれて `queue:work` で処理されますが、メールは Mailpit ではなくログに出ます
+1. **Horizon と Telescope を実物で確かめる（P4-01b は導入済み）**: 2026-10-02 に人が承認し、`laravel/horizon` v5.50.0 と `laravel/telescope` v5.25.0（dev）を入れた。`make horizon` は動く。まだ確かめていないのは、Horizon の画面で P4-02〜P4-05 のジョブが見えること、Redis での同時書き込み、`failed_jobs` の再実行（A-4）、Telescope と SQLite の相性（docs/03 10 章）。ローカルの DB に `telescope_entries` を作るため、先に `make fresh` を 1 回流す
+2. **`api/.env` を P4 の値に切り替える**（`api/.env.example` の P4 の行。docs/01 2 章）。2026-10-02 時点の `php artisan about --only=drivers` は Queue = database、Cache = database、Mail = log で、まだ P1〜P3 の値です。この状態ではジョブは DB のキューに積まれ、メールは Mailpit ではなくログに出ます。Horizon は Redis のキューしか見ない（`api/config/horizon.php` のスーパーバイザが `connection => redis`）ので、切り替えるまでは `make horizon` を起動してもジョブを拾いません
 3. マイグレーションのロック: `touch .claude/.migrations-locked`
 4. `.claude/.phase` の更新（今は 0 のまま。人の判断）
 5. 画面の手動確認: 下の M-1〜M-13 と A-1〜A-11 を通し、確認日の欄を記入する
@@ -51,7 +51,7 @@
 | `web/` | Next.js 16.3.8 / React 19.2 / TypeScript / Tailwind CSS 4（App Router） |
 | DB | SQLite（`api/database/database.sqlite`。テストは in-memory） |
 | 認証 | Sanctum SPA 認証（Cookie + CSRF）＋ Fortify ヘッドレス |
-| キュー・キャッシュ | Redis（Docker）。ワーカーは Horizon の予定だが導入は人の承認待ち（P4-01b）。それまでは `php artisan queue:work` |
+| キュー・キャッシュ | Redis（Docker）。ワーカーは Horizon（`laravel/horizon` v5.50.0。`mails` と `default` を別のスーパーバイザで各 2 プロセス）。監視は Telescope（`laravel/telescope` v5.25.0、dev。ローカルだけ登録） |
 | メール | Mailpit（Docker） |
 | テスト | api は PHPUnit。web は型チェックと ESLint、画面は下の手動チェックリスト |
 | 整形 | api は Pint、web は Prettier（編集のたびにフックが自動整形） |
@@ -75,8 +75,8 @@ next_team/
 | 画面 | http://localhost:3002 |
 | API | http://localhost:8002 |
 | Mailpit | http://localhost:8025 |
-| Horizon（P4-01b の後） | http://localhost:8002/horizon |
-| Telescope（P4-01b の後） | http://localhost:8002/telescope |
+| Horizon（ローカルのログイン済み管理者だけ） | http://localhost:8002/horizon |
+| Telescope（ローカルのログイン済み管理者だけ） | http://localhost:8002/telescope |
 
 8000 は第1弾、8001 は第2弾、3000 は別プロジェクトが使うので避けています。`make ports` で、8002 と 3002 をどのフォルダのプロセスが使っているかを確かめられます。
 
@@ -107,12 +107,13 @@ make up            # redis / mailpit（Docker。起動済みなら不要。make 
 make fresh         # 初回とデータを作り直したいときだけ。DB を作り直してシード
 make api-serve     # ターミナル 1: http://localhost:8002
 make web-dev       # ターミナル 2: http://localhost:3002
-make horizon       # ターミナル 3: キューワーカー（P4-01b で Horizon を入れた後）
+make horizon       # ターミナル 3: キューワーカー（Horizon。api/.env が P4 の値＝Redis のときにジョブを拾う）
 make schedule      # ターミナル 4: スケジューラ（F-22 の前日リマインド。毎日 18:00）
 ```
 
 - ログインは http://localhost:3002/login で **`admin@example.com` / `password`**（`make fresh` のシード。企業「株式会社サンプル」の管理者）
-- P4-01b の前は、`make horizon` の代わりに `cd api && php artisan queue:work --queue=mails,default` を動かします。ワーカーを動かさないと、確定通知・中止通知・リマインド・CSV の非同期出力はキューに積まれたまま実行されません
+- `api/.env` がまだ P1〜P3 の値（`QUEUE_CONNECTION=database`）のときは、`make horizon` の代わりに `cd api && php artisan queue:work --queue=mails,default` を動かします。Horizon は Redis のキューしか処理しないためです。どちらのワーカーも動かさないと、確定通知・中止通知・リマインド・CSV の非同期出力はキューに積まれたまま実行されません
+- Horizon と Telescope の画面は、管理画面にログインした同じブラウザで開きます（ローカル環境かつログイン済み管理者だけ。未ログインは 403）。Telescope の記録テーブル `telescope_entries` は `make fresh` で作られます
 - メールは Mailpit（http://localhost:8025）で見ます。`api/.env` が P4 の値（`MAIL_MAILER=smtp` / `MAIL_PORT=1025`）になっている必要があります
 - `make schedule` の代わりに、リマインドは `cd api && php artisan app:send-reminders --date=2026-10-03` で手動実行できます（`php artisan schedule:list` に `0 18 * * *` で出ます）
 
@@ -134,7 +135,7 @@ make down                       # redis / mailpit を止める（データは残
 
 web の自動テストは書かない方針です（決定9）。**画面と、非同期の実物（Redis・Horizon・Mailpit）は人が手で確かめます。** 確かめたら日付を書きます。対応する API の自動テストは `.claude/skills/myteam-acceptance/SKILL.md` の表にあります。
 
-A-1〜A-4・A-9・A-11 の「Horizon」「Telescope」の部分は P4-01b の後に確かめます。それまでは `queue:work` の出力と Mailpit、通知履歴の画面で代わりに見られます。
+A-1〜A-4・A-9・A-11 の「Horizon」「Telescope」の部分は、P4-01b（2026-10-02 導入）の後まだ誰も実物で確かめていません。`api/.env` を P4 の値に切り替え、`make fresh` を流してから確かめます。アクセス制御（A-11 の 403）は `api/tests/Feature/HorizonAccessTest.php` が自動テストで示しています。
 
 確認の前に: `make ports` で 8002 と 3002 が `next_team` のプロセスであること。同じブラウザで第2弾（`localhost:8001`）を開いていると `XSRF-TOKEN` Cookie が上書きし合うので、閉じるか別プロファイルを使います。
 
@@ -266,7 +267,7 @@ A-1〜A-4・A-9・A-11 の「Horizon」「Telescope」の部分は P4-01b の後
 | 3 | **日付に依存するテストは最初から `travelTo()` で固定する** | P4-04 で「勤務日が過ぎたら送らない」を足すと、固定の日付（2026-10-10 など）を使うテストが、実際の日付がその日を過ぎた時点で赤になる作りでした。`$this->travelTo()`（Rails の `travel_to`）で時刻を固定するのを tdd-workflow の既定にする |
 | 4 | **範囲外のページの空表示の文言を分ける** | 一覧で `?page=99` のように範囲外を開くと、データがあっても「拠点がまだ登録されていません。」「通知の履歴はまだありません。」のように「まだない」と出ます。`meta.total` が 0 より大きいのに `data` が空なら「このページには項目がありません」と出すか、最後のページへ誘導する |
 | 5 | **ファクトリの `fake()->optional()` を、期待値に関わる列で使わない** | 「送らなければ null」を期待するテストが、Faker の乱数で 2 回に 1 回だけ赤になりました（P2-04 / P2-06）。「再実行で緑」は合格にせず原因を調べ、テストで列を明示して作る形に直しました |
-| 6 | **パッケージの導入は人がいる時間に前倒しする** | Horizon / Telescope は P4 の最初に入れる計画でしたが、人が不在の夜間だったので後回しにしました（P4-01b）。その結果、P4 の「Horizon の画面で見える」「Telescope で cache を見る」の確認がすべて最後に残りました。フェーズの開始前に、要るパッケージの承認を人にまとめて取る |
+| 6 | **パッケージの導入は人がいる時間に前倒しする** | Horizon / Telescope は P4 の最初に入れる計画でしたが、人が不在の夜間だったので後回しにしました（P4-01b）。その結果、P4 の「Horizon の画面で見える」「Telescope で cache を見る」の確認がすべて最後に残りました。結局、導入は P5 の最後（2026-10-02 の朝に人が承認した後）になり、画面での確認は導入後もまだ残っています。フェーズの開始前に、要るパッケージの承認を人にまとめて取る |
 | 7 | **`.claude/.phase` をフェーズに合わせて進める** | 今回は人の判断で 0 のまま進めたので、Stop フックの「必須テストファイルの存在検査」が一度も効かず、リードが P2-07 と P4-05 の後に `ls` で確かめました。機械的な判定を手作業に戻した形です |
 | 8 | **手動確認をフェーズの終わりごとに行う** | M-1〜M-13、A-1〜A-11 はすべて最後にまとめる形になりました。画面の崩れや実物の Redis・Mailpit での差は手動確認でしか見つからないので、まとめるほど見つかるのが遅くなる |
 | 9 | **ポリモーフィックな関連を持つテーブルには、最初から企業の検査を計画に入れる** | `notification_logs` の他社チェック漏れ（P4-01 の重大指摘）は、「親が自社か」を保存時に確かめる既存の仕組みがポリモーフィックには効かないことから起きました。docs/01 の契約の段階で書いておけた |

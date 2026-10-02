@@ -31,8 +31,8 @@
 | 画面 | http://localhost:3002 | 3000 は別プロジェクトの Docker が使っている |
 | Mailpit | http://localhost:8025 | SMTP は 1025 |
 | Redis | localhost:6379 | |
-| Horizon | http://localhost:8002/horizon | P4 から。ログイン済み管理者のみ |
-| Telescope | http://localhost:8002/telescope | P4 から。ローカルのみ |
+| Horizon | http://localhost:8002/horizon | P4-01b（2026-10-02）から。ローカル環境 かつ ログイン済み管理者のみ |
+| Telescope | http://localhost:8002/telescope | P4-01b（2026-10-02）から。ローカル環境 かつ ログイン済み管理者のみ（Telescope 自体もローカルでしか登録しない） |
 
 ### 使うパッケージ（これ以外を入れるときは人に確認する）
 
@@ -799,6 +799,7 @@ B と C の境界: C の `AttendanceService::save()` は B の `Application`（�
 | キャッシュの破棄を Observer に | `Application` / `JobPosting` / `Location` の Observer がコミット後に破棄 | サービスの各メソッドに書くと経路を足したとき漏れる。担当 B が担当 C のキャッシュを知らなくて済む。Observer は担当 C の所有（`app/Observers/`）で、P4 に足す |
 | 通知の記録を自前のテーブルに | `notification_logs`（ポリモーフィック）＋ `dedupe_key` の UNIQUE | 冪等性を DB 制約で保証できる。Laravel の `notifications` テーブルは「管理者のアプリ内通知」にだけ使う |
 | ジョブに ID を渡す | `SerializesModels` に頼らない | 実行時点の最新状態を読む。確定後すぐキャンセルされた応募に確定通知を送らない |
+| `/horizon` `/telescope` の入口を「ローカル かつ ログイン済み管理者」に（P4-01b で 2 章の表を更新） | `HorizonServiceProvider` / `TelescopeServiceProvider` の `authorization()` を上書き | 2 章の表は Telescope を「ローカルのみ」と書いていたが、パッケージの既定（親の `authorization()`）は「ローカル環境 または Gate」で、ローカルなら未ログインでも通る。`rules/common/security.md`（ログイン済み管理者・ローカル環境に限定）に合わせ、両方とも「ログイン済み かつ Gate（ローカル）」にした。テストは `api/tests/Feature/HorizonAccessTest.php` |
 
 ---
 
