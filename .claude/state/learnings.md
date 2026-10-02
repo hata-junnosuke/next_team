@@ -4,6 +4,20 @@
 
 書式: `- YYYY-MM-DD | フェーズ | api / web / loop | 何が起きたか → 教訓 | 信頼度 0.x | 根拠`
 
+## テーマ別の索引（2026-10-02 P5-03 で整理。同じテーマの行をまとめただけで、下の行は消していない）
+
+同じことを別の場面で踏んだ行は、まとめて 1 つの教訓として読む。docs/02 の「ハマりどころ」と docs/04 の 9 章に昇格済み。
+
+| テーマ | まとめた教訓 | 該当する行 |
+|---|---|---|
+| テスト名と Pint | テスト名の英字は小文字で `_` 区切りにする。Pint の `php_unit_method_casing` が英大文字を snake_case に崩す（`JSON` → `jso_n`、`INDEX` → `_inde_x`、`DB` → `db`、`Context` → `_context`、`CSV` / `URL` も） | フェーズ 0（G-6 の tester）、フェーズ 1（P1-02 の後半）、STATE の P4-01・P4-02・P4-05 の備考 |
+| 乱数と日付で揺れるテスト | 「再実行で緑」は合格にしない。Faker のロケールは `en_US` に固定、`fake()->optional()` の列は明示、今日の日付で結果が変わるものは `travelTo()` | 第2弾（Faker の ja_JP）、フェーズ 2（P2-04 / P2-06）、フェーズ 4（P4-04） |
+| git worktree | worktree は道具の側で壊れる。api は `vendor` のシンボリックリンクで autoload がメインを読む → worktree 用 bootstrap、最終判定は統合後のメイン。web は `.next/types` がない → `next typegen` | フェーズ 2（P2-02 / P2-05）、フェーズ 3（P3 の準備） |
+| キューの試行回数の数え方 | 後回し（`WithoutOverlapping`）も戻し（`RateLimited`）も 1 回の試行に数える。メールのジョブは `$tries = 0` + `$maxExceptions` + `retryUntil()`、2 本目は `dontRelease()`。ロックの期限は `$timeout` < `expireAfter` < `retry_after` | フェーズ 4（P4-02、P4-03、P4-05 の database-reviewer） |
+| テナント分離の穴 | 企業の検査は「どの順で動くか」「どの経路から入るか」で外れる。ミドルウェアの優先順、ルートモデルバインディングの古いインスタンス、ポリモーフィックの宛先・対象、シーダーの `WithoutModelEvents` | フェーズ 1（P1-01、P1-02）、フェーズ 2（P2-01 の `transitionTo`）、フェーズ 4（P4-01） |
+| SQLite の違い | MySQL と違う点を前提にしない。外部キーに索引を張らない、`LIKE` に ESCAPE がない、`IMMEDIATE` は PHP 8.4 以上、date cast の列の保存形式 | 第2弾（LIKE）、フェーズ 1（P1-02 の前半）、フェーズ 2（P2-01） |
+| 検査を飛ばす印 | 印は抜け道になりやすい。期限・消し方・飛ばしたことの表示を決める。実際に、終わった担当の印が残ることがあった | フェーズ 0（2 行）、フェーズ 5（下の最後の行） |
+
 ## 第2弾から引き継いだ教訓（`../ecc_team/.claude/state/learnings.md` のうち第3弾でも効くもの）
 
 - 2026-09-14 | 第2弾 | api | `php artisan test --compact` と Pint は非 TTY（フック内）では JSON を出力する → フックは jq で整形する | 信頼度 0.7 | verify-loop.sh の format_phpunit / format_pint
@@ -48,3 +62,4 @@
 - 2026-10-02 | フェーズ 4 | api | 「勤務日が過ぎたら送らない」のように今日の日付で結果が変わる判定を足すと、固定の日付（2026-10-10 など）を使うテストが、実際の日付がその日を過ぎた時点で赤になる → 日付に依存するテストは `travelTo()` で時刻を固定する。スケジュールの `withoutOverlapping()` は既定 1440 分で、落ちたときに翌日の実行まで止めるので短い期限を明示する | 信頼度 0.9 | P4-04 レビュー
 - 2026-10-02 | フェーズ 4 | api | `WithoutOverlapping->dontRelease()` の `expireAfter` がキューの `retry_after` より長いと、ワーカーが落ちた後の再実行がロックに当たって黙って捨てられ、どの failed() も呼ばれない → 出力が processing のまま残り「生成中なら 422」で月が永遠に塞がる。期限は timeout < expireAfter < retry_after にし、一定時間を過ぎた生成中は次の依頼で failed にする逃げ道を作る | 信頼度 0.9 | P4-05 database-reviewer（重大）
 - 2026-10-02 | フェーズ 4 | api | sync キューでは `Bus::batch()->dispatch()` の中で then まで走り、さらにバッチ全体が `Batch::add()` のトランザクションに入るので catch で入れた failed は巻き戻る → processing は `before` で、失敗時の failed は dispatch の呼び出し側の catch で入れる | 信頼度 0.8 | P4-05 implementer
+- 2026-10-02 | フェーズ 5 | loop | セッションの記録で「担当 14 体が稼働中のため検査を保留」と数えた回があり（上限は 7 体）、11:49 の時点でも 10:52・10:57 に置かれた `.claude/.running/` の印が残っていた。うち 1 つは SubagentStop が記録されている spec-reviewer のもの → 印は 60 分で捨てるので最後には検査されるが、それまでのリードの終了は検査を飛ばす。今回はコミット前の検証（`/verify pre-commit`、STATE の各タスクに全件の件数）で補われた。SubagentStop の `agent_id` と印の名前が合わない場面がないか、フックを直すときに調べる（フックの編集は `.phase` が 0 のときだけできる） | 信頼度 0.5 | P5-03 doc-updater がセッションの記録（hookEvent）と `.claude/.running/` を確認
