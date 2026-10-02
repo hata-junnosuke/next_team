@@ -54,6 +54,9 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
+    // 管理画面（web/ の Next.js）の URL。管理者宛ての通知（P4-05 の出力完了）のリンク先に使う。ワーカー宛てのメールには使わない（CORS の許可オリジンも同じ値）
+    'frontend_url' => env('FRONTEND_URL', 'http://localhost:3002'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone

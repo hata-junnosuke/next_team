@@ -74,6 +74,11 @@ UI コンポーネントライブラリ、状態管理ライブラリ、デー�
 | `MAIL_MAILER` / `MAIL_HOST` / `MAIL_PORT` | `smtp` / `127.0.0.1` / `1025` | **P4** | Mailpit |
 | `MAIL_FROM_ADDRESS` | `no-reply@myteam.example` | **P4** | |
 | `MYTEAM_REMINDER_TIME` | `18:00` | **P4** | F-22 の送信時刻 |
+| `MYTEAM_MAILS_PER_MINUTE` | `60` | P4（任意） | メールの流量（全社・全種類で 1 つの枠） |
+| `MYTEAM_MAIL_RETRY_UNTIL_MINUTES` | `60` | P4（任意） | メールのジョブを打ち切るまでの時間 |
+| `MYTEAM_REPORT_EXPORT_STALE_MINUTES` | `30` | P4（任意） | 生成中のまま止まった出力を失敗にするまでの時間（下限 5） |
+| `MYTEAM_DASHBOARD_CACHE_SECONDS` | `300` | P4（任意） | ダッシュボードのキャッシュの秒数（0 以下でキャッシュしない） |
+| `CACHE_PREFIX` / `REDIS_PREFIX` / `HORIZON_PREFIX` | `next-team-cache-` / `next-team-database-` / `next-team-horizon:` | **P4** | 同じ Redis を他の弾と共有したときのキーの衝突を防ぐ |
 
 ### `web/.env.local`
 
@@ -198,6 +203,10 @@ INDEX: `(company_id, clock_in)`（勤怠の日時での参照用。月次集計�
 
 INDEX: `(company_id, created_at)`。`*_type` には morph map の短い名前が入ります（クラス名は入れない）。
 
+（P4-01 で決定）`dedupe_key` は `{kind}:{subject_type}:{subject_id}`（`NotificationLogService::dedupeKey()` の 1 箇所）で、UNIQUE は全社で一意（ID は全社の通し番号なので衝突しない。企業ごとにすると、企業を取り違えたジョブが同じ相手に 2 通目を送れてしまう）。**中止通知の subject は応募**（宛先ごとに 1 通にするため。募集を subject にすると 2 人目以降が潰れる）。`claim()` は宛先と対象が今の企業のものでなければ LogicException。`error` 列には例外のクラス名と固定の日本語だけを残し、生のメッセージは failed_jobs と Log に任せる（SQL やメールサーバーの認証情報を画面に出さない）。
+
+**同時実行について（P4-01 で決定。人の確認待ち）**: UNIQUE が保証するのは「一度送った後の再実行・再投入で 2 通目を送らない」こと。同じ通知のジョブが同時に 2 つ走るのを止めるのは `WithoutOverlapping`（キャッシュのロック）で、保証は at-least-once の範囲。DB で厳密に止めたいなら `claimed_at` 列を足して条件付き UPDATE で取る案（新しいマイグレーションで後から足せる）。
+
 **report_exports**（集計出力の依頼。F-23）
 
 | 列 | 型 | 制約 |
@@ -251,6 +260,8 @@ INDEX: `(company_id, created_at)`。`*_type` には morph map の短い名前が
 | `NotificationStatus`（P4） | `pending` 送信待ち / `sent` 送信済み / `failed` 失敗 |
 | `ReportExportStatus`（P4） | `queued` 受付 / `processing` 生成中 / `completed` 完了 / `failed` 失敗 |
 
+遷移（P4-01 で決定）: `NotificationStatus` は `pending → sent / failed`、`failed → sent / failed`（再送）、`sent` は終端。`ReportExportStatus` は `queued → processing / completed / failed`、`processing → completed / failed`、`completed` と `failed` は終端（`isInProgress()` は queued と processing）。集計出力の「再実行」は、失敗した依頼を直すのではなく同じ月の新しい依頼を出す（生成中でなければ受け付ける）。
+
 状態遷移（F-14）は `ApplicationStatus::canTransitionTo(self $next): bool` の **1 箇所** に置きます。
 
 ```
@@ -284,7 +295,7 @@ final class CurrentCompany
   - グローバルスコープ `company`: `where company_id = CurrentCompany::id()`
   - `creating`: `company_id` を `CurrentCompany::id()` で埋める
 - 他社のIDを URL に入れるとルートモデルバインディングが見つけられず **404** になります。Policy は作りません（第2弾で学習済み。状態による可否は業務ルールとしてサービスが 422 を返す）
-- `withoutGlobalScopes()` を使ってよいのは、企業が決まる前に行を読む必要がある場所だけです（署名付きURL のダウンロード、スケジューラの企業一覧）。**使う行に理由コメントを必ず書く**
+- `withoutGlobalScopes()` を使ってよいのは、企業が決まる前に行を読む必要がある場所だけです（署名付きURL のダウンロード）。スケジューラの企業一覧は `Company` にスコープがないので `withoutGlobalScopes()` は不要（P4-04 で確認）。**使う行に理由コメントを必ず書く**
 
 ### 4.3 モデル（`app/Models/`）
 
@@ -319,9 +330,11 @@ final class CurrentCompany
 | `MonthlyReportService` | `build(string $month): MonthlyReport` | `MonthlyReport{month, byWorker[], byLocation[], totalShifts, totalWorkedMinutes, totalPay}` | |
 | | `csvRows(string $month, ?int $locationId = null): iterable` | CSV の行（ヘッダなし） | |
 | `DashboardService` | `summary(): array` | 6 章の形 | |
-| `ReportExportService`（P4） | `request(User $u, string $month): ReportExport` | `queued` の行 | 同じ月の出力が生成中です。 |
-| `NotificationLogService`（P4） | `claim(NotificationKind $k, Model $recipient, Model $subject, string $email): ?NotificationLog` | 送ってよいなら行、送信済みなら `null` | |
-| | `markSent(NotificationLog $l): void` / `markFailed(NotificationLog $l, Throwable $e): void` | | |
+| | `forget(int $companyId): void`（呼ぶのは Observer だけ。キャッシュの有効期限は「設定の秒数後」と「翌日 0:00」の早い方。キーは `dashboard:{company_id}` のままで、日付またぎで前日の一覧が残らない。P4-07 で決定） | | |
+| `ReportExportService`（P4） | `request(User $u, string $month): ReportExport` | 受け付けた行（読み直した後の状態。Redis では `processing`、拠点 0 件は `queued`、積むのに失敗したら `failed`、sync のテストでは `completed` のこともある。P4-05 で決定） | 同じ月の出力が生成中です。 |
+| `NotificationLogService`（P4） | `claim(NotificationKind $k, Model $recipient, Model $subject): ?NotificationLog`（宛先のアドレスは $recipient->email から決める。宛先・対象が未保存・company_id なし・他社なら LogicException。P4-01 で決定） | 送ってよいなら行、送信済みなら `null` | |
+| | `markSent(NotificationLog $l): void` / `markFailed(NotificationLog $l, ?Throwable $e): void`（送信済みなら何もしない） | | |
+| | `markFailedByKey(string $dedupeKey, ?Throwable $e): void`（ジョブの `failed()` 用。行がない・送信済みなら何もしない）/ `static dedupeKey(NotificationKind, Model $subject): string` | | |
 
 ### 4.6 業務ルールの決定（要件の解釈）
 
@@ -335,8 +348,9 @@ final class CurrentCompany
 | 深夜跨ぎ（F-15） | 入力は `HH:MM`。退勤 ≤ 出勤なら翌日扱い、同時刻はエラー。判定は `AttendanceService` の 1 箇所 |
 | 月の範囲（F-17） | 勤務日（`job_postings.work_date`）が対象月に入る勤怠を集計。範囲は**半開区間**（`>= 月初 AND < 翌月初`）。`whereBetween` と `whereDate` は使わない |
 | 集計の方法 | （実測 P2-06: 統計なしの SQLite では起点が `applications (company_id, status)`、そこから `attendances.application_id` の UNIQUE と各表の主キーでたどる。全表走査はない。`job_postings (company_id, work_date)` は統計がないと使われなかった）SQL の join + GROUP BY + SUM。`attendances` の保存済みの値を合計する。join 先にはグローバルスコープが効かないので `company_id` 条件を明示する |
-| CSV（F-18 / F-23） | 列: ワーカー名, 拠点名, 勤務日, 労働分, 賃金, 交通費, 合計。UTF-8（BOM つき）。`=` `+` `-` `@` タブ CR で始まるセルは先頭に `'` を付ける（タブと CR は OWASP の推奨で P2-06 に追加。全角記号は Excel が数式にしないので対象外）。`shifts` は「確定の応募のうち勤怠が入力済みのもの」の件数 |
+| CSV（F-18 / F-23） | 列: ワーカー名, 拠点名, 勤務日, 労働分, 賃金, 交通費, 合計。UTF-8（BOM つき）。`=` `+` `-` `@` タブ CR で始まるセルは先頭に `'` を付ける。行の並びは同期（F-18）が勤務日 → 拠点、非同期（F-23）は拠点ごとのチャンクを連結するので拠点 → 勤務日（行の集合は一致。P4-05 で決定）（タブと CR は OWASP の推奨で P2-06 に追加。全角記号は Excel が数式にしないので対象外）。`shifts` は「確定の応募のうち勤怠が入力済みのもの」の件数 |
 | 最低賃金（F-05） | `config('myteam.min_wage')` 以上 |
+| 前日リマインド（F-22） | 「同じ勤務」は応募（1 枠）と読む。dedupe_key は `shift_reminder:application:{応募ID}` で勤務日を含まないので、送った後に勤務日が変わっても新しい日付では送らない。設定時刻（既定 18:00）の後に確定した翌日の勤務にはリマインドが届かない（確定通知は届く）。勤務日が過ぎたジョブは送らない（P4-04 で決定。人の確認待ち） |
 | 無効ワーカー（F-03） | 新規応募できない。既存の確定・応募は影響を受けない |
 
 ---
@@ -541,9 +555,11 @@ sequenceDiagram
 
 `ReportExportResource`: `{id, month, status: {value, label}, progress, row_count, requested_at, completed_at, download_url}`
 
-- `progress` は 0〜100（`job_batches` の進捗）
+- `progress` は 0〜100（`job_batches` の進捗）。意味を持つのは queued / processing のときだけ（failed は止まった時点の値のまま。画面は status で判断する）。202 の応答の status は queued とは限らない（4.5）
 - `download_url` は `completed` のときだけ入ります。**取得のたびに 30 分有効の署名付きURL を新しく作って返します**
-- ダウンロードのルートだけ `auth:sanctum` の外に置きます。URL を持っていること自体が認可です（メールのリンクからでも開けるようにするため）
+- ダウンロードのルートだけ `auth:sanctum` の外に置きます。URL を持っていること自体が認可です（ブラウザから直接開くため。直接の遷移では Sanctum の Origin / Referer の判定を満たせない）。**メールには署名付き URL を入れず、管理画面の出力一覧へのリンクだけを入れる**（転送されても漏れない。P4-05 で決定）
+- 生成中（queued / processing）のまま 30 分（`myteam.report_export_stale_minutes`）を過ぎた出力は、次の依頼のときに failed にして受け付ける（ワーカーが落ちて止まった出力で月が塞がらないように。P4-05 の database-reviewer の指摘）
+- 署名が無効・期限切れの 403 は `{"message":"リンクの有効期限が切れたか、正しくありません。","errors":{}}`
 
 ### 6.10 通知履歴（F-24。P5・Could）
 
@@ -632,7 +648,7 @@ export type FormState = { ok?: boolean; message?: string; errors?: Record<string
 | ワーカー一覧・登録・編集 | `/workers` … | workers | F-02〜F-04 |
 | 募集一覧・登録・編集 | `/job-postings` … | job-postings、locations | F-05、F-06 |
 | 募集詳細 | `/job-postings/[id]` | job-postings、applications、applicable-workers、attendance | F-07〜F-16 |
-| 月次集計 | `/reports/monthly` | reports/monthly | F-17、F-18 |
+| 月次集計 | `/reports/monthly` | reports/monthly、report-exports（POST。非同期出力の依頼） | F-17、F-18、F-23 |
 | 非同期出力 | `/reports/exports` | report-exports | F-23 |
 | 通知履歴 | `/notifications` | notification-logs | F-24 |
 
@@ -658,9 +674,9 @@ export type FormState = { ok?: boolean; message?: string; errors?: Record<string
 |---|---|---|---|
 | F-20 確定通知 | `ApplicationConfirmed`（コミット後） | `SendApplicationConfirmedMail(applicationId)` | `mails` |
 | F-21 中止通知 | `JobPostingCancelled`（コミット後） | 確定済みだった応募ごとに `SendPostingCancelledMail(applicationId)` | `mails` |
-| F-22 前日リマインド | スケジューラ → `app:send-reminders` | 翌日勤務の確定応募ごとに `SendShiftReminderMail(applicationId)` | `mails` |
+| F-22 前日リマインド | スケジューラ → `app:send-reminders` | 翌日勤務の確定応募ごとに `SendShiftReminderMail(applicationId, workDate)`（ID と日付の文字列だけ。モデルは渡さない。どの日の勤務を知らせるジョブかを決めるため。P4-04 で決定） | `mails` |
 | F-23 CSV 出力 | `POST /api/report-exports` | `Bus::batch([BuildLocationCsvChunk × 拠点数])` → `then`: `FinalizeReportExport` | `default` |
-| F-19 キャッシュ | `Application` / `JobPosting` の保存・削除（コミット後） | （ジョブなし）`DashboardCacheObserver` → `DashboardService::forget()` | |
+| F-19 キャッシュ | `Application` / `JobPosting` / `Location`（拠点名を表示するため。P4-07 で追加）の保存・削除（コミット後） | （ジョブなし）`DashboardCacheObserver` → `DashboardService::forget($model->company_id)` | |
 
 規約:
 
@@ -773,9 +789,10 @@ B と C の境界: C の `AttendanceService::save()` は B の `Application`（�
 | Policy を作らない | 他社は 404、状態による可否は 422 | 第2弾で学習済み。今回は API・Next・非同期に時間を使う |
 | Enum のラベルを API が返す | `{value, label}` | 日本語の文言を 2 箇所に書かない。web は色だけ持つ |
 | ログイン以外はブラウザから API を叩かない | Next サーバが中継 | Cookie と CSRF を扱う場所を `lib/api.ts` の 1 箇所にできる。CORS で通すオリジンも 1 つで済む |
-| 署名付きURL を認証の外に置く | 署名＋30 分の期限で保護 | メールのリンクやブラウザの直接遷移では Sanctum の stateful 判定（Origin / Referer）を満たせない場合がある。URL は取得のたびに作り直す |
+| 署名付きURL を認証の外に置く | 署名＋30 分の期限で保護 | ブラウザの直接遷移では Sanctum の stateful 判定（Origin / Referer）を満たせない。URL は取得のたびに作り直し、メールには入れない（P4-05） |
+| 同じ月の出力の同時依頼 | トランザクションの先頭で企業の行を `lockForUpdate()` してから生成中を確認 | SQLite では IMMEDIATE で直列化される。MySQL に移してもそのまま効く（部分インデックスの UNIQUE は MySQL にないので使わない。P4-05） |
 | 同期 CSV（F-18）は Route Handler で中継 | `app/(admin)/reports/monthly/csv/route.ts` | 上と同じ理由。こちらは署名を使わず、Next サーバが Cookie を転送して取ってくる。**同じ「ファイルを渡す」を 2 通りで実装して比べる** |
-| キャッシュの破棄を Observer に | `Application` / `JobPosting` の Observer がコミット後に破棄 | サービスの各メソッドに書くと経路を足したとき漏れる。担当 B が担当 C のキャッシュを知らなくて済む。Observer は担当 C の所有（`app/Observers/`）で、P4 に足す |
+| キャッシュの破棄を Observer に | `Application` / `JobPosting` / `Location` の Observer がコミット後に破棄 | サービスの各メソッドに書くと経路を足したとき漏れる。担当 B が担当 C のキャッシュを知らなくて済む。Observer は担当 C の所有（`app/Observers/`）で、P4 に足す |
 | 通知の記録を自前のテーブルに | `notification_logs`（ポリモーフィック）＋ `dedupe_key` の UNIQUE | 冪等性を DB 制約で保証できる。Laravel の `notifications` テーブルは「管理者のアプリ内通知」にだけ使う |
 | ジョブに ID を渡す | `SerializesModels` に頼らない | 実行時点の最新状態を読む。確定後すぐキャンセルされた応募に確定通知を送らない |
 

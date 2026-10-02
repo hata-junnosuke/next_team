@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\JobPostingController;
 use App\Http\Controllers\Api\LocationController;
 use App\Http\Controllers\Api\MonthlyReportController;
+use App\Http\Controllers\Api\ReportExportController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\WorkerController;
 use Illuminate\Support\Facades\Route;
@@ -58,4 +59,18 @@ Route::middleware(['auth:sanctum', 'company'])->group(function () {
 
     // F-19 ダッシュボード（担当 C）
     Route::get('/dashboard', [DashboardController::class, 'show'])->name('dashboard');
+
+    // F-23 月次集計の非同期出力（P4）。受付は 202。パラメータ名は {report_export}
+    Route::apiResource('report-exports', ReportExportController::class)->only(['index', 'store', 'show']);
 });
+
+/*
+ * F-23 のダウンロードだけは auth:sanctum の外（docs/01 6.9・12 章）。メールのリンクやブラウザの直接遷移では
+ * Sanctum の stateful 判定（Origin / Referer）を満たせないことがあるため。代わりに signed で、期限（30 分）と署名を検査する。
+ * 期限切れ・改ざん（ID・expires の書き換えを含む）は 403。Rails の ActiveStorage の署名付き URL（signed_id + expires_in）に近い。
+ * https://readouble.com/laravel/13.x/ja/urls.html#validating-signed-route-requests
+ */
+Route::get('/report-exports/{report_export}/download', [ReportExportController::class, 'download'])
+    ->middleware('signed')
+    ->whereNumber('report_export')
+    ->name('report-exports.download');

@@ -6,6 +6,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;
+use Illuminate\Routing\Exceptions\InvalidSignatureException;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\TokenMismatchException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -52,6 +53,16 @@ return Application::configure(basePath: dirname(__DIR__))
         // 存在しない・他社のデータはどちらも同じ 404。モデル名を出さない（docs/01 6.1 のエラー形式）
         $exceptions->render(function (NotFoundHttpException $e) {
             return response()->json(['message' => '見つかりませんでした。', 'errors' => (object) []], 404);
+        });
+
+        // 署名付き URL（F-23 のダウンロード）の期限切れ・改ざん。既定の英語 "Invalid signature." を日本語にする（419 と同じ形）。
+        // signed ミドルウェアが投げる InvalidSignatureException は HttpException(403) の子なので、そのまま型で受けられる
+        // https://readouble.com/laravel/13.x/ja/urls.html#responding-to-invalid-signed-routes
+        $exceptions->render(function (InvalidSignatureException $e) {
+            return response()->json([
+                'message' => 'リンクの有効期限が切れたか、正しくありません。',
+                'errors' => (object) [],
+            ], 403);
         });
 
         // CSRF トークンの不一致（Sanctum の SPA 認証で X-XSRF-TOKEN が古い・ない）。既定の英語 "CSRF token mismatch." を日本語にする。

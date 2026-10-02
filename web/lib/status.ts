@@ -50,3 +50,17 @@ export function statusClass(kind: StatusKind, value: string): string {
   const tones: Record<string, Tone> = statusTones[kind];
   return toneClasses[tones[value] ?? "gray"];
 }
+
+// ReportExportStatus のうち「生成中」にあたる value（docs/01 4.1・6.9）。
+// 進捗を出すか・「更新すると最新になります」の注記を出すかの表示の判断にだけ使う（依頼を受け付けるかは API の 422）
+const inProgressExportStatuses: readonly string[] = ["queued", "processing"];
+
+/** 出力の状態の value が生成中（queued / processing）か */
+export function isInProgressExportStatus(value: string): boolean {
+  return inProgressExportStatuses.includes(value);
+}
+
+/** 出力の状態の value が失敗（failed）か。「この月をもう一度依頼」のリンクを出す表示の判断にだけ使う */
+export function isFailedExportStatus(value: string): boolean {
+  return value === "failed";
+}

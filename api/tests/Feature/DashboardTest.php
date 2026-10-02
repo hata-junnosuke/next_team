@@ -6,7 +6,12 @@ use App\Models\Application;
 use App\Models\Company;
 use App\Models\JobPosting;
 use App\Models\Location;
+use App\Models\User;
+use App\Models\Worker;
+use App\Services\DashboardService;
 use App\Support\CurrentCompany;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
@@ -151,6 +156,8 @@ class DashboardTest extends TestCase
         $this->postingWithConfirmed(capacity: 3, confirmed: 1);
         $this->getDashboard()->assertOk();
 
+        // キャッシュに助けられないよう、測る前に毎回消す（P4-07 から 2 回目はキャッシュから返るため）
+        Cache::flush();
         DB::enableQueryLog();
         $this->getDashboard()->assertOk();
         $one = count(DB::getQueryLog());
@@ -158,6 +165,7 @@ class DashboardTest extends TestCase
         foreach (range(2, 6) as $day) {
             $this->postingWithConfirmed(capacity: 3, confirmed: 1, date: sprintf('2026-10-%02d', $day));
         }
+        Cache::flush();
         DB::flushQueryLog();
         $this->getDashboard()->assertOk()->assertJsonCount(6, 'data.upcoming_postings');
 
@@ -315,5 +323,230 @@ class DashboardTest extends TestCase
             ]])
             ->assertJsonPath('data.upcoming_postings.0.start_time', '09:00')
             ->assertJsonPath('data.upcoming_postings.0.end_time', '17:00');
+    }
+
+    // ---- P4-07 キャッシュ（docs/01 8 章、docs/03 3.5） ----
+
+    /**
+     * ダッシュボードを集計するクエリ（募集・応募のテーブルを読むもの）だけを数える。認証やセッションのクエリは数えない
+     */
+    private function dashboardQueryCount(callable $callback): int
+    {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $callback();
+        $queries = collect(DB::getQueryLog())->pluck('query');
+        DB::disableQueryLog();
+
+        return $queries->filter(fn (string $sql) => str_contains($sql, 'job_postings') || str_contains($sql, 'applications'))->count();
+    }
+
+    private function generatedAt(): string
+    {
+        return $this->getDashboard()->assertOk()->json('data.generated_at');
+    }
+
+    public function test_2回目の取得はキャッシュから返りgenerated_atが同じ(): void
+    {
+        $this->postingWithConfirmed(capacity: 3, confirmed: 1);
+        $first = $this->getDashboard()->assertOk()->json('data');
+
+        $this->travel(3)->minutes();
+        $queries = $this->dashboardQueryCount(function () use ($first) {
+            $this->getDashboard()->assertOk()->assertExactJson(['data' => $first]);
+        });
+
+        $this->assertSame(0, $queries);
+        // generated_at はキャッシュした時刻（2 回目の時刻 10:03 ではない）
+        $this->assertSame('2026-10-01T10:00:00+09:00', $first['generated_at']);
+    }
+
+    public function test_キャッシュのキーはdashboard_企業_i_dで値が入る(): void
+    {
+        $this->getDashboard()->assertOk();
+
+        $this->assertTrue(Cache::has('dashboard:'.$this->company->id));
+    }
+
+    public function test_承認するとキャッシュが破棄され充足率が更新される(): void
+    {
+        $posting = JobPosting::factory()->onDate('2026-10-05')->create(['capacity' => 2]);
+        $application = Application::factory()->for($posting)->create();
+        $this->getDashboard()
+            ->assertJsonPath('data.upcoming_postings.0.fill_rate', 0)
+            ->assertJsonPath('data.pending_applications_count', 1);
+
+        $this->travel(1)->minutes();
+        $this->actingAsAdmin()->postJson("/api/applications/{$application->id}/confirm")->assertOk();
+
+        $this->getDashboard()
+            ->assertJsonPath('data.upcoming_postings.0.confirmed_count', 1)
+            ->assertJsonPath('data.upcoming_postings.0.fill_rate', 50)
+            ->assertJsonPath('data.pending_applications_count', 0)
+            ->assertJsonPath('data.generated_at', '2026-10-01T10:01:00+09:00');
+    }
+
+    public function test_応募を追加するとキャッシュが破棄され未処理の件数が増える(): void
+    {
+        $posting = JobPosting::factory()->onDate('2026-10-05')->create();
+        $this->getDashboard()->assertJsonPath('data.pending_applications_count', 0);
+
+        $worker = Worker::factory()->create();
+        $this->actingAsAdmin()->postJson("/api/job-postings/{$posting->id}/applications", ['worker_id' => $worker->id])->assertCreated();
+
+        $this->getDashboard()->assertJsonPath('data.pending_applications_count', 1);
+    }
+
+    public function test_募集を作成するとキャッシュが破棄され一覧に出る(): void
+    {
+        $this->getDashboard()->assertJsonCount(0, 'data.upcoming_postings');
+
+        $location = Location::factory()->create();
+        $this->actingAsAdmin()->postJson('/api/job-postings', [
+            'location_id' => $location->id, 'job_title' => 'ピッキング', 'work_date' => '2026-10-20',
+            'start_time' => '09:00', 'end_time' => '17:00', 'capacity' => 3, 'hourly_wage' => 1300, 'transport_allowance' => 500,
+        ])->assertCreated();
+
+        $this->getDashboard()->assertJsonCount(1, 'data.upcoming_postings');
+    }
+
+    public function test_募集を締め切るとキャッシュが破棄される(): void
+    {
+        $posting = JobPosting::factory()->onDate('2026-10-05')->create();
+        $this->assertSame('2026-10-01T10:00:00+09:00', $this->generatedAt());
+
+        $this->travel(1)->minutes();
+        $this->actingAsAdmin()->postJson("/api/job-postings/{$posting->id}/close")->assertOk();
+
+        // 締切の募集は一覧に残るので、作り直されたことは generated_at で確かめる
+        $this->getDashboard()
+            ->assertJsonPath('data.upcoming_postings.0.id', $posting->id)
+            ->assertJsonPath('data.generated_at', '2026-10-01T10:01:00+09:00');
+    }
+
+    public function test_募集を中止するとキャッシュが破棄される(): void
+    {
+        $posting = JobPosting::factory()->onDate('2026-10-05')->create();
+        Application::factory()->for($posting)->create();
+        $this->getDashboard()
+            ->assertJsonCount(1, 'data.upcoming_postings')
+            ->assertJsonPath('data.pending_applications_count', 1);
+
+        $this->actingAsAdmin()->postJson("/api/job-postings/{$posting->id}/cancel")->assertOk();
+
+        // 中止で募集は一覧から消え、応募中の応募は却下になる
+        $this->getDashboard()
+            ->assertJsonCount(0, 'data.upcoming_postings')
+            ->assertJsonPath('data.pending_applications_count', 0);
+    }
+
+    public function test_募集を削除してもキャッシュが破棄される(): void
+    {
+        $posting = JobPosting::factory()->onDate('2026-10-05')->create();
+        $this->getDashboard()->assertJsonCount(1, 'data.upcoming_postings');
+
+        // 募集の削除 API はない。Observer の deleted が効くことをモデルの削除で確かめる
+        $posting->delete();
+
+        $this->getDashboard()->assertJsonCount(0, 'data.upcoming_postings');
+    }
+
+    public function test_ロールバックした変更ではキャッシュは破棄されない(): void
+    {
+        $this->getDashboard()->assertJsonCount(0, 'data.upcoming_postings');
+
+        try {
+            DB::transaction(function () {
+                JobPosting::factory()->onDate('2026-10-05')->create();
+                // トランザクションの途中ではまだ破棄されない（コミット後に破棄する）
+                $this->assertTrue(Cache::has('dashboard:'.$this->company->id));
+
+                throw new \RuntimeException('ロールバックさせる');
+            });
+        } catch (\RuntimeException) {
+            // 想定どおり
+        }
+
+        $this->assertTrue(Cache::has('dashboard:'.$this->company->id));
+        $this->assertSame('2026-10-01T10:00:00+09:00', $this->generatedAt());
+    }
+
+    public function test_定員超過で承認できなかったときはキャッシュは破棄されない(): void
+    {
+        $posting = $this->postingWithConfirmed(capacity: 1, confirmed: 1);
+        $application = Application::factory()->for($posting)->create();
+        $this->getDashboard()->assertOk();
+
+        $spy = Cache::spy();
+        $this->actingAsAdmin()->postJson("/api/applications/{$application->id}/confirm")->assertUnprocessable();
+
+        $spy->shouldNotHaveReceived('forget');
+    }
+
+    public function test_キャッシュは企業ごとに分かれ他社の値が混ざらない(): void
+    {
+        $ours = JobPosting::factory()->onDate('2026-10-05')->create();
+        $other = Company::factory()->create();
+        $theirs = CurrentCompany::runAs($other->id, fn () => JobPosting::factory()->onDate('2026-10-06')->create());
+        $otherAdmin = User::factory()->for($other)->create();
+
+        Context::forget('company_id');
+        $this->getDashboard()->assertJsonPath('data.upcoming_postings.0.id', $ours->id);
+
+        // 自社のキャッシュがあっても、他社には他社の値が返る
+        Context::forget('company_id');
+        $this->actingAs($otherAdmin)->getJson('/api/dashboard')
+            ->assertOk()
+            ->assertJsonCount(1, 'data.upcoming_postings')
+            ->assertJsonPath('data.upcoming_postings.0.id', $theirs->id);
+
+        // 他社の変更で自社のキャッシュは消えない
+        $this->travel(1)->minutes();
+        CurrentCompany::runAs($other->id, fn () => JobPosting::factory()->onDate('2026-10-07')->create());
+        $this->assertTrue(Cache::has('dashboard:'.$this->company->id));
+        $this->assertFalse(Cache::has('dashboard:'.$other->id));
+
+        Context::forget('company_id');
+        $this->getDashboard()
+            ->assertJsonCount(1, 'data.upcoming_postings')
+            ->assertJsonPath('data.generated_at', '2026-10-01T10:00:00+09:00');
+    }
+
+    public function test_有効期限を過ぎると作り直される(): void
+    {
+        Config::set('myteam.dashboard_cache_seconds', 300);
+        $this->getDashboard()->assertOk();
+
+        $this->travel(299)->seconds();
+        $this->assertSame('2026-10-01T10:00:00+09:00', $this->generatedAt());
+
+        $this->travel(1)->seconds();
+        $this->assertSame('2026-10-01T10:05:00+09:00', $this->generatedAt());
+    }
+
+    public function test_日付をまたいだら有効期限内でも作り直され前日の募集は消える(): void
+    {
+        $this->travelTo(now()->setDate(2026, 10, 1)->setTime(23, 58));
+        $today = JobPosting::factory()->onDate('2026-10-01')->create();
+        $this->getDashboard()->assertJsonPath('data.upcoming_postings.0.id', $today->id);
+
+        // 5 分以内でも日付が変わったら古い一覧は返さない
+        $this->travelTo(now()->setDate(2026, 10, 2)->setTime(0, 0));
+
+        $this->getDashboard()
+            ->assertJsonCount(0, 'data.upcoming_postings')
+            ->assertJsonPath('data.generated_at', '2026-10-02T00:00:00+09:00');
+    }
+
+    public function test_forgetは指定した企業のキャッシュだけを消す(): void
+    {
+        $other = Company::factory()->create();
+        Cache::put('dashboard:'.$this->company->id, ['x'], 300);
+        Cache::put('dashboard:'.$other->id, ['y'], 300);
+
+        app(DashboardService::class)->forget($this->company->id);
+
+        $this->assertFalse(Cache::has('dashboard:'.$this->company->id));
+        $this->assertTrue(Cache::has('dashboard:'.$other->id));
     }
 }
