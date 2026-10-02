@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ToggleWorkerActiveButton } from "@/components/workers/ToggleWorkerActiveButton";
 import { WorkerSearchForm } from "@/components/workers/WorkerSearchForm";
 import { Alert } from "@/components/ui/Alert";
-import { Pagination } from "@/components/ui/Pagination";
+import { emptyText, Pagination } from "@/components/ui/Pagination";
 import { Table, Td } from "@/components/ui/Table";
 import { setWorkerActive } from "@/lib/actions/worker";
 import { ApiError, apiGet } from "@/lib/api";
@@ -72,11 +72,13 @@ export default async function WorkersPage({ searchParams }: Props) {
         <>
           <Table
             head={["氏名", "メールアドレス", "電話番号", "状態", ""]}
-            empty={
+            empty={emptyText(
+              result.meta,
+              result.data.length,
               q !== "" || isActive !== ""
                 ? "条件に合うワーカーがいません。"
-                : "ワーカーがまだ登録されていません。"
-            }
+                : "ワーカーがまだ登録されていません。",
+            )}
           >
             {result.data.map((worker) => (
               <tr key={worker.id} className="align-top">
@@ -115,6 +117,7 @@ export default async function WorkersPage({ searchParams }: Props) {
             meta={result.meta}
             basePath="/workers"
             query={{ q, is_active: isActive }}
+            itemCount={result.data.length}
           />
         </>
       )}

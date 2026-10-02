@@ -4,7 +4,7 @@ import {
 } from "@/components/notifications/NotificationFilters";
 import { NotificationLogTable } from "@/components/notifications/NotificationLogTable";
 import { Alert } from "@/components/ui/Alert";
-import { Pagination } from "@/components/ui/Pagination";
+import { emptyText, Pagination } from "@/components/ui/Pagination";
 import { ApiError, apiGet } from "@/lib/api";
 import { notificationLogListResponse } from "@/lib/schemas/notification-log";
 
@@ -81,17 +81,20 @@ export default async function NotificationsPage({ searchParams }: Props) {
         <>
           <NotificationLogTable
             logs={result.data}
-            empty={
+            empty={emptyText(
+              result.meta,
+              result.data.length,
               filtered
                 ? "条件に合う通知はありません。"
-                : "通知の履歴はまだありません。"
-            }
+                : "通知の履歴はまだありません。",
+            )}
           />
 
           <Pagination
             meta={result.meta}
             basePath="/notifications"
             query={filters}
+            itemCount={result.data.length}
           />
         </>
       )}

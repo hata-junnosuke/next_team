@@ -128,7 +128,7 @@ const res = await fetch(`${API}/login`, {
 | `Button` | `pending` で無効化と文言の切り替え。`variant`: primary / secondary / danger |
 | `Alert` | `FormState` の `message` を表示（成功 / エラー）。`errors` に項目があるときは出さない（項目エラーは `Field`、業務ルール違反は `Alert`） |
 | `Badge` | 状態の表示。色は `lib/status.ts` |
-| `Pagination` | `meta` を受けて前後のリンク |
+| `Pagination` | `meta` を受けて前後のリンク。範囲外の page（`meta.total > 0` なのに 0 件）では 1 ページ目へのリンクだけを出す。`itemCount`（`data.length`）は必須。表の空の文言は `emptyText(meta, data.length, "…まだ…")` で差し替える（範囲外なら「このページには表示する項目がありません。」） |
 
 ## 表示（`lib/format.ts`）
 - `yen(9600)` → `9,600円` / `minutes(420)` → `7時間00分` / `date("2026-09-20")` → `2026/09/20（日）` / `dateTime(iso)` → `2026/10/01（木） 10:00` / `time(iso)` → `09:00`

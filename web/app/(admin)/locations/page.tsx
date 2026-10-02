@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { DeleteLocationButton } from "@/components/locations/DeleteLocationButton";
-import { Pagination } from "@/components/ui/Pagination";
+import { emptyText, Pagination } from "@/components/ui/Pagination";
 import { Table, Td } from "@/components/ui/Table";
 import { deleteLocation } from "@/lib/actions/location";
 import { apiGet } from "@/lib/api";
@@ -37,7 +37,11 @@ export default async function LocationsPage({ searchParams }: Props) {
 
       <Table
         head={["名称", "住所", "募集数", ""]}
-        empty="拠点がまだ登録されていません。"
+        empty={emptyText(
+          meta,
+          locations.length,
+          "拠点がまだ登録されていません。",
+        )}
       >
         {locations.map((location) => (
           <tr key={location.id} className="align-top">
@@ -65,7 +69,11 @@ export default async function LocationsPage({ searchParams }: Props) {
         ))}
       </Table>
 
-      <Pagination meta={meta} basePath="/locations" />
+      <Pagination
+        meta={meta}
+        basePath="/locations"
+        itemCount={locations.length}
+      />
     </div>
   );
 }

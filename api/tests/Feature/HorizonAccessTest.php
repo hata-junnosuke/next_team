@@ -2,12 +2,19 @@
 
 namespace Tests\Feature;
 
+use App\Models\ReportExport;
 use App\Providers\TelescopeServiceProvider;
+use Illuminate\Foundation\Http\Events\RequestHandled;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Session\ArraySessionHandler;
+use Illuminate\Session\Store;
 use Laravel\Horizon\Contracts\MasterSupervisorRepository;
 use Laravel\Horizon\Contracts\SupervisorRepository;
 use Laravel\Telescope\Http\Middleware\Authorize;
+use Laravel\Telescope\IncomingEntry;
 use Laravel\Telescope\Telescope;
+use Laravel\Telescope\Watchers\RequestWatcher;
 use Tests\TestCase;
 
 /**
@@ -18,6 +25,31 @@ use Tests\TestCase;
  */
 class HorizonAccessTest extends TestCase
 {
+    /** @var array<string, mixed> TelescopeServiceProvider が書き換える Telescope の static（テストごとに元に戻す） */
+    private array $telescopeStatics = [];
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->telescopeStatics = [
+            'hiddenRequestHeaders' => Telescope::$hiddenRequestHeaders,
+            'hiddenRequestParameters' => Telescope::$hiddenRequestParameters,
+            'hiddenResponseParameters' => Telescope::$hiddenResponseParameters,
+            'afterRecordingHook' => Telescope::$afterRecordingHook,
+        ];
+    }
+
+    protected function tearDown(): void
+    {
+        // static はプロセスの間残るので、後続のテスト（ほかのクラスを含む）に設定を持ち越さない
+        foreach ($this->telescopeStatics as $name => $value) {
+            Telescope::${$name} = $value;
+        }
+
+        parent::tearDown();
+    }
+
     private function actAsLocal(): void
     {
         $this->app['env'] = 'local';
@@ -84,6 +116,66 @@ class HorizonAccessTest extends TestCase
             $this->assertContains($parameter, Telescope::$hiddenRequestParameters, "パラメータ {$parameter} を隠す");
         }
         $this->assertContains(Authorize::class, config('telescope.middleware'), '画面の入口で Telescope::check() を通す');
+    }
+
+    public function test_telescopeは署名付きurlを記録しない(): void
+    {
+        $this->app->register(TelescopeServiceProvider::class);
+
+        $this->assertContains('data.download_url', Telescope::$hiddenResponseParameters, '詳細の download_url を隠す');
+        $this->assertContains('signature', Telescope::$hiddenRequestParameters, 'ダウンロードのクエリの署名を隠す');
+        $this->assertNotNull(Telescope::$afterRecordingHook, '一覧の download_url と URI の署名は記録の後に隠す');
+    }
+
+    public function test_telescopeのリクエストの記録に署名付きurlが残らない(): void
+    {
+        // 設定に入っただけでなく、RequestWatcher の整形（hideParameters）と記録の後の加工を実際に通して確かめる。
+        // Telescope は testing では登録しないので、watcher を直接作って RequestHandled を渡す
+        $this->app->register(TelescopeServiceProvider::class);
+        $export = ReportExport::factory()->completed()->create();
+        ReportExport::factory()->create(['month' => '2026-01']);
+
+        $index = $this->actingAsAdmin()->getJson('/api/report-exports')->assertOk();
+        $show = $this->actingAsAdmin()->getJson("/api/report-exports/{$export->id}")->assertOk();
+        $downloadUrl = $show->json('data.download_url');
+        $this->assertStringContainsString('signature=', $downloadUrl);
+        $download = Request::create($downloadUrl);
+        // ブラウザから開くと StartSession が storeCurrentUrl() で署名入りの fullUrl() を _previous.url に入れる。その状態を作る
+        $session = new Store('test', new ArraySessionHandler(120));
+        $session->put('_previous.url', $download->fullUrl());
+        $download->setLaravelSession($session);
+
+        $watcher = new RequestWatcher([]);
+        Telescope::flushEntries();
+        Telescope::startRecording(loadMonitoredTags: false); // 監視タグは DB（telescope_monitoring）を読むので読まない
+        try {
+            $watcher->recordRequest(new RequestHandled($index->baseRequest, $index->baseResponse));
+            $watcher->recordRequest(new RequestHandled($show->baseRequest, $show->baseResponse));
+            $watcher->recordRequest(new RequestHandled($download, new Response('csv', 200, ['Content-Type' => 'text/csv'])));
+            $entries = array_map(fn (IncomingEntry $entry) => $entry->content, Telescope::$entriesQueue);
+        } finally {
+            Telescope::stopRecording();
+            Telescope::flushEntries();
+        }
+
+        $this->assertCount(3, $entries);
+        [$indexEntry, $showEntry, $downloadEntry] = $entries;
+
+        $urls = array_column($indexEntry['response']['data'], 'download_url', 'id');
+        $this->assertSame('********', $urls[$export->id], '一覧の完了した出力の URL を隠す');
+        $this->assertContains(null, $urls, '未完了の出力の null はそのまま');
+        $this->assertSame('********', $showEntry['response']['data']['download_url'], '詳細の URL を隠す');
+        $this->assertSame($export->id, $showEntry['response']['data']['id'], 'ほかの項目は残す');
+
+        $signature = $download->query('signature');
+        $this->assertSame('********', $downloadEntry['payload']['signature'], 'ダウンロードのクエリの署名を隠す');
+        $this->assertStringNotContainsString($signature, $downloadEntry['uri'], 'ダウンロードの URI に署名を残さない');
+        $this->assertStringContainsString('signature=********', $downloadEntry['uri']);
+        $this->assertStringNotContainsString($signature, $downloadEntry['session']['_previous']['url'], 'セッションの直前の URL に署名を残さない');
+        $this->assertStringContainsString('signature=********', $downloadEntry['session']['_previous']['url']);
+
+        $this->assertStringNotContainsString($signature, json_encode($entries), 'どこにも署名が残らない');
+        $this->assertStringNotContainsString('signature=', json_encode([$indexEntry, $showEntry]));
     }
 
     public function test_testing環境ではtelescopeを登録しない(): void
