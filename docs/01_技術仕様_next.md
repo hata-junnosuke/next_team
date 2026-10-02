@@ -666,6 +666,7 @@ export type FormState = { ok?: boolean; message?: string; errors?: Record<string
 - 例外（P3-02 で決定）: 入力欄のない項目の 422（例: 複製フォームの `errors.hourly_wage`）は、そのフォームの下にまとめて出す（Alert は項目エラーがあると出さないため）
 - 拠点の選択肢は `per_page=100` の 1 ページ分（101 件以上は想定しない）
 - 例外（P5-01 で決定）: 通知履歴の「種別」「状態」の絞り込みの選択肢（NotificationKind / NotificationStatus）のラベルも、同じ理由で web に置く。表の表示は API の label を出す
+- 例外（P5-02 で決定）: 通知履歴のエラー列だけは折り返す（`whitespace-pre-wrap` と幅の上限を中の要素に付け、空白のない長い語も切る）。共通部品の `Td` は折り返さないので、この列だけ `<td>` を直接書く
 - 例外（P3-03 で決定）: キャンセル理由の選択肢（company 企業都合 / worker ワーカー都合）のラベルも、状態の絞り込みと同じ理由で web に置く。表示は API の label を出す
 - 表の中の操作（承認・却下・キャンセル・勤怠・締切・中止）の 404 は not-found 画面にせず、行の Alert に API の message を出す
 
