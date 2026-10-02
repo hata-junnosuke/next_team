@@ -44,3 +44,4 @@
 - 2026-10-02 | フェーズ 4 | api | Context はキューのペイロードに載り、Worker が JobProcessing で戻してから試行回数の超過を判定するので、`failed()` の時点でも `CurrentCompany` は戻っている（docs/01 13 章 #4 を `queue:work --once` で実物確認） | 信頼度 0.9 | P4-02 implementer
 - 2026-10-02 | フェーズ 4 | api | Markdown メールの `{{ }}` は HTML しか無害化せず、名前に `[x](https://evil)` を入れるとリンクになる → `Markdown::withSecuredEncoding()`。ただしこれも `|` はエスケープしないので表のセルは別に潰す。`x-mail::message` は APP_URL へのリンクをヘッダーに入れるので、外部の人宛てには `x-mail::layout` を直接使う | 信頼度 0.9 | P4-02 security / code レビュー
 - 2026-10-02 | フェーズ 4 | api | `WithoutOverlapping` で後回しにされた回も tries に数えるので、送信が遅いと 2 本目が failed になり送信済みなのに「失敗」が残る → 冪等の通知ジョブは `dontRelease()` で 2 本目を捨てる | 信頼度 0.8 | P4-02 spec-reviewer
+- 2026-10-02 | フェーズ 4 | api | `RateLimited` で戻された回も `$tries` に数えるので、tries=3 だと流量の上限を 3 回超えただけで claim の前に failed になり「届いていない」記録が残らない → メールのジョブは `$tries = 0` + `$maxExceptions = 3` + `retryUntil()`。期限切れで failed() に入ったときは対象を読み直して `recordFailure()` で記録を作る | 信頼度 0.9 | P4-03 tester が再現

@@ -170,6 +170,54 @@ class NotificationLogServiceTest extends TestCase
         $this->assertSame(NotificationStatus::Sent, $log->fresh()->status);
     }
 
+    public function test_mark_failed_by_keyは行があればtrueなければfalseを返す(): void
+    {
+        $log = $this->claim();
+
+        $this->assertTrue($this->service->markFailedByKey($log->dedupe_key, null));
+        $this->assertFalse($this->service->markFailedByKey('application_confirmed:application:999999', null));
+    }
+
+    // ---- recordFailure（ジョブの failed() で、claim の前に打ち切られた通知の記録を作る） ----
+
+    public function test_record_failureは行がなければfailedの行を作る(): void
+    {
+        $this->freezeSecond();
+
+        $this->service->recordFailure(NotificationKind::ApplicationConfirmed, $this->application->worker, $this->application, new RuntimeException('期限切れ'));
+
+        $log = NotificationLog::query()->sole();
+        $this->assertSame(NotificationStatus::Failed, $log->status);
+        $this->assertSame(NotificationKind::ApplicationConfirmed, $log->kind);
+        $this->assertSame($this->application->worker->email, $log->recipient_email);
+        $this->assertTrue($log->failed_at->equalTo(now()));
+        $this->assertSame('RuntimeException: 処理に失敗しました。', $log->error);
+    }
+
+    public function test_record_failureは送信済みの行を失敗に戻さない(): void
+    {
+        $log = $this->claim();
+        $this->service->markSent($log);
+
+        $this->service->recordFailure(NotificationKind::ApplicationConfirmed, $this->application->worker, $this->application, null);
+
+        $this->assertSame(NotificationStatus::Sent, $log->fresh()->status);
+        $this->assertSame(1, NotificationLog::query()->count());
+    }
+
+    public function test_record_failureも他社の宛先なら例外で行を作らない(): void
+    {
+        $other = Company::factory()->create();
+        $theirWorker = CurrentCompany::runAs($other->id, fn () => Worker::factory()->create());
+
+        $this->expectException(LogicException::class);
+        try {
+            $this->service->recordFailure(NotificationKind::ApplicationConfirmed, $theirWorker, $this->application, null);
+        } finally {
+            $this->assertSame(0, NotificationLog::withoutGlobalScopes()->count()); // 全社の行を数えるため
+        }
+    }
+
     public function test_別のワーカーが先に送信済みにしていたらmark_sentは何もせずsent_atは最初のまま(): void
     {
         $this->freezeSecond();

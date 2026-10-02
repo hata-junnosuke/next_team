@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Mail\Concerns\FormatsMarkdownText;
 use App\Models\Application;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -18,6 +19,8 @@ use Illuminate\Mail\Mailables\Envelope;
  */
 class ApplicationConfirmedMail extends Mailable
 {
+    use FormatsMarkdownText;
+
     public function __construct(public Application $application) {}
 
     public function envelope(): Envelope
@@ -32,7 +35,7 @@ class ApplicationConfirmedMail extends Mailable
         return new Content(
             markdown: 'mail.application-confirmed',
             with: [
-                'workerName' => $this->application->worker->name,
+                'workerName' => self::singleLine($this->application->worker->name),
                 'workDate' => $posting->work_date->isoFormat('YYYY年M月D日（ddd）'),
                 'startTime' => substr($posting->start_time, 0, 5),
                 'endTime' => substr($posting->end_time, 0, 5),
@@ -42,15 +45,5 @@ class ApplicationConfirmedMail extends Mailable
                 'hourlyWage' => number_format($this->application->confirmed_hourly_wage),
             ],
         );
-    }
-
-    /**
-     * 表のセルに入れる利用者の入力（拠点名・住所・職種）。Markdown::withSecuredEncoding() がエスケープするのは
-     * [ < > だけで、| と改行はそのまま残り、表の列や行を壊す（拠点名の | の後ろが消える）ので、ここで潰す。
-     * | は GFM の表の書き方どおり \| に、改行は空白にする
-     */
-    private static function tableCell(?string $value): string
-    {
-        return str_replace(['|', "\r\n", "\r", "\n"], ['\\|', ' ', ' ', ' '], $value ?? '');
     }
 }

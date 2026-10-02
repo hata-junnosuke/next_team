@@ -18,7 +18,8 @@ use Throwable;
  *
  * メールを送るジョブは必ず次の順に呼ぶ（async-rules）:
  *   $log = claim(...) → null なら return（送信済み）→ 送信 → markSent($log)
- *   全部の試行が失敗したら、ジョブの failed() から markFailedByKey(dedupeKey(...), $e)
+ *   例外 3 回か期限切れで打ち切った後、ジョブの failed() から markFailedByKey(dedupeKey(...), $e)。
+ *   行がなければ（claim の前に打ち切られた。例: 流量制限で戻され続けて期限切れ）、まだ送るべき対象なら recordFailure(...)
  *
  * 「送信 → 記録」の順なので、送信の直後・記録の前に落ちると再試行でもう 1 通送る（at-least-once。docs/03 4.3）。
  * 企業は BelongsToCompany が CurrentCompany::id() で埋める（ジョブには Context で引き継がれる）。
@@ -126,11 +127,30 @@ class NotificationLogService
 
     /**
      * ジョブの failed() から呼ぶ。failed() はジョブの外で呼ばれ、claim した行を持っていないのでキーで探す。
-     * 行がない（claim の前に失敗した。例: 応募が見つからない）なら何もしない。宛先が分からないので行は作らない。
+     * 行があれば failed にして true（送信済みなら変えないが、行はあるので true）。行がなければ何もせず false。
+     * false のときは、呼び出し側が「まだ送るべき対象か」を確かめてから recordFailure() で記録を作る。
      */
-    public function markFailedByKey(string $dedupeKey, ?Throwable $e): void
+    public function markFailedByKey(string $dedupeKey, ?Throwable $e): bool
     {
         $log = NotificationLog::query()->where('dedupe_key', $dedupeKey)->first();
+
+        if ($log === null) {
+            return false;
+        }
+
+        $this->markFailed($log, $e);
+
+        return true;
+    }
+
+    /**
+     * claim の前に打ち切られた通知（例: 流量制限で戻され続けて retryUntil を過ぎた）の「届いていない」記録を作る。
+     * claim と同じ検査（宛先・対象が今の企業の保存済みの行か）を通し、claim が null（送信済み）なら何もしない。
+     * 行が返れば failed にする。ジョブの failed() から、まだ送るべき対象だと確かめた後に呼ぶ。
+     */
+    public function recordFailure(NotificationKind $kind, Model $recipient, Model $subject, ?Throwable $e): void
+    {
+        $log = $this->claim($kind, $recipient, $subject);
 
         if ($log !== null) {
             $this->markFailed($log, $e);

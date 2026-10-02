@@ -2,11 +2,16 @@
 
 namespace Tests\Feature;
 
+use App\Enums\CancelReason;
+use App\Enums\JobPostingStatus;
 use App\Enums\NotificationKind;
 use App\Enums\NotificationStatus;
 use App\Jobs\SendApplicationConfirmedMail;
+use App\Jobs\SendPostingCancelledMail;
 use App\Mail\ApplicationConfirmedMail;
+use App\Mail\PostingCancelledMail;
 use App\Models\Application;
+use App\Models\JobPosting;
 use App\Models\NotificationLog;
 use App\Models\Worker;
 use App\Services\NotificationLogService;
@@ -16,7 +21,7 @@ use Tests\TestCase;
 /**
  * 同じ通知を二重に送らない（要件 7 章「4.7 を実装する弾のみ」、docs/03 4 章。docs/01 9.1 の必須テスト）。
  * ジョブの handle() を直接呼び、「実行したら何通送られたか」を Mail::fake() で数える。
- * 中止通知（P4-03）・前日リマインド（P4-04）・出力完了（P4-05）はそれぞれのタスクで追記する。
+ * 前日リマインド（P4-04）・出力完了（P4-05）はそれぞれのタスクで追記する。
  */
 class NotificationIdempotencyTest extends TestCase
 {
@@ -127,6 +132,59 @@ class NotificationIdempotencyTest extends TestCase
         Mail::assertSentCount(1);
         $this->assertSame(1, NotificationLog::query()->count());
         $this->assertSame(NotificationStatus::Sent, NotificationLog::query()->sole()->status);
+    }
+
+    // ---- F-21 中止通知（P4-03） ----
+
+    public function test_中止通知ジョブを2回実行してもメールは1通(): void
+    {
+        Mail::fake();
+        $posting = JobPosting::factory()->create(['status' => JobPostingStatus::Cancelled]);
+        $application = Application::factory()->for($posting)->cancelled(CancelReason::Company)->create();
+
+        $this->runCancelledJob($application->id);
+        $this->runCancelledJob($application->id); // 再試行・手動の再実行・二重投入
+
+        Mail::assertSent(PostingCancelledMail::class, 1);
+        $log = NotificationLog::query()->sole();
+        $this->assertSame(NotificationStatus::Sent, $log->status);
+        $this->assertSame("posting_cancelled:application:{$application->id}", $log->dedupe_key);
+    }
+
+    public function test_中止で3人に送った後に同じジョブを積み直しても追加で送らない(): void
+    {
+        Mail::fake();
+        $posting = JobPosting::factory()->create(['capacity' => 3]);
+        $ids = Application::factory()->for($posting)->confirmed()->count(3)->create()->pluck('id')->all();
+
+        // sync キューなので、中止のコミット後にリスナが積んだ 3 ジョブがその場で送る（1 人 1 通）
+        $this->actingAsAdmin()->postJson("/api/job-postings/{$posting->id}/cancel")->assertOk();
+        foreach ($ids as $id) {
+            SendPostingCancelledMail::dispatch($id); // 手動の再投入
+        }
+
+        Mail::assertSent(PostingCancelledMail::class, 3);
+        $this->assertSame(3, NotificationLog::query()->where('status', NotificationStatus::Sent)->count());
+    }
+
+    public function test_同じ応募に確定通知と中止通知はそれぞれ1通ずつ送れる(): void
+    {
+        // dedupe_key は種類ごとに別（application_confirmed:… と posting_cancelled:…）なので、確定通知の送信済みが中止通知を止めない
+        Mail::fake();
+        $posting = JobPosting::factory()->create();
+        $application = Application::factory()->for($posting)->create();
+
+        $this->actingAsAdmin()->postJson("/api/applications/{$application->id}/confirm")->assertOk();
+        $this->postJson("/api/job-postings/{$posting->id}/cancel")->assertOk();
+
+        Mail::assertSent(ApplicationConfirmedMail::class, 1);
+        Mail::assertSent(PostingCancelledMail::class, 1);
+        $this->assertSame(2, NotificationLog::query()->count());
+    }
+
+    private function runCancelledJob(int $applicationId): void
+    {
+        (new SendPostingCancelledMail($applicationId))->handle(app(NotificationLogService::class));
     }
 
     private function runConfirmedJob(int $applicationId): void

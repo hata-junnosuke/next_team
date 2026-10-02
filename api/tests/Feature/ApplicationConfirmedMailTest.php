@@ -16,6 +16,7 @@ use App\Models\Worker;
 use App\Services\ApplicationService;
 use App\Services\NotificationLogService;
 use App\Support\CurrentCompany;
+use Illuminate\Queue\Middleware\RateLimited;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Context;
@@ -194,12 +195,16 @@ class ApplicationConfirmedMailTest extends TestCase
         $this->assertStringNotContainsString('secret', $log->error);
     }
 
-    public function test_ジョブはmailsキューに3回までbackoffは10秒と60秒(): void
+    public function test_ジョブはmailsキューで例外3回か積んでから60分で打ち切りbackoffは10秒と60秒(): void
     {
+        $this->freezeSecond();
         $job = new SendApplicationConfirmedMail(1);
 
         $this->assertSame('mails', $job->queue);
-        $this->assertSame(3, $job->tries);
+        // 試行の回数では打ち切らない（キューへ戻された回を失敗に数えない）。例外 3 回か retryUntil で打ち切る
+        $this->assertSame(0, $job->tries);
+        $this->assertSame(3, $job->maxExceptions);
+        $this->assertEquals(now()->addMinutes(60), $job->retryUntil());
         $this->assertSame([10, 60], $job->backoff());
     }
 
@@ -349,10 +354,27 @@ class ApplicationConfirmedMailTest extends TestCase
 
     public function test_claimの前に失敗したらfailedは記録を作らず例外にならない(): void
     {
-        // 例: 応募が消えていた・DB に繋がらなかった。宛先が分からないので notification_logs の行は作らない（failed_jobs には残る）
+        // 送るべき対象でない（応募が見つからない・もう確定ではない）なら、送る通知がないので notification_logs の行は作らない
+        // （failed_jobs には残る）
+        $cancelled = Application::factory()->cancelled(CancelReason::Worker)->create();
+
         (new SendApplicationConfirmedMail(999_999))->failed(new \RuntimeException('boom'));
+        (new SendApplicationConfirmedMail($cancelled->id))->failed(new \RuntimeException('boom'));
 
         $this->assertSame(0, NotificationLog::withoutGlobalScopes()->count()); // 全社の行を数えるため
+    }
+
+    public function test_claimの前に打ち切られてもまだ確定ならfailedが届いていない記録を作る(): void
+    {
+        // 例: 流量制限で戻され続けて retryUntil を過ぎた（handle() に 1 度も入っていない）
+        $application = $this->confirmedApplication();
+
+        (new SendApplicationConfirmedMail($application->id))->failed(new \RuntimeException('期限切れ'));
+
+        $log = NotificationLog::query()->sole();
+        $this->assertSame(NotificationStatus::Failed, $log->status);
+        $this->assertSame('hanako@example.com', $log->recipient_email);
+        $this->assertSame("application_confirmed:application:{$application->id}", $log->dedupe_key);
     }
 
     public function test_送信済みの後にfailedが呼ばれても失敗に戻さない(): void
@@ -394,15 +416,17 @@ class ApplicationConfirmedMailTest extends TestCase
         $this->assertNotNull($log->sent_at);
     }
 
-    public function test_同じ応募のジョブは通知のキーでwithout_overlappingがかかる(): void
+    public function test_ミドルウェアはメールの流量制限と通知のキーのwithout_overlapping(): void
     {
         $middleware = (new SendApplicationConfirmedMail(15))->middleware();
 
-        $this->assertCount(1, $middleware);
-        $this->assertInstanceOf(WithoutOverlapping::class, $middleware[0]);
-        $this->assertSame('application_confirmed:application:15', $middleware[0]->key);
-        $this->assertNull($middleware[0]->releaseAfter); // dontRelease(): 重なった 2 本目は戻さずに捨てる
-        $this->assertSame(120, $middleware[0]->expiresAfter);
+        // 流量の制限（中止通知・リマインドと同じリミッター mails）を、ロックより先に
+        $this->assertCount(2, $middleware);
+        $this->assertInstanceOf(RateLimited::class, $middleware[0]);
+        $this->assertInstanceOf(WithoutOverlapping::class, $middleware[1]);
+        $this->assertSame('application_confirmed:application:15', $middleware[1]->key);
+        $this->assertNull($middleware[1]->releaseAfter); // dontRelease(): 重なった 2 本目は戻さずに捨てる
+        $this->assertSame(120, $middleware[1]->expiresAfter);
     }
 
     // ---- レビュー反映（P4-02） ----
@@ -427,13 +451,28 @@ class ApplicationConfirmedMailTest extends TestCase
         });
     }
 
+    public function test_氏名の改行は空白になり見出しや段落を作らない(): void
+    {
+        Mail::fake();
+        $application = $this->confirmedApplication();
+        $application->worker->update(['name' => "山田\n# 偽の見出し"]);
+
+        $this->runJob($application->id);
+
+        Mail::assertSent(ApplicationConfirmedMail::class, function (ApplicationConfirmedMail $mail) {
+            $html = $mail->render();
+
+            return str_contains($html, '山田 # 偽の見出し 様') && substr_count($html, '<h1') === 1;
+        });
+    }
+
     public function test_同じ通知のジョブが走っている間の2本目は送らずfailedにもならない(): void
     {
         Mail::fake();
         $application = $this->confirmedApplication();
         $job = new SendApplicationConfirmedMail($application->id);
         // 1 本目が実行中＝同じキーのロックを持っている状態を作る
-        $lock = Cache::lock($job->middleware()[0]->getLockKey($job), 120);
+        $lock = Cache::lock($job->middleware()[1]->getLockKey($job), 120);
         $this->assertTrue($lock->get());
 
         SendApplicationConfirmedMail::dispatch($application->id)->onConnection('database');
