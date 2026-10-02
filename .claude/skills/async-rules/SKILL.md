@@ -27,7 +27,9 @@ class SendApplicationConfirmedMail implements ShouldQueue
 
     public function middleware(): array
     {
-        return [new WithoutOverlapping("application_confirmed:{$this->applicationId}")];  // 同じ通知を同時に 2 つ走らせない
+        // 同じ通知を同時に 2 つ走らせない。キーは dedupe_key と同じ。重なった 2 本目は戻さず捨てる（tries を食わせない）。
+        // ワーカーが落ちてロックが残っても 120 秒で外れる
+        return [(new WithoutOverlapping($this->dedupeKey()))->dontRelease()->expireAfter(120)];
     }
 
     public function handle(NotificationLogService $logs): void
@@ -37,7 +39,7 @@ class SendApplicationConfirmedMail implements ShouldQueue
             return;                                           // 実行時点の最新状態を見る。もう確定でなければ送らない
         }
 
-        $log = $logs->claim(NotificationKind::ApplicationConfirmed, $application->worker, $application, $application->worker->email);
+        $log = $logs->claim(NotificationKind::ApplicationConfirmed, $application->worker, $application); // 宛先のアドレスは worker->email から決まる（P4-01 で決定）
         if ($log === null) {
             return;                                           // 送信済み（再実行・二重投入）
         }
@@ -48,7 +50,15 @@ class SendApplicationConfirmedMail implements ShouldQueue
 
     public function failed(?Throwable $e): void              // 全部の試行が失敗した後に 1 回だけ呼ばれる
     {
-        app(NotificationLogService::class)->markFailedByKey("application_confirmed:application:{$this->applicationId}", $e);
+        app(NotificationLogService::class)->markFailedByKey($this->dedupeKey(), $e);
+    }
+
+    private function dedupeKey(): string                      // キーは NotificationLogService::dedupeKey() の 1 箇所で作る
+    {
+        $subject = new Application;                           // ID だけを持つ未保存のインスタンス（DB は読まない）
+        $subject->setAttribute($subject->getKeyName(), $this->applicationId);
+
+        return NotificationLogService::dedupeKey(NotificationKind::ApplicationConfirmed, $subject);
     }
 }
 ```
@@ -60,6 +70,10 @@ class SendApplicationConfirmedMail implements ShouldQueue
 | `handle()` の最初に「まだ送るべき状態か」を確かめる | 確定の直後にキャンセルされた応募に確定通知を送らない |
 | 業務ルールをジョブに書かない | 定員・状態遷移はサービスにある。ジョブは読んで送るだけ |
 | `claim → 送信 → markSent` の順 | 再実行しても 2 通目を送らない（冪等性） |
+| `claim()` は 3 引数（種類・宛先・対象）。宛先のアドレスは渡さない | アドレスは宛先のモデルの `email` から決まる。呼び出し側が別のアドレスを渡せないようにする（P4-01） |
+| `WithoutOverlapping` のキーは `NotificationLogService::dedupeKey()` から作り、`dontRelease()` と `expireAfter()` を必ず付ける | キーの書き方を 1 箇所に。戻すと重なった 2 本目が tries を食い、送れているのに failed が残る。`expireAfter` がないと落ちたワーカーのロックが残り続ける（P4-02） |
+| ワーカー宛てのメールにリンクを付けない（ボタンも、既定のヘッダーの `APP_URL` も） | ワーカーはログインできない。管理画面の URL を外部に配らない。`x-mail::message` ではなく `x-mail::layout` にリンクのないヘッダーを渡す（P4-02） |
+| Markdown メールは `Markdown::withSecuredEncoding()`（`AppServiceProvider`）。表のセルに入れる入力は `\|` と改行も潰す | 名前に `[x](https://...)` を入れるとリンクになる。secured encoding は `[` `<` `>` しかエスケープしないので、`\|` は列を壊す（P4-02） |
 | `$tries` `backoff()` `failed()` を必ず書く | 既定のままだと 1 回の失敗で終わる／失敗が記録に残らない |
 | キュー名を明示（`mails` / `default`） | Horizon でメールと重い処理を別々に観察・制御する |
 | ジョブの中の DB 書き込みは短く。**メール送信をトランザクションの中でしない** | SQLite は書き込みが 1 本。長く持つと Web 側が待たされる |

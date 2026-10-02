@@ -8,6 +8,7 @@ use App\Models\ReportExport;
 use App\Models\User;
 use App\Models\Worker;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Mail\Markdown;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -36,5 +37,10 @@ class AppServiceProvider extends ServiceProvider
             'job_posting' => JobPosting::class,
             'report_export' => ReportExport::class,
         ]);
+
+        // Markdown のメールに差し込む値（ワーカー名・拠点名など、利用者が入力した文字列）の Markdown 記号もエスケープする。
+        // 既定では HTML だけがエスケープされ、名前に [x](https://evil.example) や | を入れるとリンクや表の列になってしまう。
+        // https://readouble.com/laravel/13.x/ja/mail.html#markdown-mailables
+        Markdown::withSecuredEncoding();
     }
 }
