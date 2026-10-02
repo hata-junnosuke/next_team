@@ -23,4 +23,9 @@ return [
     // 下限 5 分: 0 や小さすぎる値だと、動いている出力まで同じ月の依頼で failed にしてしまう
     'report_export_stale_minutes' => max(5, (int) env('MYTEAM_REPORT_EXPORT_STALE_MINUTES', 30)),
 
+    // F-19: ダッシュボードのキャッシュの秒数（DashboardService::summary()）。ただし日付の終わり（翌日 0:00）を超えては持たない。
+    // 変更はコミット後に Observer が破棄するので、これは「Observer を通らない変更（DB を直接書き換えた等）が残る最長時間」。
+    // .env の MYTEAM_DASHBOARD_CACHE_SECONDS で変える。0 以下ならキャッシュしない
+    'dashboard_cache_seconds' => (int) env('MYTEAM_DASHBOARD_CACHE_SECONDS', 300),
+
 ];

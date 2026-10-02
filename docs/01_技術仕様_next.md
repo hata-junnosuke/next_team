@@ -74,6 +74,11 @@ UI コンポーネントライブラリ、状態管理ライブラリ、デー�
 | `MAIL_MAILER` / `MAIL_HOST` / `MAIL_PORT` | `smtp` / `127.0.0.1` / `1025` | **P4** | Mailpit |
 | `MAIL_FROM_ADDRESS` | `no-reply@myteam.example` | **P4** | |
 | `MYTEAM_REMINDER_TIME` | `18:00` | **P4** | F-22 の送信時刻 |
+| `MYTEAM_MAILS_PER_MINUTE` | `60` | P4（任意） | メールの流量（全社・全種類で 1 つの枠） |
+| `MYTEAM_MAIL_RETRY_UNTIL_MINUTES` | `60` | P4（任意） | メールのジョブを打ち切るまでの時間 |
+| `MYTEAM_REPORT_EXPORT_STALE_MINUTES` | `30` | P4（任意） | 生成中のまま止まった出力を失敗にするまでの時間（下限 5） |
+| `MYTEAM_DASHBOARD_CACHE_SECONDS` | `300` | P4（任意） | ダッシュボードのキャッシュの秒数（0 以下でキャッシュしない） |
+| `CACHE_PREFIX` / `REDIS_PREFIX` / `HORIZON_PREFIX` | `next-team-cache-` / `next-team-database-` / `next-team-horizon:` | **P4** | 同じ Redis を他の弾と共有したときのキーの衝突を防ぐ |
 
 ### `web/.env.local`
 
@@ -325,6 +330,7 @@ final class CurrentCompany
 | `MonthlyReportService` | `build(string $month): MonthlyReport` | `MonthlyReport{month, byWorker[], byLocation[], totalShifts, totalWorkedMinutes, totalPay}` | |
 | | `csvRows(string $month, ?int $locationId = null): iterable` | CSV の行（ヘッダなし） | |
 | `DashboardService` | `summary(): array` | 6 章の形 | |
+| | `forget(int $companyId): void`（呼ぶのは Observer だけ。キャッシュの有効期限は「設定の秒数後」と「翌日 0:00」の早い方。キーは `dashboard:{company_id}` のままで、日付またぎで前日の一覧が残らない。P4-07 で決定） | | |
 | `ReportExportService`（P4） | `request(User $u, string $month): ReportExport` | 受け付けた行（読み直した後の状態。Redis では `processing`、拠点 0 件は `queued`、積むのに失敗したら `failed`、sync のテストでは `completed` のこともある。P4-05 で決定） | 同じ月の出力が生成中です。 |
 | `NotificationLogService`（P4） | `claim(NotificationKind $k, Model $recipient, Model $subject): ?NotificationLog`（宛先のアドレスは $recipient->email から決める。宛先・対象が未保存・company_id なし・他社なら LogicException。P4-01 で決定） | 送ってよいなら行、送信済みなら `null` | |
 | | `markSent(NotificationLog $l): void` / `markFailed(NotificationLog $l, ?Throwable $e): void`（送信済みなら何もしない） | | |
@@ -670,7 +676,7 @@ export type FormState = { ok?: boolean; message?: string; errors?: Record<string
 | F-21 中止通知 | `JobPostingCancelled`（コミット後） | 確定済みだった応募ごとに `SendPostingCancelledMail(applicationId)` | `mails` |
 | F-22 前日リマインド | スケジューラ → `app:send-reminders` | 翌日勤務の確定応募ごとに `SendShiftReminderMail(applicationId, workDate)`（ID と日付の文字列だけ。モデルは渡さない。どの日の勤務を知らせるジョブかを決めるため。P4-04 で決定） | `mails` |
 | F-23 CSV 出力 | `POST /api/report-exports` | `Bus::batch([BuildLocationCsvChunk × 拠点数])` → `then`: `FinalizeReportExport` | `default` |
-| F-19 キャッシュ | `Application` / `JobPosting` の保存・削除（コミット後） | （ジョブなし）`DashboardCacheObserver` → `DashboardService::forget()` | |
+| F-19 キャッシュ | `Application` / `JobPosting` / `Location`（拠点名を表示するため。P4-07 で追加）の保存・削除（コミット後） | （ジョブなし）`DashboardCacheObserver` → `DashboardService::forget($model->company_id)` | |
 
 規約:
 
@@ -786,7 +792,7 @@ B と C の境界: C の `AttendanceService::save()` は B の `Application`（�
 | 署名付きURL を認証の外に置く | 署名＋30 分の期限で保護 | ブラウザの直接遷移では Sanctum の stateful 判定（Origin / Referer）を満たせない。URL は取得のたびに作り直し、メールには入れない（P4-05） |
 | 同じ月の出力の同時依頼 | トランザクションの先頭で企業の行を `lockForUpdate()` してから生成中を確認 | SQLite では IMMEDIATE で直列化される。MySQL に移してもそのまま効く（部分インデックスの UNIQUE は MySQL にないので使わない。P4-05） |
 | 同期 CSV（F-18）は Route Handler で中継 | `app/(admin)/reports/monthly/csv/route.ts` | 上と同じ理由。こちらは署名を使わず、Next サーバが Cookie を転送して取ってくる。**同じ「ファイルを渡す」を 2 通りで実装して比べる** |
-| キャッシュの破棄を Observer に | `Application` / `JobPosting` の Observer がコミット後に破棄 | サービスの各メソッドに書くと経路を足したとき漏れる。担当 B が担当 C のキャッシュを知らなくて済む。Observer は担当 C の所有（`app/Observers/`）で、P4 に足す |
+| キャッシュの破棄を Observer に | `Application` / `JobPosting` / `Location` の Observer がコミット後に破棄 | サービスの各メソッドに書くと経路を足したとき漏れる。担当 B が担当 C のキャッシュを知らなくて済む。Observer は担当 C の所有（`app/Observers/`）で、P4 に足す |
 | 通知の記録を自前のテーブルに | `notification_logs`（ポリモーフィック）＋ `dedupe_key` の UNIQUE | 冪等性を DB 制約で保証できる。Laravel の `notifications` テーブルは「管理者のアプリ内通知」にだけ使う |
 | ジョブに ID を渡す | `SerializesModels` に頼らない | 実行時点の最新状態を読む。確定後すぐキャンセルされた応募に確定通知を送らない |
 

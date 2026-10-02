@@ -136,8 +136,9 @@ class SendApplicationConfirmedMail implements ShouldQueue
 - 成果物は `Storage::disk('local')` に置く。パスは `exports/{company_id}/{export_id}/monthly-{month}.csv`。**入力からパスを組み立てない**（DB の `file_path` だけを使う）
 
 ## キャッシュ（F-19）
-- `Cache::remember("dashboard:{$companyId}", now()->addMinutes(5), fn () => ...)`
-- 破棄は `DashboardService::forget()` の 1 箇所。呼ぶのは `Application` と `JobPosting` に付けた Observer（`ShouldHandleEventsAfterCommit`）だけ
+- `Cache::remember("dashboard:{$companyId}", $expiresAt, fn () => ...)`。`$expiresAt` は「設定の秒数後」と「翌日 0:00」の早い方（日付をまたいで前日の一覧を残さない）。`now` は 1 回だけ取り、集計の「今日」・有効期限・`generated_at` に同じ値を使う
+- 破棄は `DashboardService::forget(int $companyId)` の 1 箇所。呼ぶのは `Application` / `JobPosting` / `Location` に付けた Observer（`ShouldHandleEventsAfterCommit`）だけで、消すのは変更されたモデルの `company_id` の企業
+- 一括の `query()->update()` は Observer を通らない。対象のモデルに一括更新を足すときは破棄を考える
 - 二重クリック対策など「同時に 1 つだけ」は `Cache::lock($key, 10)->block(3, fn () => ...)`
 
 ## テストの型

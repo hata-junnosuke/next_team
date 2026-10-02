@@ -4,9 +4,11 @@ namespace App\Providers;
 
 use App\Models\Application;
 use App\Models\JobPosting;
+use App\Models\Location;
 use App\Models\ReportExport;
 use App\Models\User;
 use App\Models\Worker;
+use App\Observers\DashboardCacheObserver;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Mail\Markdown;
@@ -49,5 +51,13 @@ class AppServiceProvider extends ServiceProvider
         // 上限はメールサーバーの都合なので企業ごとに分けず全社共通（by() を付けない）。超えたジョブは送らずにキューへ戻る。
         // https://readouble.com/laravel/13.x/ja/queues.html#rate-limiting
         RateLimiter::for('mails', fn () => Limit::perMinute((int) config('myteam.mails_per_minute')));
+
+        // ダッシュボードのキャッシュの破棄（F-19。docs/03 3.5）。応募・募集・拠点が保存・削除されたらコミット後に消す。
+        // 拠点は location_name を表示しているため（名前を変えても最長 5 分古いままにしない。リードの決定）。
+        // モデルに #[ObservedBy] を付けず、ここで登録する（どのモデルに付いているかをこの 1 箇所で見渡せるようにするため。
+        // モデルは別担当の所有でもある）。https://readouble.com/laravel/13.x/ja/eloquent.html#observers
+        Application::observe(DashboardCacheObserver::class);
+        JobPosting::observe(DashboardCacheObserver::class);
+        Location::observe(DashboardCacheObserver::class);
     }
 }
