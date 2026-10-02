@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\JobPostingController;
 use App\Http\Controllers\Api\LocationController;
 use App\Http\Controllers\Api\MonthlyReportController;
+use App\Http\Controllers\Api\NotificationLogController;
 use App\Http\Controllers\Api\ReportExportController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\WorkerController;
@@ -62,6 +63,9 @@ Route::middleware(['auth:sanctum', 'company'])->group(function () {
 
     // F-23 月次集計の非同期出力（P4）。受付は 202。パラメータ名は {report_export}
     Route::apiResource('report-exports', ReportExportController::class)->only(['index', 'store', 'show']);
+
+    // F-24 通知履歴（P5）。読み取りだけ
+    Route::get('/notification-logs', [NotificationLogController::class, 'index'])->name('notification-logs.index');
 });
 
 /*
