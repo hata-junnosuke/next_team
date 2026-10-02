@@ -39,3 +39,4 @@
 - 2026-10-01 | フェーズ 2 | api | ファクトリの `fake()->optional()` の列を、テストが「送らなければ null」と期待すると、Faker の乱数で 2 回に 1 回だけ赤になる（「再実行で緑」は合格ではない）→ 期待値に関わる列はテストで明示して作る | 信頼度 0.9 | P2-04 / P2-06 の担当が全件テストで発見
 - 2026-10-01 | フェーズ 3 | loop | web の git worktree は `node_modules` をシンボリックリンクにすればよいが、`LayoutProps` などの型は `.next/types`（gitignore）に生成されるので、worktree ごとに `next typegen` を先に回さないと tsc が赤になる | 信頼度 0.9 | P3 の worktree 準備
 - 2026-10-01 | フェーズ 3 | web | 共通部品 `Field` が id を `field-${name}` で作るので、同じページに同じ name のフォームが 2 つあると id が重なり、ラベルと aria-describedby が別の欄に結び付く → `id` prop を足し、行ごと・フォームごとに重ならない id を渡す | 信頼度 0.9 | P3-02 code-reviewer（重大）
+- 2026-10-01 | フェーズ 4 | api | ポリモーフィックな宛先・対象は `companyScopedParents` の保存時検査が効かないので、通知の記録を作る `claim()` で企業を確かめないと、他社の宛先（個人情報）が自社の履歴に入り、全社 UNIQUE の dedupe_key を先取りして他社の通知を止められる → 未保存・company_id なし・他社なら LogicException。error 列には生のメッセージ（SQL のバインド値や SMTP のユーザー名を含む）を残さない | 信頼度 0.9 | P4-01 security-reviewer（重大）

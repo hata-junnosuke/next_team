@@ -198,6 +198,10 @@ INDEX: `(company_id, clock_in)`（勤怠の日時での参照用。月次集計�
 
 INDEX: `(company_id, created_at)`。`*_type` には morph map の短い名前が入ります（クラス名は入れない）。
 
+（P4-01 で決定）`dedupe_key` は `{kind}:{subject_type}:{subject_id}`（`NotificationLogService::dedupeKey()` の 1 箇所）で、UNIQUE は全社で一意（ID は全社の通し番号なので衝突しない。企業ごとにすると、企業を取り違えたジョブが同じ相手に 2 通目を送れてしまう）。**中止通知の subject は応募**（宛先ごとに 1 通にするため。募集を subject にすると 2 人目以降が潰れる）。`claim()` は宛先と対象が今の企業のものでなければ LogicException。`error` 列には例外のクラス名と固定の日本語だけを残し、生のメッセージは failed_jobs と Log に任せる（SQL やメールサーバーの認証情報を画面に出さない）。
+
+**同時実行について（P4-01 で決定。人の確認待ち）**: UNIQUE が保証するのは「一度送った後の再実行・再投入で 2 通目を送らない」こと。同じ通知のジョブが同時に 2 つ走るのを止めるのは `WithoutOverlapping`（キャッシュのロック）で、保証は at-least-once の範囲。DB で厳密に止めたいなら `claimed_at` 列を足して条件付き UPDATE で取る案（新しいマイグレーションで後から足せる）。
+
 **report_exports**（集計出力の依頼。F-23）
 
 | 列 | 型 | 制約 |
@@ -250,6 +254,8 @@ INDEX: `(company_id, created_at)`。`*_type` には morph map の短い名前が
 | `NotificationKind`（P4） | `application_confirmed` 確定通知 / `posting_cancelled` 中止通知 / `shift_reminder` 前日リマインド / `export_ready` 出力完了 |
 | `NotificationStatus`（P4） | `pending` 送信待ち / `sent` 送信済み / `failed` 失敗 |
 | `ReportExportStatus`（P4） | `queued` 受付 / `processing` 生成中 / `completed` 完了 / `failed` 失敗 |
+
+遷移（P4-01 で決定）: `NotificationStatus` は `pending → sent / failed`、`failed → sent / failed`（再送）、`sent` は終端。`ReportExportStatus` は `queued → processing / completed / failed`、`processing → completed / failed`、`completed` と `failed` は終端（`isInProgress()` は queued と processing）。集計出力の「再実行」は、失敗した依頼を直すのではなく同じ月の新しい依頼を出す（生成中でなければ受け付ける）。
 
 状態遷移（F-14）は `ApplicationStatus::canTransitionTo(self $next): bool` の **1 箇所** に置きます。
 
@@ -320,8 +326,9 @@ final class CurrentCompany
 | | `csvRows(string $month, ?int $locationId = null): iterable` | CSV の行（ヘッダなし） | |
 | `DashboardService` | `summary(): array` | 6 章の形 | |
 | `ReportExportService`（P4） | `request(User $u, string $month): ReportExport` | `queued` の行 | 同じ月の出力が生成中です。 |
-| `NotificationLogService`（P4） | `claim(NotificationKind $k, Model $recipient, Model $subject, string $email): ?NotificationLog` | 送ってよいなら行、送信済みなら `null` | |
-| | `markSent(NotificationLog $l): void` / `markFailed(NotificationLog $l, Throwable $e): void` | | |
+| `NotificationLogService`（P4） | `claim(NotificationKind $k, Model $recipient, Model $subject): ?NotificationLog`（宛先のアドレスは $recipient->email から決める。宛先・対象が未保存・company_id なし・他社なら LogicException。P4-01 で決定） | 送ってよいなら行、送信済みなら `null` | |
+| | `markSent(NotificationLog $l): void` / `markFailed(NotificationLog $l, ?Throwable $e): void`（送信済みなら何もしない） | | |
+| | `markFailedByKey(string $dedupeKey, ?Throwable $e): void`（ジョブの `failed()` 用。行がない・送信済みなら何もしない）/ `static dedupeKey(NotificationKind, Model $subject): string` | | |
 
 ### 4.6 業務ルールの決定（要件の解釈）
 
