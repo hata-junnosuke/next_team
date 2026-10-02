@@ -8,8 +8,10 @@ use App\Enums\NotificationKind;
 use App\Enums\NotificationStatus;
 use App\Jobs\SendApplicationConfirmedMail;
 use App\Jobs\SendPostingCancelledMail;
+use App\Jobs\SendShiftReminderMail;
 use App\Mail\ApplicationConfirmedMail;
 use App\Mail\PostingCancelledMail;
+use App\Mail\ShiftReminderMail;
 use App\Models\Application;
 use App\Models\JobPosting;
 use App\Models\NotificationLog;
@@ -102,6 +104,34 @@ class FailedJobTest extends TestCase
         $log = DB::table('notification_logs')->sole();
         $this->assertSame(NotificationStatus::Sent->value, $log->status);
         $this->assertNotNull($log->sent_at);
+        $this->assertSame($this->company->id, (int) $log->company_id);
+    }
+
+    public function test_リマインドが3回失敗した後にqueue_retryで再実行すると1通送られsentになる(): void
+    {
+        // F-22。18 時にコマンドが積んだリマインドが送れず failed_jobs に移り、同じ日のうちに再実行した
+        $this->travelTo(now()->setDate(2026, 10, 9)->setTime(18, 0));
+        $application = Application::factory()->for(JobPosting::factory()->onDate('2026-10-10'))
+            ->for(Worker::factory()->state(['email' => 'hanako@example.com']))->confirmed()->create();
+        Mail::shouldReceive('to')->andThrow(new TransportException('Connection refused'));
+        SendShiftReminderMail::dispatch($application->id, '2026-10-10')->onConnection('database');
+        $this->failThreeTimes();
+        $this->assertSame(1, DB::table('failed_jobs')->count());
+        $this->assertSame(NotificationStatus::Failed->value, DB::table('notification_logs')->sole()->status);
+
+        $this->stopFailingMailer();
+        Mail::fake();
+        $this->artisan('queue:retry', ['id' => ['all']])->assertExitCode(0);
+        Context::forget('company_id'); // 企業は再実行したジョブのペイロードの Context から戻る
+        $this->work();
+
+        Mail::assertSent(ShiftReminderMail::class, fn (ShiftReminderMail $mail) => $mail->hasTo('hanako@example.com'));
+        Mail::assertSentCount(1);
+        $this->assertSame(0, DB::table('failed_jobs')->count());
+        $this->assertSame(0, DB::table('jobs')->count());
+        $log = DB::table('notification_logs')->sole(); // 行は増えず、failed の行が sent になる
+        $this->assertSame(NotificationKind::ShiftReminder->value, $log->kind);
+        $this->assertSame(NotificationStatus::Sent->value, $log->status);
         $this->assertSame($this->company->id, (int) $log->company_id);
     }
 

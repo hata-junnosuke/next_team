@@ -8,8 +8,10 @@ use App\Enums\NotificationKind;
 use App\Enums\NotificationStatus;
 use App\Jobs\SendApplicationConfirmedMail;
 use App\Jobs\SendPostingCancelledMail;
+use App\Jobs\SendShiftReminderMail;
 use App\Mail\ApplicationConfirmedMail;
 use App\Mail\PostingCancelledMail;
+use App\Mail\ShiftReminderMail;
 use App\Models\Application;
 use App\Models\JobPosting;
 use App\Models\NotificationLog;
@@ -21,7 +23,7 @@ use Tests\TestCase;
 /**
  * 同じ通知を二重に送らない（要件 7 章「4.7 を実装する弾のみ」、docs/03 4 章。docs/01 9.1 の必須テスト）。
  * ジョブの handle() を直接呼び、「実行したら何通送られたか」を Mail::fake() で数える。
- * 前日リマインド（P4-04）・出力完了（P4-05）はそれぞれのタスクで追記する。
+ * 出力完了（P4-05）はそのタスクで追記する。
  */
 class NotificationIdempotencyTest extends TestCase
 {
@@ -180,6 +182,39 @@ class NotificationIdempotencyTest extends TestCase
         Mail::assertSent(ApplicationConfirmedMail::class, 1);
         Mail::assertSent(PostingCancelledMail::class, 1);
         $this->assertSame(2, NotificationLog::query()->count());
+    }
+
+    // ---- F-22 前日リマインド（P4-04） ----
+
+    public function test_コマンドを2回実行してもリマインドは1通(): void
+    {
+        // 18 時の実行の後に手で再実行した・スケジューラが 2 回呼んだ、など。sync キューなので積むとその場で送られ、
+        // 1 回目のジョブが終わって ShouldBeUnique のロックが外れた後の 2 回目は、notification_logs の送信済み（claim）が止める
+        Mail::fake();
+        $this->travelTo(now()->setDate(2026, 10, 9)->setTime(18, 0));
+        $application = Application::factory()->for(JobPosting::factory()->onDate('2026-10-10'))->confirmed()->create();
+
+        $this->artisan('app:send-reminders')->assertExitCode(0);
+        $this->artisan('app:send-reminders', ['--date' => '2026-10-10'])->assertExitCode(0);
+
+        Mail::assertSent(ShiftReminderMail::class, 1);
+        $log = NotificationLog::query()->sole();
+        $this->assertSame(NotificationStatus::Sent, $log->status);
+        $this->assertSame("shift_reminder:application:{$application->id}", $log->dedupe_key);
+    }
+
+    public function test_リマインドジョブを2回実行しても1通(): void
+    {
+        Mail::fake();
+        $this->travelTo(now()->setDate(2026, 10, 9)->setTime(18, 0)); // 勤務日が過ぎていると送らないので「今」を固定する
+        $application = Application::factory()->for(JobPosting::factory()->onDate('2026-10-10'))->confirmed()->create();
+        $run = fn () => (new SendShiftReminderMail($application->id, '2026-10-10'))->handle(app(NotificationLogService::class));
+
+        $run();
+        $run(); // 再試行・手動の再実行・二重投入
+
+        Mail::assertSent(ShiftReminderMail::class, 1);
+        $this->assertSame(NotificationStatus::Sent, NotificationLog::query()->sole()->status);
     }
 
     private function runCancelledJob(int $applicationId): void

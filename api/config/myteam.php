@@ -15,4 +15,7 @@ return [
     // F-20〜F-22: メールのジョブを積んでから再試行をあきらめるまでの分数（ジョブの retryUntil()）。過ぎたら failed() に入る
     'mail_retry_until_minutes' => (int) env('MYTEAM_MAIL_RETRY_UNTIL_MINUTES', 60),
 
+    // F-22: 前日リマインドを積む時刻（"HH:MM"、Asia/Tokyo）。routes/console.php のスケジュールが読む。.env の MYTEAM_REMINDER_TIME で変える
+    'reminder_time' => env('MYTEAM_REMINDER_TIME', '18:00'),
+
 ];

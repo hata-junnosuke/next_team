@@ -290,7 +290,7 @@ final class CurrentCompany
   - グローバルスコープ `company`: `where company_id = CurrentCompany::id()`
   - `creating`: `company_id` を `CurrentCompany::id()` で埋める
 - 他社のIDを URL に入れるとルートモデルバインディングが見つけられず **404** になります。Policy は作りません（第2弾で学習済み。状態による可否は業務ルールとしてサービスが 422 を返す）
-- `withoutGlobalScopes()` を使ってよいのは、企業が決まる前に行を読む必要がある場所だけです（署名付きURL のダウンロード、スケジューラの企業一覧）。**使う行に理由コメントを必ず書く**
+- `withoutGlobalScopes()` を使ってよいのは、企業が決まる前に行を読む必要がある場所だけです（署名付きURL のダウンロード）。スケジューラの企業一覧は `Company` にスコープがないので `withoutGlobalScopes()` は不要（P4-04 で確認）。**使う行に理由コメントを必ず書く**
 
 ### 4.3 モデル（`app/Models/`）
 
@@ -344,6 +344,7 @@ final class CurrentCompany
 | 集計の方法 | （実測 P2-06: 統計なしの SQLite では起点が `applications (company_id, status)`、そこから `attendances.application_id` の UNIQUE と各表の主キーでたどる。全表走査はない。`job_postings (company_id, work_date)` は統計がないと使われなかった）SQL の join + GROUP BY + SUM。`attendances` の保存済みの値を合計する。join 先にはグローバルスコープが効かないので `company_id` 条件を明示する |
 | CSV（F-18 / F-23） | 列: ワーカー名, 拠点名, 勤務日, 労働分, 賃金, 交通費, 合計。UTF-8（BOM つき）。`=` `+` `-` `@` タブ CR で始まるセルは先頭に `'` を付ける（タブと CR は OWASP の推奨で P2-06 に追加。全角記号は Excel が数式にしないので対象外）。`shifts` は「確定の応募のうち勤怠が入力済みのもの」の件数 |
 | 最低賃金（F-05） | `config('myteam.min_wage')` 以上 |
+| 前日リマインド（F-22） | 「同じ勤務」は応募（1 枠）と読む。dedupe_key は `shift_reminder:application:{応募ID}` で勤務日を含まないので、送った後に勤務日が変わっても新しい日付では送らない。設定時刻（既定 18:00）の後に確定した翌日の勤務にはリマインドが届かない（確定通知は届く）。勤務日が過ぎたジョブは送らない（P4-04 で決定。人の確認待ち） |
 | 無効ワーカー（F-03） | 新規応募できない。既存の確定・応募は影響を受けない |
 
 ---
@@ -665,7 +666,7 @@ export type FormState = { ok?: boolean; message?: string; errors?: Record<string
 |---|---|---|---|
 | F-20 確定通知 | `ApplicationConfirmed`（コミット後） | `SendApplicationConfirmedMail(applicationId)` | `mails` |
 | F-21 中止通知 | `JobPostingCancelled`（コミット後） | 確定済みだった応募ごとに `SendPostingCancelledMail(applicationId)` | `mails` |
-| F-22 前日リマインド | スケジューラ → `app:send-reminders` | 翌日勤務の確定応募ごとに `SendShiftReminderMail(applicationId)` | `mails` |
+| F-22 前日リマインド | スケジューラ → `app:send-reminders` | 翌日勤務の確定応募ごとに `SendShiftReminderMail(applicationId, workDate)`（ID と日付の文字列だけ。モデルは渡さない。どの日の勤務を知らせるジョブかを決めるため。P4-04 で決定） | `mails` |
 | F-23 CSV 出力 | `POST /api/report-exports` | `Bus::batch([BuildLocationCsvChunk × 拠点数])` → `then`: `FinalizeReportExport` | `default` |
 | F-19 キャッシュ | `Application` / `JobPosting` の保存・削除（コミット後） | （ジョブなし）`DashboardCacheObserver` → `DashboardService::forget()` | |
 
