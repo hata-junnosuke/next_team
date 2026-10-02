@@ -11,7 +11,7 @@
 | p2-domain | 2 | `epic/p2-domain` | 完了（main にマージ） | api の基盤 → A / B / C。F-01〜F-19 |
 | p3-front | 3 | `epic/p3-front` | 完了（main にマージ。手動確認 M-1〜M-13 は最後にまとめて） | web の WA / WB / WC。動線 10 ステップが画面で通る（前半完了） |
 | p4-async | 4 | `epic/p4-async` | 完了（main にマージ。Horizon / Telescope の導入 P4-01b と手動確認 A-1〜A-11 は人の作業待ち） | F-20 → F-21 → F-22 → F-23 → F-19 キャッシュ。直列。着手前に人が `.env` を P4 の値に切り替える |
-| p5-finish | 5 | `epic/p5-finish`（未作成） | 未着手 | F-24、README、docs の「想定と実際」 |
+| p5-finish | 5 | `epic/p5-finish` | 進行中 | F-24、README、docs の「想定と実際」 |
 | p6-reverb | 6 | `epic/p6-reverb`（未作成） | 未着手（Could） | F-25 Broadcasting |
 
 各エピックは人が `/epic-flow <エピック名>` で起動する。フェーズの移行は人が `.claude/.phase` を書き換える。
