@@ -642,7 +642,7 @@ export type FormState = { ok?: boolean; message?: string; errors?: Record<string
 | ワーカー一覧・登録・編集 | `/workers` … | workers | F-02〜F-04 |
 | 募集一覧・登録・編集 | `/job-postings` … | job-postings、locations | F-05、F-06 |
 | 募集詳細 | `/job-postings/[id]` | job-postings、applications、applicable-workers、attendance | F-07〜F-16 |
-| 月次集計 | `/reports/monthly` | reports/monthly | F-17、F-18 |
+| 月次集計 | `/reports/monthly` | reports/monthly、report-exports（POST。非同期出力の依頼） | F-17、F-18、F-23 |
 | 非同期出力 | `/reports/exports` | report-exports | F-23 |
 | 通知履歴 | `/notifications` | notification-logs | F-24 |
 

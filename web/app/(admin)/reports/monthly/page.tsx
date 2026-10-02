@@ -1,11 +1,13 @@
 import { MonthPicker } from "@/components/reports/MonthPicker";
+import { RequestExportForm } from "@/components/reports/RequestExportForm";
 import { SummaryTable } from "@/components/reports/SummaryTable";
 import { Alert } from "@/components/ui/Alert";
 import { ApiError, apiGet } from "@/lib/api";
 import { monthlyReportResponse } from "@/lib/schemas/report";
 
 // 月次集計（F-17）と CSV ダウンロード（F-18）。GET /api/reports/monthly?month=YYYY-MM をそのまま表示する。
-// CSV は同じフォルダの csv/route.ts（Route Handler）が Cookie を転送して中継する（docs/01 12 章）
+// CSV は同じフォルダの csv/route.ts（Route Handler）が Cookie を転送して中継する（docs/01 12 章）。
+// 「CSV を生成（非同期）」は POST /api/report-exports（202）→ 出力一覧 /reports/exports へ（F-23）
 
 type Props = {
   searchParams: Promise<{ month?: string | string[] }>;
@@ -58,17 +60,21 @@ export default async function MonthlyReportPage({ searchParams }: Props) {
 
       {report && (
         <>
-          <div className="flex items-center justify-between gap-4">
-            <p className="text-sm whitespace-nowrap text-gray-600">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <p className="py-2 text-sm whitespace-nowrap text-gray-600">
               対象月: {report.month}
             </p>
-            {/* ファイルの受け渡しなので Link ではなく a。Route Handler が text/csv を返す */}
-            <a
-              href={`/reports/monthly/csv?month=${encodeURIComponent(report.month)}`}
-              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium whitespace-nowrap text-white hover:bg-blue-700"
-            >
-              CSV をダウンロード
-            </a>
+            <div className="flex flex-wrap items-start gap-3">
+              {/* ファイルの受け渡しなので Link ではなく a。Route Handler が text/csv を返す */}
+              <a
+                href={`/reports/monthly/csv?month=${encodeURIComponent(report.month)}`}
+                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium whitespace-nowrap text-white hover:bg-blue-700"
+              >
+                CSV をダウンロード
+              </a>
+              {/* 月が変わったら古い 422 の Alert を消すため key に月を入れる */}
+              <RequestExportForm key={report.month} month={report.month} />
+            </div>
           </div>
 
           <section className="space-y-2">
