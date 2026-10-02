@@ -10,8 +10,8 @@
 | p1-skeleton | 1 | `epic/p1-skeleton` | 完了（main にマージ。手動確認は最後にまとめて） | Sanctum + Fortify、エラー形式、拠点（F-01）を API → 画面まで縦に 1 本 |
 | p2-domain | 2 | `epic/p2-domain` | 完了（main にマージ） | api の基盤 → A / B / C。F-01〜F-19 |
 | p3-front | 3 | `epic/p3-front` | 完了（main にマージ。手動確認 M-1〜M-13 は最後にまとめて） | web の WA / WB / WC。動線 10 ステップが画面で通る（前半完了） |
-| p4-async | 4 | `epic/p4-async` | 完了（main にマージ。Horizon / Telescope の導入 P4-01b と手動確認 A-1〜A-11 は人の作業待ち） | F-20 → F-21 → F-22 → F-23 → F-19 キャッシュ。直列。着手前に人が `.env` を P4 の値に切り替える |
-| p5-finish | 5 | `epic/p5-finish` | 進行中 | F-24、README、docs の「想定と実際」 |
+| p4-async | 4 | `epic/p4-async` | 完了（main にマージ。P4-01b は P5 の最後に epic/p5-finish で導入。手動確認 A-1〜A-11 は人の作業待ち） | F-20 → F-21 → F-22 → F-23 → F-19 キャッシュ。直列。着手前に人が `.env` を P4 の値に切り替える |
+| p5-finish | 5 | `epic/p5-finish` | 完了（main にマージ。手動確認は人の作業待ち） | F-24、README、docs の「想定と実際」 |
 | p6-reverb | 6 | `epic/p6-reverb`（未作成） | 未着手（Could） | F-25 Broadcasting |
 
 各エピックは人が `/epic-flow <エピック名>` で起動する。フェーズの移行は人が `.claude/.phase` を書き換える。
@@ -74,21 +74,33 @@ P5（直列）      P5-01 → P5-02 → P5-03
 - 人の作業（後回し可。リードが最後にまとめて依頼する）: ① P2-01 の後に `touch .claude/.migrations-locked` ② P4-01 の前に `api/.env` を P4 の値に（docs/01 2 章）と `make up` ③ P3 の後に M-1〜M-13、P5 の後に A-1〜A-11 の手動確認。`.claude/.phase` は 0 のまま（人の判断）なので、verify-loop の必須テスト存在検査は走らない。P2-07 と P4-05 の完了時にリードが `ls api/tests/...` で 6 本を確かめる
 - 見積: P1 7.5h / P2 13h（並列で実質 8h）/ P3 9h（並列で実質 5h）/ P4 14.5h / P5 4h = 計 48h（並列込みの実時間は約 37h）
 
-## 人への引き継ぎ（2026-10-01 夜、リードが更新する）
-
-人は朝まで不在。確認の要る操作（パッケージ追加など）は止めて、ここに積む。
+## 人への引き継ぎ（最終版。2026-10-02、リードが更新）
 
 ### 終わったこと
-- P1〜P3 は main にマージ済み（api テスト 482 件・`make verify-full` 緑）。P4 は `epic/p4-async` で進行中
-- 必須テスト 6 本のうち 4 本（ApplicationTest / PayrollCalculatorTest / ApplicationStatusTest / AcceptanceScenarioTest）が存在。残り 2 本は P4
+- P1〜P5 の全タスクが完了し、`main` にマージ済み。P4-01b（Horizon / Telescope）は 2026-10-02 に人が承認して導入した
+- `make verify-full` 緑: Pint、PHPUnit 834 件・4122 アサーション、tsc、ESLint、Prettier、`next build`
+- 必須テスト 6 本（ApplicationTest / PayrollCalculatorTest / ApplicationStatusTest / AcceptanceScenarioTest / NotificationIdempotencyTest / FailedJobTest）はすべてある（`.phase` が 0 なので Stop フックは存在を検査しない。リードが ls で確認）
+- README・docs/00〜04 を実装に合わせて更新した（P5-03）
 
-### 人の作業（朝にお願いしたいこと）
-1. Horizon と Telescope の導入: 実は P4-01 の担当が、リードの「後回し」の連絡が届く前に `composer require` まで実行していた（承認は通っていた）。リードの指示で元に戻した（composer.json / lock / providers を git の状態に戻し、vendor も lock に合わせた）。朝に改めて `composer require laravel/horizon` と `composer require --dev laravel/telescope` を承認してもらい、Horizon の設定・Gate・HorizonAccessTest を足す（P4-01 の残り。STATE の P4-01 の備考に手順あり）
-2. `api/.env` を P4 の値に（`api/.env.example` の P4 の行。docs/01 2 章）。P4 で増えた項目: `CACHE_PREFIX=next-team-cache-` / `REDIS_PREFIX=next-team-database-` / `HORIZON_PREFIX=next-team-horizon:`（他の弾と同じ Redis を共有したときのキーの衝突を防ぐ。キューが空のときに反映する）と、任意の `MYTEAM_*`（既定値で動く）
-3. マイグレーションのロック: `touch .claude/.migrations-locked`（P2-01 で database-reviewer が「ロック可」）
-4. `.claude/.phase` の更新（人の判断。今は 0 のまま）
-5. 画面の手動確認（`myteam-acceptance` の M-1〜M-13。P4 以降は A-1〜）
-6. **判断の確認（夜の間にリードが決めたもの。違えば戻す）**
-   - 同時に 2 つ走った通知ジョブの二重送信: DB で厳密に止める（`claimed_at` 列を足す）のではなく、`WithoutOverlapping` で抑え「at-least-once」と docs/03 3.3 に明記した。厳密にしたいなら新しいマイグレーションで後から足せる
-   - `dedupe_key` の UNIQUE は全社で一意のまま（企業ごとにしない）。代わりに `claim()` で宛先と対象が自社のものか確かめる
-   - P4-01 は「パッケージなしの分（完了）」と「Horizon / Telescope の分（P4-01b。人の承認待ち）」に分けた。P4-02 以降の完了条件から「Horizon の画面で見える」の目視を外し、P4-01b の後に人が確認する
+### 人の作業（残り）
+1. `api/.env` を P4 の値に切り替える（`api/.env.example` の P4 の行。docs/01 2 章）。今は Queue / Cache = database、Mail = log。`QUEUE_CONNECTION=redis` にしないと `make horizon` はジョブを拾わない（それまでは `cd api && php artisan queue:work --queue=mails,default`）。`CACHE_PREFIX` / `REDIS_PREFIX` / `HORIZON_PREFIX`、`TELESCOPE_ENABLED=true` も入れる
+2. `make fresh` で telescope_entries を作る（開発用 DB は P5-03 の起動確認でシード状態に戻っている）
+3. `make up` → `make api-serve` / `make web-dev` / `make horizon` → 管理画面にログインして `http://localhost:8002/horizon` と `/telescope` を開き、P4-02〜P4-05 のジョブ・failed_jobs の再実行・Telescope と SQLite の相性を確かめる（docs/03 10 章の「未確認」の行）
+4. 画面の手動確認: `myteam-acceptance` の M-1〜M-13、A-1〜A-11。README の確認日の欄を記入
+5. マイグレーションのロック: `touch .claude/.migrations-locked`（telescope のマイグレーションを足した後）
+6. `.claude/.phase` の判断（今は 0 のまま）
+7. **判断の確認（人の不在中にリードが決めたもの。違えば戻す）**
+   - 同時に 2 つ走った通知ジョブの二重送信は at-least-once と明記した（`claimed_at` 列は足していない。厳密にしたいなら新しいマイグレーションで後から足せる）
+   - `dedupe_key` の UNIQUE は全社で一意のまま。代わりに `claim()` で宛先と対象が自社のものか確かめる
+   - P4-01 を「パッケージなしの分」と P4-01b に分けた
+   - メールの流量は既定 60 通/分、全社・全種類で 1 つの枠
+   - リマインドの「同じ勤務」は応募単位。設定時刻（18 時）より後に確定した翌日の勤務にはリマインドが届かない（確定通知は届く）
+   - 非同期 CSV の行は拠点 → 勤務日の順。ファイル名は `monthly-{月}.csv`（同期 CSV の `monthly-report-{月}.csv` とそろっていない）
+   - ダッシュボードの充足率は満員でなければ上限 99%
+   - ダッシュボードのキャッシュの破棄の対象に Location を足した
+   - 出力一覧の自動更新（F-25 の先取り）は外し、「最新の状態に更新」リンクにした
+
+### 残課題（軽微）
+- 通知履歴などで範囲外の page を URL に手で書くと「履歴はまだありません」と出る
+- Telescope の記録に F-23 の署名付き URL（30 分有効）が応答本文として残る（ローカル専用）
+- `.claude/.running/` に終わった担当の印が残ることがある（フックの不具合の候補。60 分で捨てられる。フックは触っていない）
