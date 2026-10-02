@@ -6,7 +6,7 @@ import {
 } from "@/components/job-postings/JobPostingFilters";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
-import { Pagination } from "@/components/ui/Pagination";
+import { emptyText, Pagination } from "@/components/ui/Pagination";
 import { Table, Td } from "@/components/ui/Table";
 import { ApiError, apiGet } from "@/lib/api";
 import { date, yen } from "@/lib/format";
@@ -117,7 +117,11 @@ export default async function JobPostingsPage({ searchParams }: Props) {
               "交通費",
               "",
             ]}
-            empty="条件に合う募集はありません。"
+            empty={emptyText(
+              result.meta,
+              result.data.length,
+              "条件に合う募集はありません。",
+            )}
           >
             {result.data.map((posting) => (
               <tr key={posting.id}>
@@ -168,6 +172,7 @@ export default async function JobPostingsPage({ searchParams }: Props) {
             meta={result.meta}
             basePath="/job-postings"
             query={filters}
+            itemCount={result.data.length}
           />
         </>
       )}
