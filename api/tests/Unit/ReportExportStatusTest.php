@@ -74,11 +74,11 @@ class ReportExportStatusTest extends TestCase
     {
         $export = ReportExport::factory()->processing()->create();
 
-        $export->transitionTo(ReportExportStatus::Completed, ['file_path' => 'exports/1/1/monthly-2026-09.csv', 'row_count' => 5, 'completed_at' => now()]);
+        $export->transitionTo(ReportExportStatus::Completed, ['file_path' => 'exports/1/1/monthly-report-2026-09.csv', 'row_count' => 5, 'completed_at' => now()]);
 
         $export->refresh();
         $this->assertSame(ReportExportStatus::Completed, $export->status);
-        $this->assertSame('exports/1/1/monthly-2026-09.csv', $export->file_path);
+        $this->assertSame('exports/1/1/monthly-report-2026-09.csv', $export->file_path);
         $this->assertSame(5, $export->row_count);
     }
 
@@ -86,7 +86,7 @@ class ReportExportStatusTest extends TestCase
     {
         $export = ReportExport::factory()->processing()->create();
         $stale = ReportExport::query()->findOrFail($export->id);
-        $export->transitionTo(ReportExportStatus::Completed, ['file_path' => 'exports/1/1/monthly-2026-09.csv', 'row_count' => 0, 'completed_at' => now()]);
+        $export->transitionTo(ReportExportStatus::Completed, ['file_path' => 'exports/1/1/monthly-report-2026-09.csv', 'row_count' => 0, 'completed_at' => now()]);
 
         $this->expectException(LogicException::class);
 
@@ -98,7 +98,7 @@ class ReportExportStatusTest extends TestCase
         $export = ReportExport::factory()->processing()->create();
 
         try {
-            $export->transitionTo(ReportExportStatus::Completed, ['file_path' => 'exports/1/1/monthly-2026-09.csv', 'row_count' => 5]);
+            $export->transitionTo(ReportExportStatus::Completed, ['file_path' => 'exports/1/1/monthly-report-2026-09.csv', 'row_count' => 5]);
             $this->fail('completed_at なしで完了にできてしまった');
         } catch (LogicException) {
             $this->assertSame(ReportExportStatus::Processing, $export->fresh()->status);
@@ -123,7 +123,7 @@ class ReportExportStatusTest extends TestCase
     {
         $export = ReportExport::factory()->create();
 
-        $export->transitionTo(ReportExportStatus::Completed, ['file_path' => 'exports/1/1/monthly-2026-09.csv', 'row_count' => 0, 'completed_at' => now()]);
+        $export->transitionTo(ReportExportStatus::Completed, ['file_path' => 'exports/1/1/monthly-report-2026-09.csv', 'row_count' => 0, 'completed_at' => now()]);
 
         $this->assertSame(ReportExportStatus::Completed, $export->fresh()->status);
         $this->assertSame(0, $export->fresh()->row_count);
@@ -133,6 +133,6 @@ class ReportExportStatusTest extends TestCase
     {
         $export = ReportExport::factory()->completed()->create(['month' => '2026-09']);
 
-        $this->assertSame("exports/{$this->company->id}/{$export->id}/monthly-2026-09.csv", $export->fresh()->file_path);
+        $this->assertSame("exports/{$this->company->id}/{$export->id}/monthly-report-2026-09.csv", $export->fresh()->file_path);
     }
 }

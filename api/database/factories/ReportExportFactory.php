@@ -41,7 +41,7 @@ class ReportExportFactory extends Factory
     }
 
     /**
-     * 完了。file_path は exports/{company_id}/{export_id}/monthly-{month}.csv の形（ファイル自体は置かない）
+     * 完了。file_path は exports/{company_id}/{export_id}/monthly-report-{month}.csv の形（ファイル自体は置かない）
      */
     public function completed(): static
     {
@@ -51,7 +51,7 @@ class ReportExportFactory extends Factory
             'row_count' => 3,
             'completed_at' => now(),
         ])->afterCreating(function (ReportExport $export) {
-            $export->forceFill(['file_path' => "exports/{$export->company_id}/{$export->id}/monthly-{$export->month}.csv"])->save();
+            $export->forceFill(['file_path' => "exports/{$export->company_id}/{$export->id}/monthly-report-{$export->month}.csv"])->save();
         });
     }
 
