@@ -28,7 +28,7 @@
 - 起動時に SessionStart フックがこれらを要約して出す
 
 ## スキル（`/名前` で起動）
-`/epic-flow` アウターループ（人が起動）/ `/issue-flow` インナーループ / `/plan` / `/verify [quick|pre-commit|full]` / `/code-review` / `/learn`。
+`/issue-start` issue の worktree を作る（main で使う）/ `/epic-flow` アウターループ（人が起動）/ `/issue-flow` インナーループ / `/plan` / `/verify [quick|pre-commit|full]` / `/code-review` / `/learn`。
 知識スキル: `tdd-workflow` `myteam-domain-rules` `laravel-api-standards` `next-coding-standards` `async-rules` `myteam-acceptance`
 
 ## エージェント（`.claude/agents/`）
