@@ -24,11 +24,11 @@
 
 ## 現在地の見方
 - フェーズ: `.claude/.phase`（0 ハーネス・ゲート / 1 API 骨格 / 2 ドメイン / 3 フロント / 4 非同期 / 5 仕上げ / 6 Could）。**人が書き換える**
-- タスク状態: `.claude/state/STATE.md`。差し戻し記録: `.claude/state/loop-log.md`。教訓: `.claude/state/learnings.md`
+- タスク状態: **GitHub Issues**（本文のチェックリスト、`requires-human` ラベル）。ブランチは `issue/<番号>`。差し戻し記録: `.claude/state/loop-log.md`。教訓: `.claude/state/learnings.md`（旧 `STATE.md` は `.claude/state/archive/` に凍結）
 - 起動時に SessionStart フックがこれらを要約して出す
 
 ## スキル（`/名前` で起動）
-`/epic-flow` アウターループ（人が起動）/ `/issue-flow` インナーループ / `/plan` / `/verify [quick|pre-commit|full]` / `/code-review` / `/learn`。
+`/issue-start` issue の worktree を作る（main で使う）/ `/epic-flow` アウターループ（人が起動）/ `/issue-flow` インナーループ / `/plan` / `/verify [quick|pre-commit|full]` / `/code-review` / `/learn`。
 知識スキル: `tdd-workflow` `myteam-domain-rules` `laravel-api-standards` `next-coding-standards` `async-rules` `myteam-acceptance`
 
 ## エージェント（`.claude/agents/`）

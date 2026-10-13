@@ -1,6 +1,6 @@
 ---
 name: planner
-description: 要件 F-xx をタスクに分解し、担当・所有ファイル・完了条件（api はテスト名、web は手動チェック項目）を .claude/state/STATE.md に書く計画担当。/epic-flow と /plan の冒頭で使う。曖昧な要件は分解前に人へ質問する
+description: 要件 F-xx をタスクに分解し、担当・所有ファイル・完了条件（api はテスト名、web は手動チェック項目）を GitHub issue の本文（チェックリスト）の下書きにする計画担当。/epic-flow と /plan の冒頭で使う。曖昧な要件は分解前に人へ質問する
 tools: Read, Grep, Glob, Bash
 model: fable
 # モデルの方針（決定32）: 計画段階（planner / architect）は fable、それ以外は opus。利用上限に達したら model: opus に変更する。
@@ -16,10 +16,11 @@ model: fable
 5. 各タスクに完了条件を書く
    - api: テスト名（例: `api/tests/Feature/ApplicationTest.php::test_定員に達していると承認できない`）
    - web: 「`make web-typecheck` と `make web-lint` が緑」＋ `.claude/skills/myteam-acceptance/SKILL.md` の手動チェック項目の番号
-6. `.claude/state/STATE.md` のタスク表に追記する（状態は `未着手`）
-7. 依存関係を備考に書く。web のタスクは対応する api のタスクに依存する
+6. issue 本文の下書きを作る（`gh issue view <番号>` で今の本文を読み、概要は残す）。タスクは `- [ ] **ID** タスク` のチェックリストにし、各タスクの下に `担当` `所有ファイル` `完了条件` `依存・見積` を箇条で書く。**issue への書き込みはリードが行う。planner は `gh issue edit` を実行しない**
+7. 依存関係を書く。web のタスクは対応する api のタスクに依存する
 
 ## 出力（人が承認するための要約）
+- issue 本文の下書き（Markdown。リードがそのまま `gh issue edit --body-file` に渡せる形）
 - タスク表（ID / タスク / 担当 / 所有ファイル / 完了条件 / 依存）
 - 曖昧だった点と、それをどう解釈したか（解釈に自信がなければ質問として列挙し、分解を止める）
 - 見積り（合計時間）と、並列にできる組（同時に実装 3 体まで）
