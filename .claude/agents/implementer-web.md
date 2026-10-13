@@ -6,7 +6,7 @@ model: opus
 # モデルの方針（決定32）: 計画段階（planner / architect）は fable、それ以外は opus。利用上限に達したら model: sonnet に変更する。
 ---
 
-あなたは myteam 第3弾の **画面実装担当** です。渡されたタスク（`.claude/state/STATE.md` の 1 行）だけを実装します。
+あなたは myteam 第3弾の **画面実装担当** です。渡されたタスク（GitHub issue のタスク 1 件。リードがプロンプトで渡す）だけを実装します。
 
 ## 最初に必ずやること
 **Next.js 16 はあなたの知っている Next.js と違います。** 書く前に `web/node_modules/next/dist/docs/01-app/` の該当ページを読みます。
@@ -23,7 +23,7 @@ model: opus
 3. 順番: zod スキーマ（`lib/schemas/`）→ 一覧ページ（Server Component）→ Server Action → フォーム（Client Component）
 4. 1 画面できるたびに `make web-typecheck` と `make web-lint` を回す
 5. API が契約どおりに返すかは、`make api-serve` が動いていれば画面で、動いていなければ `api/tests/` のテスト名と docs/01 で確認する（`api/app/` は読まない）
-6. 終わったら `STATE.md` の状態を `レビュー中` にする
+6. 終わったら検証の結果をリードに報告する。issue には書き込まない
 
 ## 守ること
 - `fetch` を直接書かない。`lib/api.ts`（サーバ）と `lib/browser-api.ts`（ブラウザ・ログインとログアウトだけ）を通す

@@ -27,14 +27,14 @@
 
 ### 人の作業（残っているもの）
 
-`.claude/state/STATE.md` の末尾「人への引き継ぎ」と同じ内容です。
+`.claude/state/archive/STATE_P0-P5.md`（旧 `STATE.md`。2026-10-13 からタスクは GitHub Issues で管理）の末尾「人への引き継ぎ」と同じ内容です。
 
 1. **Horizon と Telescope の実物の確認は、リードが API 経由で済ませた**（2026-10-02 の夕方）。`api/.env` は変えず、起動時の環境変数で P4 の値を渡して、Horizon でのジョブの処理、Redis での同時書き込み（`database is locked` は 0 件）、`failed_jobs` の再実行、Telescope と SQLite の相性を確かめた。結果は [`docs/03`](docs/03_非同期処理の設計.md) 10 章。人がやるのは、下の 2 番の `.env` の切り替えと、5 番の画面での手動確認（Horizon と Telescope の画面もそこで見る）。ローカルの DB に `telescope_entries` を作るため、先に `make fresh` を 1 回流す
 2. **`api/.env` を P4 の値に切り替える**（`api/.env.example` の P4 の行。docs/01 2 章）。2026-10-02 時点の `php artisan about --only=drivers` は Queue = database、Cache = database、Mail = log で、まだ P1〜P3 の値です。この状態ではジョブは DB のキューに積まれ、メールは Mailpit ではなくログに出ます。Horizon は Redis のキューしか見ない（`api/config/horizon.php` のスーパーバイザが `connection => redis`）ので、切り替えるまでは `make horizon` を起動してもジョブを拾いません
 3. マイグレーションのロック: `touch .claude/.migrations-locked`
 4. `.claude/.phase` の更新（今は 0 のまま。人の判断）
 5. 画面の手動確認: 下の M-1〜M-13 と A-1〜A-11 を通し、確認日の欄を記入する
-6. 夜の間にリードが決めた判断の確認（`STATE.md` の「判断の確認」、docs/00 の 2.4）
+6. 夜の間にリードが決めた判断の確認（`archive/STATE_P0-P5.md` の「判断の確認」、docs/00 の 2.4）
 
 ### 人しかやらないこと
 

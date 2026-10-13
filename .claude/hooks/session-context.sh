@@ -29,11 +29,12 @@ TEST_COUNT="$(grep -rhoE 'function test_[^ (]+' api/tests 2>/dev/null | wc -l | 
 DIRTY="$(git status --short 2>/dev/null | wc -l | tr -d ' ')"
 
 echo "## next_team セッション開始情報"
-echo "- 起動場所: ${ROOT}（ここが next_team/ なら Stop フックが効きます）"
-case "$ROOT" in
-  */next_team) ;;
-  *) echo "- **警告**: 起動場所が next_team/ ではありません。フックの相対パスがずれます。cd next_team && claude で入り直してください" ;;
-esac
+echo "- 起動場所: ${ROOT}（リポジトリの直下なら Stop フックが効きます。worktree の直下でもよい）"
+# worktree（~/orca/workspaces/next_team/<名前> など）でも効くよう、名前ではなく git の最上位と比べる
+TOPLEVEL="$(git rev-parse --show-toplevel 2>/dev/null)"
+if [ "$TOPLEVEL" != "$ROOT" ] || [ ! -d api ] || [ ! -d web ]; then
+  echo "- **警告**: 起動場所がリポジトリの直下（api/ と web/ がある場所）ではありません。フックの相対パスがずれます。直下に cd して claude で入り直してください"
+fi
 echo "- 現在フェーズ: ${PHASE}（${PHASE_NAME}）。フェーズ移行は人が .claude/.phase を書き換える"
 echo "- api のテスト関数: ${TEST_COUNT} 件 / 未コミット変更: ${DIRTY} ファイル"
 echo "- 検証ループのカウンタを 0 にリセットしました（Stop 時に api は Pint + PHPUnit、web は変更があれば tsc + ESLint が走ります）"
@@ -65,9 +66,22 @@ else
   echo "- まだコミットがありません"
 fi
 
-if [ -f .claude/state/STATE.md ]; then
-  echo "- 進行中のタスク（.claude/state/STATE.md より）:"
-  grep -E '^\| .* \| (進行中|レビュー中|requires-human) \|' .claude/state/STATE.md | head -10 | sed 's/^/    /' || true
+# タスクの状態は GitHub Issues が正（issue #4）。ブランチ issue/<番号>-<名前> なら今の issue を出す
+BRANCH="$(git branch --show-current 2>/dev/null)"
+ISSUE_NO="$(printf '%s' "$BRANCH" | sed -nE 's#^issue/([0-9]+)-.*#\1#p')"
+if [ -n "$ISSUE_NO" ]; then
+  echo "- 今のブランチ ${BRANCH} は issue #${ISSUE_NO} の作業。タスク表は gh issue view ${ISSUE_NO} の本文のチェックリスト"
+fi
+if command -v gh >/dev/null 2>&1; then
+  # オフラインや未認証で起動が止まらないよう、5 秒で諦める（macOS には timeout がないので perl の alarm）
+  ISSUES="$(perl -e 'alarm shift; exec @ARGV' 5 gh issue list --state open --limit 10 --json number,title,labels \
+    --jq '.[] | "#\(.number) \(.title)\(if any(.labels[]; .name == "requires-human") then "（requires-human）" else "" end)"' 2>/dev/null)"
+  if [ -n "$ISSUES" ]; then
+    echo "- open の issue（GitHub。タスクの正）:"
+    printf '%s\n' "$ISSUES" | sed 's/^/    /'
+  else
+    echo "- open の issue を取得できませんでした（0 件、またはオフライン）。gh issue list で確認してください"
+  fi
 fi
 
 if [ -f .claude/state/learnings.md ]; then

@@ -83,7 +83,7 @@ COUNT="$(cat "$COUNTER" 2>/dev/null || echo 0)"
 if [ "$COUNT" -ge "$MAX" ]; then
   rm -f "$COUNTER"
   printf -- "- %s | フェーズ %s | 打ち切り | 検証ループが %d 回に達したため素通し。人の判断が必要\n" "$(date '+%Y-%m-%d %H:%M')" "$PHASE" "$MAX" >> "$LOG"
-  echo "検証ループが ${MAX} 回に達したため打ち切りました。残った失敗を人に報告し、.claude/state/STATE.md の該当タスクを requires-human にしてください。" >&2
+  echo "検証ループが ${MAX} 回に達したため打ち切りました。残った失敗を人に報告し、作業中の issue に requires-human ラベルを付けて理由をコメントしてください。" >&2
   exit 0
 fi
 

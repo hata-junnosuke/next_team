@@ -1,7 +1,7 @@
 ---
 name: issue-flow
-description: インナーループ。STATE.md のタスク 1 件を implementer（api か web）→ tester → 3 レビュアー並列（spec / code / security）→ 差し戻し（最大 2 周）→ 完了 の順で、各工程を直列に回す。epic-flow から呼ばれるほか、単発タスクでも使う
-argument-hint: <タスクID または タスクの説明>
+description: インナーループ。GitHub issue のタスク 1 件（issue 本文のチェックリストの 1 行、または小さな issue そのもの）を implementer（api か web）→ tester → 3 レビュアー並列（spec / code / security）→ 差し戻し（最大 2 周）→ 完了 の順で、各工程を直列に回す。epic-flow から呼ばれるほか、単発タスクでも使う
+argument-hint: <issue 番号> [タスクID。例: 3 D-2]
 ---
 
 # /issue-flow — インナーループ（タスク 1 件）
@@ -15,9 +15,10 @@ argument-hint: <タスクID または タスクの説明>
 ## 手順
 
 ### 0. 準備
-- `.claude/state/STATE.md` から対象タスクの行（担当・所有ファイル・完了条件）を読む。表にない場合は 1 行追加してから始める
+- `gh issue view <番号>` で対象タスク（担当・所有ファイル・完了条件）を読む。完了条件がなければ着手せず `/plan <番号>` に戻す
 - 担当が api か web かを確定する。両方にまたがるタスクは 2 つに分ける
-- 状態を `進行中` にする
+- **工程ごとの状態は書かない**（進行中・レビュー中を issue に書き込まない。いま何をしているかはリードの会話とブランチで分かる）
+- ブランチが `issue/<番号>-<名前>` でなければ作る（epic-flow の中ならすでにある）
 
 ### 1. 実装（implementer-api または implementer-web）
 - タスク行・所有ファイル・完了条件・`docs/01` の該当章を渡す
@@ -38,13 +39,14 @@ argument-hint: <タスクID または タスクの説明>
 
 ### 4. 判定と差し戻し — 手順 3 が全員終わってから
 - `重大` が 1 つでもあれば implementer に戻す（指摘表を渡す）。戻すのは **最大 2 周**。戻した後は手順 2 → 3 をもう一度通す
-- 2 周しても `重大` が残る → `STATE.md` を `requires-human` にして止まり、残った指摘を人に報告する
+- 2 周しても `重大` が残る → issue に `requires-human` ラベルを付け、残った指摘をコメントして止まり、人に報告する
 - `推奨` は implementer に渡して直せるものは直す。`任意` は `learnings.md` 行きの候補にする
 
 ### 5. 完了
 - api: `make api-test FILTER=<担当のテストクラス>` と `make api-pint-test` が緑
 - web: `make web-typecheck` と `make web-lint` が緑
-- `STATE.md` の状態を `完了`、備考に「レビュー N 周」を書く。web のタスクは「手動確認: 未」と書き、人が確認したら「済」にする
+- issue 本文の該当タスクにチェックを付ける（`gh issue view <番号> --json body -q .body` → `- [ ] **ID**` を `- [x] **ID**` に → `gh issue edit <番号> --body-file -`）。**issue を更新するのはこの 1 回だけ**。レビュー周回数はコミットメッセージの本文に書く。web のタスクの手動確認は PR の説明に「手動確認: 未」と書き、人が確認する
+- 小さな issue そのものがタスクなら、チェックは付けずに PR を作る（本文に `Closes #<番号>`）。マージは人が行う
 - 差し戻しがあった場合は `/learn` で教訓を 1 行残す
 - `git add` した上で日本語のコミットメッセージでコミット（`feat(api): F-05 募集の作成・編集` の形式）
 
