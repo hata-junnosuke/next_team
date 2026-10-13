@@ -246,7 +246,7 @@ class ReportExportTest extends TestCase
         $this->assertNotNull($export->completed_at);
         $this->assertNotNull($export->batch_id, '生成中（processing）を通ったなら batch_id が残る');
         $this->assertDatabaseHas('job_batches', ['id' => $export->batch_id, 'total_jobs' => 2, 'pending_jobs' => 0, 'failed_jobs' => 0]);
-        $this->assertSame("exports/{$this->company->id}/{$export->id}/monthly-2026-09.csv", $export->file_path);
+        $this->assertSame("exports/{$this->company->id}/{$export->id}/monthly-report-2026-09.csv", $export->file_path);
         $response->assertJsonPath('data.status.value', 'completed')->assertJsonPath('data.row_count', 3);
 
         Storage::disk('local')->assertExists($export->file_path);
@@ -585,12 +585,56 @@ class ReportExportTest extends TestCase
 
         $response->assertOk();
         $this->assertStringStartsWith('text/csv', (string) $response->headers->get('Content-Type'));
-        $this->assertStringContainsString('monthly-2026-09.csv', (string) $response->headers->get('Content-Disposition'));
+        $this->assertStringContainsString('monthly-report-2026-09.csv', (string) $response->headers->get('Content-Disposition'));
         $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
         $this->assertStringContainsString('private', (string) $response->headers->get('Cache-Control'));
         $body = $response->streamedContent();
         $this->assertSame(Storage::disk('local')->get($export->file_path), $body);
         $this->assertSame('東京倉庫', self::parseCsv($body)[1][1]);
+    }
+
+    public function test_同じ月なら同期csvと非同期csvのダウンロード名が同じ(): void
+    {
+        // issue #1: F-18（同期）と F-23（非同期）で利用者の手元に残るファイル名をそろえる（docs/01 6 章）
+        Notification::fake();
+        $this->shift('2026-09-10', Location::factory()->create());
+        $this->requestExport('2026-09');
+        $export = ReportExport::query()->sole();
+        $url = $this->actingAsAdmin()->getJson("/api/report-exports/{$export->id}")->json('data.download_url');
+
+        $sync = $this->actingAsAdmin()->get('/api/reports/monthly/csv?month=2026-09');
+        $this->app['auth']->forgetGuards();
+        $async = $this->getAsGuest($url);
+
+        $sync->assertOk();
+        $async->assertOk();
+        $this->assertSame('monthly-report-2026-09.csv', self::dispositionFilename($sync));
+        $this->assertSame(self::dispositionFilename($sync), self::dispositionFilename($async));
+    }
+
+    public function test_変更前の名前で保存された出力も保存済みのパスのままダウンロードできる(): void
+    {
+        // issue #1 より前の出力は file_path が monthly-{month}.csv のまま残る。ダウンロードは保存済みのパスを読むので 404 にならない
+        $export = ReportExport::factory()->completed()->create(['month' => '2026-08']);
+        $legacy = "exports/{$this->company->id}/{$export->id}/monthly-2026-08.csv";
+        $export->forceFill(['file_path' => $legacy])->save();
+        Storage::disk('local')->put($legacy, "\xEF\xBB\xBFold");
+
+        $response = $this->getAsGuest(self::downloadUrl($export));
+
+        $response->assertOk();
+        $this->assertSame('monthly-2026-08.csv', self::dispositionFilename($response));
+        $this->assertSame("\xEF\xBB\xBFold", $response->streamedContent());
+    }
+
+    /**
+     * Content-Disposition の filename を取り出す（引用符の有無どちらにも対応）
+     */
+    private static function dispositionFilename(TestResponse $response): ?string
+    {
+        $header = (string) $response->headers->get('Content-Disposition');
+
+        return preg_match('/filename="?([^";]+)"?/', $header, $m) === 1 ? $m[1] : null;
     }
 
     public function test_31分後のurlは403(): void

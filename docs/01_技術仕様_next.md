@@ -551,7 +551,7 @@ sequenceDiagram
 | POST | `/api/report-exports` | `month` | **202**（受付だけ） |
 | GET | `/api/report-exports` | | 一覧（新しい順、最大 20 件） |
 | GET | `/api/report-exports/{id}` | | 200（進捗の確認に使う） |
-| GET | `/api/report-exports/{id}/download?expires=…&signature=…` | | 200 `text/csv`。**認証なし・署名で保護**。期限切れ・改ざんは 403 |
+| GET | `/api/report-exports/{id}/download?expires=…&signature=…` | | 200 `text/csv`。**認証なし・署名で保護**。期限切れ・改ざんは 403。`Content-Disposition: attachment; filename=monthly-report-{month}.csv`（同期 CSV と同じ名前） |
 
 `ReportExportResource`: `{id, month, status: {value, label}, progress, row_count, requested_at, completed_at, download_url}`
 

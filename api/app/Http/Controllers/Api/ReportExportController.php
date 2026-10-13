@@ -58,7 +58,7 @@ class ReportExportController extends Controller
     {
         $path = $service->downloadablePath($reportExport);
 
-        // ファイル名は保存名（monthly-{month}.csv）。企業 ID と出力 ID はディレクトリ側にあり、ファイル名には出ない
+        // ファイル名は保存名（monthly-report-{month}.csv）。企業 ID と出力 ID はディレクトリ側にあり、ファイル名には出ない
         return Storage::disk('local')->download($path, basename($path), [
             'Content-Type' => 'text/csv; charset=UTF-8',
             'Cache-Control' => 'no-store, private',

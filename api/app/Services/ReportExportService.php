@@ -181,7 +181,7 @@ class ReportExportService
     }
 
     /**
-     * チャンクを拠点 ID の順に連結して monthly-{month}.csv（BOM + ヘッダ + 行）を作り、completed にする。
+     * チャンクを拠点 ID の順に連結して monthly-report-{month}.csv（BOM + ヘッダ + 行）を作り、completed にする。
      * 戻り値は「今 completed か」（通知を送ってよいか）。
      *
      * - もう completed なら何もしない（then の二重実行・手動の再実行。ファイルを作り直さない）→ true
@@ -332,7 +332,7 @@ class ReportExportService
 
     private static function filePath(ReportExport $export): string
     {
-        return self::directory($export)."/monthly-{$export->month}.csv";
+        return self::directory($export)."/monthly-report-{$export->month}.csv";
     }
 
     /**
