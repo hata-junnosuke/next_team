@@ -1,7 +1,7 @@
 ---
 name: issue-start
-description: 計画が承認された issue の作業場所を作る。main（司令塔）から issue 用の worktree（ブランチ issue/<番号>-<名前>）を切り、依存・.env の確認・DB まで整えて、そこで Claude を起動すれば /epic-flow か /issue-flow に入れる状態にする。「issue #◯ を始めて」「#◯ の worktree を作って」で使う
-argument-hint: <issue 番号> [名前（英小文字とハイフン。例: design-refresh）]
+description: 計画が承認された issue の作業場所を作る。main（司令塔）から issue 用の worktree（ブランチ issue/<番号>）を切り、依存・.env の確認・DB まで整えて、そこで Claude を起動すれば /epic-flow か /issue-flow に入れる状態にする。「issue #◯ を始めて」「#◯ の worktree を作って」で使う
+argument-hint: <issue 番号>
 ---
 
 # /issue-start — issue の作業場所を作る
@@ -12,7 +12,7 @@ argument-hint: <issue 番号> [名前（英小文字とハイフン。例: desig
 
 ## 前提
 - このスキルは **main の作業ツリー（司令塔）** で使う。main ではコードを書かない（`.claude/rules/common/git-workflow.md`）
-- 1 issue = 1 ブランチ `issue/<番号>-<名前>` = 1 worktree。置き場所は `~/orca/workspaces/next_team/issue-<番号>-<名前>`（Orca から開ける。レビュー用の `レビュー用` と並ぶ）
+- 1 issue = 1 ブランチ `issue/<番号>` = 1 worktree。置き場所は `~/orca/workspaces/next_team/issue-<番号>`。名前は付けない（中身は issue のタイトルで分かる）（Orca から開ける。レビュー用の `レビュー用` と並ぶ）
 - `.env` / `.env.local` は Claude が読まない・書かない。存在の確認（`test -f`）だけする
 - サーバーは起動しない（api 8002 / web 3002 はどの worktree も同じ番号。動かすのは一度に 1 つ）
 - `git reset --hard` / `git clean -f` は使わない（フックで禁止）
@@ -30,14 +30,13 @@ gh issue view <番号> --json number,title,state,labels,body
 | 本文にタスクのチェックリスト（`- [ ] **ID**`）と完了条件がない、または「人が承認」の記載がない | 止めて `/plan <番号>` を案内する（loop-rules 1: 完了条件のないタスクは着手しない）。小さな issue で本文に「完了条件」があればそのまま進めてよい |
 | `requires-human` ラベルが付いている | 止めて、理由のコメントを人に見せる |
 
-### 2. 名前と場所を決める
-- 名前は引数の 2 つ目。なければ issue のタイトルから英小文字とハイフンの短い名前（2〜3 語）を案として出し、人に確認する
-- `BRANCH=issue/<番号>-<名前>`、`WT=~/orca/workspaces/next_team/issue-<番号>-<名前>`
+### 2. 場所を決める
+- `BRANCH=issue/<番号>`、`WT=~/orca/workspaces/next_team/issue-<番号>`
 - すでにあるか調べる:
 ```bash
 git worktree list
-git branch --list "issue/<番号>-*"
-git ls-remote --heads origin "issue/<番号>-*"
+git branch --list "issue/<番号>"
+git ls-remote --heads origin "issue/<番号>"
 ```
 | 状況 | どうするか |
 |---|---|

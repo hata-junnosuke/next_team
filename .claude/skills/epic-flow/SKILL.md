@@ -11,7 +11,7 @@ disable-model-invocation: true
 
 エピック: **$ARGUMENTS**
 
-エピック = タスクが複数ある GitHub issue 1 つ。タスクの正は issue 本文のチェックリスト（`STATE.md` は issue #4 で廃止。P0〜P5 の記録は `.claude/state/archive/`）。ブランチは `issue/<番号>-<名前>`。
+エピック = タスクが複数ある GitHub issue 1 つ。タスクの正は issue 本文のチェックリスト（`STATE.md` は issue #4 で廃止。P0〜P5 の記録は `.claude/state/archive/`）。ブランチは `issue/<番号>`。
 
 ## 手順
 
@@ -22,7 +22,7 @@ disable-model-invocation: true
 
 ### 2. 人の承認（チェックポイント 1）
 - タスク表を要約して人に見せ、承認を待つ。**承認前に実装を始めない。リードが代行しない**（第2弾ではここを省いてしまった）
-- 承認後、issue 本文に「（日付 人が承認）」と書き、`git switch -c issue/<番号>-<名前>`（すでにその worktree / ブランチにいればそのまま）
+- 承認後、issue 本文に「（日付 人が承認）」と書き、`git switch -c issue/<番号>`（すでにその worktree / ブランチにいればそのまま）
 
 ### 3. タスクの実行（issue-flow の繰り返し）
 - 依存関係の順に、タスクごとに `/issue-flow <番号> <タスクID>` を実行する。issue 本文でチェック済みのタスクは飛ばす（途中から再開できる）

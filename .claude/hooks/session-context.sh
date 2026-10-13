@@ -66,9 +66,9 @@ else
   echo "- まだコミットがありません"
 fi
 
-# タスクの状態は GitHub Issues が正（issue #4）。ブランチ issue/<番号>-<名前> なら今の issue を出す
+# タスクの状態は GitHub Issues が正（issue #4）。ブランチ issue/<番号> なら今の issue を出す
 BRANCH="$(git branch --show-current 2>/dev/null)"
-ISSUE_NO="$(printf '%s' "$BRANCH" | sed -nE 's#^issue/([0-9]+)-.*#\1#p')"
+ISSUE_NO="$(printf '%s' "$BRANCH" | sed -nE 's#^issue/([0-9]+)(-.*)?$#\1#p')"
 if [ -n "$ISSUE_NO" ]; then
   echo "- 今のブランチ ${BRANCH} は issue #${ISSUE_NO} の作業。タスク表は gh issue view ${ISSUE_NO} の本文のチェックリスト"
 fi

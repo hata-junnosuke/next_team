@@ -10,7 +10,7 @@ argument-hint: <issue 番号 または 対象。例: #3、F-20 確定通知メ�
 
 対象: **$ARGUMENTS**
 
-タスクの正は **GitHub Issues**（issue #4 で `STATE.md` から移した）。1 issue = 1 ブランチ `issue/<番号>-<名前>`。
+タスクの正は **GitHub Issues**（issue #4 で `STATE.md` から移した）。1 issue = 1 ブランチ `issue/<番号>`。
 
 1. issue がなければ先に作る（`gh issue create`。概要と背景だけでよい）
 2. `planner` サブエージェントを起動し、対象を分解させる。渡すもの: issue 番号（`gh issue view <番号>` で本文が読める）、対象の F-xx、`docs/01` の 10 章

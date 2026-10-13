@@ -21,7 +21,7 @@
 - タスクの状態は **GitHub Issues** が正（本文のチェックリスト、`requires-human` ラベル、PR の `Closes #<番号>`）。工程ごとには書き換えず、タスクの完了時にチェックを 1 回付けるだけ
 - `loop-log.md`（差し戻しの自動記録）と `learnings.md`（`/learn` の教訓）はセッション外に永続化する。SessionStart フックが open の issue と一緒に読み戻す
 - `.claude/state/STATE.md` は 2026-10-13 に廃止（issue #4）。P0〜P5 の記録は `.claude/state/archive/STATE_P0-P5.md`（編集しない）
-- 1 issue = 1 ブランチ `issue/<番号>-<名前>`。並列に進めるときは issue ごとに worktree を分ける
+- 1 issue = 1 ブランチ `issue/<番号>`。並列に進めるときは issue ごとに worktree を分ける
 - 差し戻し・重大指摘・想定外の挙動があったら `/learn` で 1 行残す
 
 詳細: `docs/04_ループエンジニアリング.md`
