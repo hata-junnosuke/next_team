@@ -40,10 +40,8 @@
     "deny": [
       "Read(api/.env)",
       "Edit(api/.env)",
-      "Write(api/.env)",
       "Read(web/.env.local)",
-      "Edit(web/.env.local)",
-      "Write(web/.env.local)"
+      "Edit(web/.env.local)"
     ]
   },
   "hooks": {
