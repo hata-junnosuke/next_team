@@ -202,7 +202,7 @@ class WorkerTest extends TestCase
 
     public function test_検索語の百分率記号と下線は文字としてそのまま扱う(): void
     {
-        // LIKE のワイルドカード（% と _）を入れても全件にならない（SQLite は ESCAPE の明示が必要。learnings）
+        // LIKE のワイルドカード（% と _）を入れても全件にならない（SQLite は ESCAPE の明示が必要）
         $percent = Worker::factory()->create(['name' => '100%田中']);
         Worker::factory()->create(['name' => '山田太郎']);
         $underscore = Worker::factory()->create(['name' => 'a_b']);

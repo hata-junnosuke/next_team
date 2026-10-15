@@ -19,8 +19,8 @@
 | `api/` | Laravel 13 / PHP 8.4。**JSON API 専用**（Blade の画面は持たない） |
 | `web/` | Next.js 16（App Router）/ React 19 / TypeScript / Tailwind CSS 4 |
 | DB | SQLite（`api/database/database.sqlite`。テストは in-memory） |
-| キュー・キャッシュ | Redis（Docker。P4 から） |
-| メール | Mailpit（Docker。P4 から） |
+| キュー・キャッシュ | Redis（Docker。非同期の実装時に導入） |
+| メール | Mailpit（Docker。非同期の実装時に導入） |
 | 認証 | Sanctum SPA 認証（Cookie + CSRF）＋ Fortify ヘッドレス |
 
 ### ポート
@@ -226,7 +226,7 @@ INDEX: `(company_id, created_at)`。`*_type` には morph map の短い名前が
 | テーブル | 用途 | 備考 |
 |---|---|---|
 | `sessions` | セッション（`SESSION_DRIVER=database`） | 雛形のまま |
-| `cache` / `cache_locks` | P3 まで使う。P4 から Redis | 雛形のまま |
+| `cache` / `cache_locks` | P3 まで使った。P4 で Redis に切り替え | 雛形のまま |
 | `jobs` | 使わない（キューは Redis） | 雛形のまま残す |
 | `job_batches` | `Bus::batch()` の進捗（F-23） | Redis キューでも DB に持つ |
 | `failed_jobs` | 失敗ジョブの記録 | Redis キューでも DB に持つ |
@@ -769,9 +769,9 @@ B と C の境界: C の `AttendanceService::save()` は B の `Application`（�
 
 ---
 
-## 11. フェーズ
+## 11. フェーズ（P0〜P6 の区切り）
 
-`.claude/.phase` に数字を書きます。**書き換えるのは人だけ**です。
+実装の順番の区切りです。2026-10-15 の issue #8 で、フェーズの番号でフックの動きを変える仕組みは廃止しました（docs/00 決定 46）。今は 1 issue = 1 ブランチで進め、必須テスト 6 本は常に検査されます。
 
 | フェーズ | 内容 | 終わりの条件 |
 |---|---|---|

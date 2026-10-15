@@ -549,7 +549,7 @@ class ApplicationTest extends TestCase
             ];
         });
         $mine = Worker::factory()->create();
-        // TestCase の setUp で入れた企業を消し、ミドルウェアが企業を決めるところから通す（learnings）
+        // TestCase の setUp で入れた企業を消し、ミドルウェアが企業を決めるところから通す
         Context::forget('company_id');
 
         $this->actingAsAdmin()

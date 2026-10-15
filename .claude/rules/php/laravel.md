@@ -24,7 +24,7 @@ paths:
 - ファクトリは state（`->inactive()` `->confirmed()`）で状況を表す
 - 日付は `CarbonImmutable`。タイムゾーンは `config('app.timezone')` = Asia/Tokyo
 
-## 非同期（P4 から）
+## 非同期
 - ジョブのコンストラクタには ID（int）を渡す。モデルを渡さない
 - ジョブの中に業務ルールを書かない。サービスを呼ぶ
 - メールを送るジョブは `NotificationLogService::claim()` → 送信 → `markSent()` の順を守る

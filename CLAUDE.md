@@ -16,19 +16,19 @@
 3. `api/` は JSON しか返さない。`web/` は `lib/api.ts` を通さずに `fetch` しない。レスポンスは zod で `parse` する
 4. api と web の境界は `docs/01` の 6 章だけ。web 担当は `api/` のコードを読まない。形がずれていたら web で吸収せず報告する
 5. 第1弾・第2弾のコードを読まない（README だけ可）。パッケージを勝手に足さない
-6. `.env`・`vendor/`・`node_modules/`・ロック後のマイグレーション・フック・`.claude/.phase` は触らない（フックが止める）
-7. 赤のまま終わらない（Stop フックが差し戻す。5 回で打ち切り → 人に報告）
-8. 実装前に `/plan`。計画の承認・フェーズの移行は人が行う。リードが代行しない
+6. `.env`・`vendor/`・`node_modules/`・ロック後のマイグレーションは触らない（フックが止める）。フックと `settings.json` の編集は毎回人の承認を挟む（フックが承認ダイアログを出す）
+7. 赤のまま終わらない（Stop フックが差し戻す。5 回で打ち切り → 人に報告）。PR は CI（`make verify`）が緑であること
+8. 実装前に `/plan`。計画の承認と `main` へのマージは人が行う。リードが代行しない。承認後の実装・push・PR 作成・CI の確認は止まらずに進める
 9. サブエージェントの「できました」は判定材料にしない。検証結果とレビュー表で判定する
 10. `web/` を書く前に `web/node_modules/next/dist/docs/` の該当ページを読む（Next 16 は学習データと違う）
 
 ## 現在地の見方
-- フェーズ: `.claude/.phase`（0 ハーネス・ゲート / 1 API 骨格 / 2 ドメイン / 3 フロント / 4 非同期 / 5 仕上げ / 6 Could）。**人が書き換える**
-- タスク状態: **GitHub Issues**（本文のチェックリスト、`requires-human` ラベル）。ブランチは `issue/<番号>`。差し戻し記録: `.claude/state/loop-log.md`。教訓: `.claude/state/learnings.md`（旧 `STATE.md` は `.claude/state/archive/` に凍結）
-- 起動時に SessionStart フックがこれらを要約して出す
+- タスク状態: **GitHub Issues**（本文のチェックリスト、`requires-human` ラベル）。ブランチは `issue/<番号>`。合否と差し戻しの履歴は CI と PR で見る（旧 `STATE.md` と P0〜P5 の記録は `.claude/state/archive/` に凍結）
+- 教訓は効かせたい場所（この `CLAUDE.md`・`.claude/rules/`・スキル・docs）に PR で直接書く
+- 起動時に SessionStart フックが open の issue と直近のコミットを要約して出す
 
 ## スキル（`/名前` で起動）
-`/issue-start` issue の worktree を作る（main で使う）/ `/epic-flow` アウターループ（人が起動）/ `/issue-flow` インナーループ / `/plan` / `/verify [quick|pre-commit|full]` / `/code-review` / `/learn`。
+`/issue-start` issue の worktree を作る（main で使う）/ `/epic-flow` アウターループ（人が起動）/ `/issue-flow` インナーループ / `/plan` / `/verify [quick|pre-commit|full]` / `/code-review` / `/issue-create` issue をテンプレートどおりに作る / `/pr-create` PR を作って CI を確かめる。
 知識スキル: `tdd-workflow` `myteam-domain-rules` `laravel-api-standards` `next-coding-standards` `async-rules` `myteam-acceptance`
 
 ## エージェント（`.claude/agents/`）
@@ -44,7 +44,7 @@ make fresh                        # DB 作り直し（admin@example.com / passwo
 make up                           # redis / mailpit
 make api-serve                    # http://localhost:8002
 make web-dev                      # http://localhost:3002
-make horizon                      # キューワーカー（P4 から）
+make horizon                      # キューワーカー
 make ports                        # 8002 / 3002 を誰が使っているか
 ```
 

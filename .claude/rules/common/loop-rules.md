@@ -23,6 +23,6 @@
 - SessionStart フックが open の issue と直近のコミットを読み戻す
 - `.claude/state/STATE.md` は 2026-10-13 に廃止（issue #4）。P0〜P5 の記録は `.claude/state/archive/STATE_P0-P5.md`（編集しない）
 - 1 issue = 1 ブランチ `issue/<番号>`。並列に進めるときは issue ごとに worktree を分ける
-- 差し戻し・重大指摘・想定外の挙動から得た教訓は、効かせたい場所（`CLAUDE.md`・`.claude/rules/`・スキル・docs）に **PR で直接書く**。教訓だけを貯める置き場は作らない（issue #8 で `learnings.md` と `/learn` を廃止）
+- 差し戻し・重大指摘・想定外の挙動から得た教訓は、効かせたい場所（`CLAUDE.md`・`.claude/rules/`・スキル・docs）に **PR で直接書く**。教訓だけを貯める置き場は作らない（issue #8 で教訓の記録ファイルと専用スキルを廃止）
 
 詳細: `docs/04_ループエンジニアリング.md`

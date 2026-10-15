@@ -1,6 +1,6 @@
 // 状態の value → バッジの色。対応表はここ 1 箇所だけ（docs/01 6.1・7.5）。
 // ラベルは API の label をそのまま表示する。ここには色しか置かない。
-// 値は docs/01 4.1 の Enum（P4 以降のものも先に置く）
+// 値は docs/01 4.1 の Enum（非同期の状態も含む）
 
 export type Tone = "gray" | "blue" | "green" | "amber" | "red" | "purple";
 

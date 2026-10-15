@@ -1,9 +1,9 @@
 ---
 name: async-rules
-description: myteam 第3弾の非同期処理の規約（Job / Queue / イベント / スケジューラ / バッチ / メール / 通知の記録 / キャッシュ）。ジョブの書き方の型、冪等性の守り方、失敗時の扱い、テストの型。P4 以降の implementer-api・tester・code-reviewer が従う
+description: myteam 第3弾の非同期処理の規約（Job / Queue / イベント / スケジューラ / バッチ / メール / 通知の記録 / キャッシュ）。ジョブの書き方の型、冪等性の守り方、失敗時の扱い、テストの型。ジョブ・キュー・通知・キャッシュに触れるときの implementer-api・tester・code-reviewer が従う
 ---
 
-# 非同期処理の規約（P4 から）
+# 非同期処理の規約
 
 設計の全体と理由は `docs/03_非同期処理の設計.md`。ここは「書くときに守る型」。
 

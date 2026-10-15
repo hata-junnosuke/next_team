@@ -6,7 +6,7 @@ import { dashboardResponse } from "@/lib/schemas/dashboard";
 
 // ダッシュボード（F-19）。GET /api/dashboard をそのまま表示する。
 // 充足率・確定数・未処理の応募数は API が数える（web で計算しない）。
-// P4 から API 側でキャッシュされるので、generated_at で「いつの値か」を出す
+// API 側でキャッシュされるので、generated_at で「いつの値か」を出す
 
 const linkClass = "whitespace-nowrap text-blue-700 hover:underline";
 

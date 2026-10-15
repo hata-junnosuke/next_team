@@ -29,16 +29,15 @@
 
 `.claude/state/archive/STATE_P0-P5.md`（旧 `STATE.md`。2026-10-13 からタスクは GitHub Issues で管理）の末尾「人への引き継ぎ」と同じ内容です。
 
-1. **Horizon と Telescope の実物の確認は、リードが API 経由で済ませた**（2026-10-02 の夕方）。`api/.env` は変えず、起動時の環境変数で P4 の値を渡して、Horizon でのジョブの処理、Redis での同時書き込み（`database is locked` は 0 件）、`failed_jobs` の再実行、Telescope と SQLite の相性を確かめた。結果は [`docs/03`](docs/03_非同期処理の設計.md) 10 章。人がやるのは、下の 2 番の `.env` の切り替えと、5 番の画面での手動確認（Horizon と Telescope の画面もそこで見る）。ローカルの DB に `telescope_entries` を作るため、先に `make fresh` を 1 回流す
+1. **Horizon と Telescope の実物の確認は、リードが API 経由で済ませた**（2026-10-02 の夕方）。`api/.env` は変えず、起動時の環境変数で P4 の値を渡して、Horizon でのジョブの処理、Redis での同時書き込み（`database is locked` は 0 件）、`failed_jobs` の再実行、Telescope と SQLite の相性を確かめた。結果は [`docs/03`](docs/03_非同期処理の設計.md) 10 章。人がやるのは、下の 2 番の `.env` の切り替えと、4 番の画面での手動確認（Horizon と Telescope の画面もそこで見る）。ローカルの DB に `telescope_entries` を作るため、先に `make fresh` を 1 回流す
 2. **`api/.env` を P4 の値に切り替える**（`api/.env.example` の P4 の行。docs/01 2 章）。2026-10-02 時点の `php artisan about --only=drivers` は Queue = database、Cache = database、Mail = log で、まだ P1〜P3 の値です。この状態ではジョブは DB のキューに積まれ、メールは Mailpit ではなくログに出ます。Horizon は Redis のキューしか見ない（`api/config/horizon.php` のスーパーバイザが `connection => redis`）ので、切り替えるまでは `make horizon` を起動してもジョブを拾いません
 3. マイグレーションのロック: `touch .claude/.migrations-locked`
-4. `.claude/.phase` の更新（今は 0 のまま。人の判断）
-5. 画面の手動確認: 下の M-1〜M-13 と A-1〜A-11 を通し、確認日の欄を記入する
-6. 夜の間にリードが決めた判断の確認（`archive/STATE_P0-P5.md` の「判断の確認」、docs/00 の 2.4）
+4. 画面の手動確認: 下の M-1〜M-13 と A-1〜A-11 を通し、確認日の欄を記入する
+5. 夜の間にリードが決めた判断の確認（`archive/STATE_P0-P5.md` の「判断の確認」、docs/00 の 2.4）
 
 ### 人しかやらないこと
 
-フェーズの移行（`.claude/.phase`）、マイグレーションのロック（`.claude/.migrations-locked`）、`.env` の変更、計画の承認、`main` へのマージ、画面の手動確認。いつ何をするかは [`docs/00`](docs/00_計画と決定事項.md) の 6 章にあります。
+マイグレーションのロック（`.claude/.migrations-locked`）、`.env` の変更、フックと `settings.json` の変更の承認、計画の承認、`main` へのマージ、画面の手動確認。いつ何をするかは [`docs/00`](docs/00_計画と決定事項.md) の 6 章にあります。
 
 ---
 
@@ -54,7 +53,8 @@
 | メール | Mailpit（Docker） |
 | テスト | api は PHPUnit。web は型チェックと ESLint、画面は下の手動チェックリスト |
 | 整形 | api は Pint、web は Prettier（編集のたびにフックが自動整形） |
-| AI ハーネス | `.claude/`（agents 11 / skills 12 / rules 8 / hooks 8 / contexts 3 / state） |
+| AI ハーネス | `.claude/`（agents 9 / skills 14 / rules 8 / hooks 8 / state は archive のみ） |
+| CI | GitHub Actions（`.github/workflows/ci.yml`）。main 向けの PR と main への push で `make verify` |
 
 ```
 next_team/
@@ -179,14 +179,16 @@ A 項目の多くは、2026-10-02 の夕方にリードが実物（Redis・Horiz
 
 | やりたいこと | コマンド |
 |---|---|
-| フェーズ 1 つ分をまとめて進める | `/epic-flow p1-skeleton`（人が起動。計画を承認してから実装が始まる） |
-| タスク 1 件を実装 → テスト → レビューまで回す | `/issue-flow <タスクID>` |
-| 実装の前に計画だけ立てる | `/plan F-20 確定通知メール` |
+| issue を作る | `/issue-create task <概要>` / `/issue-create bug <概要>`（`.github/ISSUE_TEMPLATE/` どおり） |
+| 実装の前に計画だけ立てる | `/plan <issue 番号>` |
+| issue の作業場所（worktree）を作る | `/issue-start <issue 番号>`（main で） |
+| タスクが複数ある issue をまとめて進める | `/epic-flow <issue 番号>`（人が起動。計画を承認してから実装が始まる） |
+| タスク 1 件を実装 → テスト → レビューまで回す | `/issue-flow <issue 番号> [タスクID]` |
 | 検証する | `/verify`（quick）/ `/verify pre-commit` / `/verify full` |
 | レビューだけする | `/code-review` |
-| 教訓を残す | `/learn <出来事>` |
+| PR を作って CI を確かめる | `/pr-create <issue 番号>`（`.github/pull_request_template.md` どおり） |
 
-応答を終えようとするたびに Stop フックが検証を回し、赤なら差し戻します（5 回で打ち切り）。仕組みは [`docs/04`](docs/04_ループエンジニアリング.md)。
+応答を終えようとするたびに Stop フックが検証を回し、赤なら差し戻します（5 回で打ち切り）。PR では CI が同じ `make verify` を回します（手元の速い合否が Stop フック、チームの関門が CI）。教訓は `CLAUDE.md`・`.claude/rules/`・スキル・docs に PR で直接書きます。仕組みは [`docs/04`](docs/04_ループエンジニアリング.md)。
 
 ---
 
@@ -268,7 +270,7 @@ A 項目の多くは、2026-10-02 の夕方にリードが実物（Redis・Horiz
 | 4 | **範囲外のページの空表示の文言を分ける** | 一覧で `?page=99` のように範囲外を開くと、データがあっても「拠点がまだ登録されていません。」「通知の履歴はまだありません。」のように「まだない」と出ます。`epic/p5-followup` で、`web/components/ui/Pagination.tsx` に必須の `itemCount` と `emptyText()` を足し、範囲外のときは「このページには表示する項目がありません。」と「1 ページ目へ」のリンクだけを出す形に直している最中です。最初から共通部品の契約に入れておけば、一覧ごとに後から直さずに済んだ |
 | 5 | **ファクトリの `fake()->optional()` を、期待値に関わる列で使わない** | 「送らなければ null」を期待するテストが、Faker の乱数で 2 回に 1 回だけ赤になりました（P2-04 / P2-06）。「再実行で緑」は合格にせず原因を調べ、テストで列を明示して作る形に直しました |
 | 6 | **パッケージの導入は人がいる時間に前倒しする** | Horizon / Telescope は P4 の最初に入れる計画でしたが、人が不在の夜間だったので後回しにしました（P4-01b）。その結果、P4 の「Horizon の画面で見える」「Telescope で cache を見る」の確認がすべて最後に残りました。結局、導入は P5 の最後（2026-10-02 の朝に人が承認した後）になり、実物の確認はその日の夕方にリードが API 経由で行いました。画面での確認はまだ残っています。フェーズの開始前に、要るパッケージの承認を人にまとめて取る |
-| 7 | **`.claude/.phase` をフェーズに合わせて進める** | 今回は人の判断で 0 のまま進めたので、Stop フックの「必須テストファイルの存在検査」が一度も効かず、リードが P2-07 と P4-05 の後に `ls` で確かめました。機械的な判定を手作業に戻した形です |
+| 7 | **必須テストの存在検査を段階に依存させない** | 今回はフェーズの番号を人の判断で 0 のまま進めたので、Stop フックの「必須テストファイルの存在検査」が一度も効かず、リードが P2-07 と P4-05 の後に `ls` で確かめました。機械的な判定を手作業に戻した形です。issue #8 でフェーズの仕組み自体を廃止し、必須テスト 6 本は常に検査する形にしました |
 | 8 | **手動確認をフェーズの終わりごとに行う** | M-1〜M-13、A-1〜A-11 はすべて最後にまとめる形になりました。画面の崩れや実物の Redis・Mailpit での差は手動確認でしか見つからないので、まとめるほど見つかるのが遅くなる |
 | 9 | **ポリモーフィックな関連を持つテーブルには、最初から企業の検査を計画に入れる** | `notification_logs` の他社チェック漏れ（P4-01 の重大指摘）は、「親が自社か」を保存時に確かめる既存の仕組みがポリモーフィックには効かないことから起きました。docs/01 の契約の段階で書いておけた |
 

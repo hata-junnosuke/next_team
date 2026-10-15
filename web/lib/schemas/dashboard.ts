@@ -22,7 +22,7 @@ export type UpcomingPosting = z.infer<typeof upcomingPostingSchema>;
 export const dashboardSchema = z.object({
   upcoming_postings: z.array(upcomingPostingSchema),
   pending_applications_count: z.number().int(),
-  /** 集計した時刻（P4 からはキャッシュした時刻）。「いつの値か」を画面に出す。offset を許さないと +09:00 付きが弾かれる */
+  /** 集計した時刻（キャッシュされていればキャッシュした時刻）。「いつの値か」を画面に出す。offset を許さないと +09:00 付きが弾かれる */
   generated_at: z.iso.datetime({ offset: true }),
 });
 

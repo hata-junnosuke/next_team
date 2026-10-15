@@ -51,7 +51,7 @@ class Worker extends Model
 
     /**
      * 氏名の部分一致（F-04）。Rails の scope :name_like に相当し、Worker::query()->nameLike('山田') で呼ぶ。
-     * SQLite の LIKE は既定のエスケープ文字がないので ESCAPE を明示し、% と _ を文字として扱う（learnings）。
+     * SQLite の LIKE は既定のエスケープ文字がないので ESCAPE を明示し、% と _ を文字として扱う。
      * 列は qualifyColumn で workers.name にする（join しても曖昧にならない）。
      * https://readouble.com/laravel/13.x/ja/eloquent.html#local-scopes
      *

@@ -69,7 +69,7 @@ return [
 - `CurrentCompany` を設定するのは `SetCurrentCompany` ミドルウェア・スケジューラのコマンド・テストだけ。サービスやコントローラで `set()` しない
 - join 先のテーブルにはスコープが効かない。`->where('job_postings.company_id', CurrentCompany::id())` を明示する
 
-## 認証（P1）
+## 認証
 - `php artisan install:api` → Sanctum。`composer require laravel/fortify` → `php artisan fortify:install`。**Fortify が作るビュー関連・2FA のマイグレーションは消す**
 - `config/fortify.php`: `'views' => false`、`'features' => []`
 - `bootstrap/app.php`: `$middleware->statefulApi();`、`$middleware->alias(['company' => SetCurrentCompany::class]);`

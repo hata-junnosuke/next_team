@@ -22,9 +22,9 @@ api-serve: ## Laravel API を http://localhost:8002 で起動
 	cd api && php artisan serve --port=8002
 web-dev: ## Next.js を http://localhost:3002 で起動
 	cd web && npm run dev -- --port 3002
-horizon: ## キューワーカー（P4 以降。http://localhost:8002/horizon）
+horizon: ## キューワーカー（http://localhost:8002/horizon）
 	cd api && php artisan horizon
-schedule: ## スケジューラをフォアグラウンドで回す（P4 以降）
+schedule: ## スケジューラをフォアグラウンドで回す
 	cd api && php artisan schedule:work
 fresh: ## DB を作り直してシードを入れる
 	cd api && php artisan migrate:fresh --seed
