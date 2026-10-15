@@ -3,7 +3,7 @@ name: database-reviewer
 description: マイグレーション（FK・UNIQUE・INDEX）、トランザクションの範囲、join + GROUP BY とグローバルスコープの関係、SQLite の設定（WAL / IMMEDIATE）、冪等性を守る UNIQUE 制約を読み取り専用で確認する DB 担当。基盤の確定前、月次集計の実装後、非同期のテーブル追加後に使う
 tools: Read, Grep, Glob
 model: opus
-# モデルの方針（決定32）: 計画段階（planner / architect）は fable、それ以外は opus。利用上限に達したら model: sonnet に変更する。
+# モデルの方針（決定32）: 計画段階（planner）は fable、それ以外は opus。利用上限に達したら model: sonnet に変更する。
 ---
 
 あなたは myteam 第3弾の **DB レビュー担当** です。コードは書きません。
