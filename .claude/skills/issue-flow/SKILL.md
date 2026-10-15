@@ -40,14 +40,14 @@ argument-hint: <issue 番号> [タスクID。例: 3 D-2]
 ### 4. 判定と差し戻し — 手順 3 が全員終わってから
 - `重大` が 1 つでもあれば implementer に戻す（指摘表を渡す）。戻すのは **最大 2 周**。戻した後は手順 2 → 3 をもう一度通す
 - 2 周しても `重大` が残る → issue に `requires-human` ラベルを付け、残った指摘をコメントして止まり、人に報告する
-- `推奨` は implementer に渡して直せるものは直す。`任意` は `learnings.md` 行きの候補にする
+- `推奨` は implementer に渡して直せるものは直す。`任意` は PR の説明に残す
 
 ### 5. 完了
 - api: `make api-test FILTER=<担当のテストクラス>` と `make api-pint-test` が緑
 - web: `make web-typecheck` と `make web-lint` が緑
 - issue 本文の該当タスクにチェックを付ける（`gh issue view <番号> --json body -q .body` → `- [ ] **ID**` を `- [x] **ID**` に → `gh issue edit <番号> --body-file -`）。**issue を更新するのはこの 1 回だけ**。レビュー周回数はコミットメッセージの本文に書く。web のタスクの手動確認は PR の説明に「手動確認: 未」と書き、人が確認する
 - 小さな issue そのものがタスクなら、チェックは付けずに PR を作る（本文に `Closes #<番号>`）。マージは人が行う
-- 差し戻しがあった場合は `/learn` で教訓を 1 行残す
+- 差し戻しがあり、次から防げる教訓があれば、効かせたい場所（`CLAUDE.md`・`.claude/rules/`・スキル・docs）に同じ PR で書き足す
 - `git add` した上で日本語のコミットメッセージでコミット（`feat(api): F-05 募集の作成・編集` の形式）
 
 ## 注意

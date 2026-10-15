@@ -29,7 +29,7 @@ allowed-tools: Bash(make:*), Bash(git diff:*), Bash(git status:*)
 2. `make verify-full`（+ Prettier のチェックと `next build`）
 3. `make api-routes` を出し、`docs/01` の 6 章のエンドポイントと一致すること、`register` / `password.*` / `two-factor.*` が **出ない** こと（Fortify の features が空）を確認
 4. `.claude/skills/myteam-acceptance/SKILL.md` のチェックリストを上から順に確認し、テストで担保されている項目はテスト名を、人の目視が必要な項目は「要手動確認」を書く
-5. `docs/01` の 9.1 の必須テストファイルが、現在のフェーズで要るものすべて存在し緑であることを明記
+5. `docs/01` の 9.1 の必須テストファイル 6 本がすべて存在し緑であることを明記
 6. 総括: 「動線 10 ステップ: API 自動 N / 画面手動 M」「テスト N 件緑」「型・ESLint・ビルド 緑」「重大指摘 0」
 
 ## Stop フックとの関係

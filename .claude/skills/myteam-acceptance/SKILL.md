@@ -1,6 +1,6 @@
 ---
 name: myteam-acceptance
-description: 要件 5 章の受け入れ動線 10 ステップと 4.7 の非同期要件を検証する手順。API の自動テスト（AcceptanceScenarioTest）との対応と、画面・Mailpit・Horizon での手動チェックリスト。verify full と各フェーズの最終確認で使う
+description: 要件 5 章の受け入れ動線 10 ステップと 4.7 の非同期要件を検証する手順。API の自動テスト（AcceptanceScenarioTest）との対応と、画面・Mailpit・Horizon での手動チェックリスト。verify full と PR の最終確認で使う
 ---
 
 # 受け入れ確認（要件 5 章・4.7・8 章）
@@ -9,16 +9,16 @@ web のテストは書かない（決定9）。**API は自動テスト、画面
 
 ## 準備
 ```bash
-make up            # redis / mailpit（P4 以降で必要）
+make up            # redis / mailpit
 make fresh         # DB 作り直し + シード（admin@example.com / password）
 make ports         # 8002 / 3002 を別の弾のサーバーが使っていないか
 make api-serve     # 別ターミナル
 make web-dev       # 別ターミナル
-make horizon       # 別ターミナル（P4 以降）
+make horizon       # 別ターミナル（後半の非同期で必要）
 ```
 同じブラウザで第2弾（`localhost:8001`）を開いていると `XSRF-TOKEN` Cookie が上書きし合う。閉じるか別プロファイルで確認する。
 
-## 前半: 動線 10 ステップ（フェーズ 3 の終わり）
+## 前半: 動線 10 ステップ
 `api/tests/Feature/AcceptanceScenarioTest.php` が同じ 10 ステップを API 呼び出しで 1 本通す。各ステップにコメントで番号を振る。
 
 | # | ステップ | 期待 | API の自動テスト | 画面で人が見る点 |
@@ -39,7 +39,7 @@ make horizon       # 別ターミナル（P4 以降）
 - M-12 募集の締切・中止（F-07）、複製（F-08）
 - M-13 ログアウトすると `/login` に戻り、戻るボタンで管理画面が見えない
 
-## 後半: 非同期（フェーズ 4・5 の終わり）
+## 後半: 非同期
 | # | 要件 | 手順 | 期待 |
 |---|---|---|---|
 | A-1 | F-20 | 応募を承認する | 画面はすぐ返る。http://localhost:8025 に確定通知（日時・拠点・職種・時給）。Horizon の `mails` に完了ジョブ |
@@ -55,8 +55,8 @@ make horizon       # 別ターミナル（P4 以降）
 | A-11 | Horizon の認証 | ログアウトして http://localhost:8002/horizon を開く | 403 |
 
 ## 完了の定義（要件 8 章）
-- 前半: M-1〜M-10 が画面で通る。`docs/01` 9.1 のフェーズ 3 の必須テスト 4 つが緑
-- 後半: A-1〜A-9 と A-11 が通る。フェーズ 5 の必須テスト 2 つが緑。`failed_jobs` からの再実行を確認した
+- 前半: M-1〜M-10 が画面で通る。`docs/01` 9.1 の必須テストのうち動線の 4 つ（ApplicationTest / PayrollCalculatorTest / ApplicationStatusTest / AcceptanceScenarioTest）が緑
+- 後半: A-1〜A-9 と A-11 が通る。非同期の必須テスト 2 つ（NotificationIdempotencyTest / FailedJobTest）が緑。`failed_jobs` からの再実行を確認した
 - README に構成・起動手順・設計で迷った点と判断・次回やり直すなら変えることがある
 
 確認したら `README.md` の手動チェックリストに日付を書き、該当する PR か issue に「手動確認: 済（日付）」とコメントする。
