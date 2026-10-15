@@ -97,7 +97,8 @@ $(format_phpunit "$TEST_OUT")
 "
 fi
 if [ "$CHECK_WEB" = 1 ]; then
-  TSC_OUT="$(cd web && node_modules/.bin/tsc --noEmit 2>&1)" || FAIL="${FAIL}## web: 型エラー（make web-typecheck で再現）
+  # 先に next typegen で LayoutProps などのルートの型を生成する（.next/ がない worktree でも赤にしない）
+  TSC_OUT="$(cd web && node_modules/.bin/next typegen >/dev/null 2>&1; node_modules/.bin/tsc --noEmit 2>&1)" || FAIL="${FAIL}## web: 型エラー（make web-typecheck で再現）
 $(printf '%s' "$TSC_OUT" | head -30)
 
 "

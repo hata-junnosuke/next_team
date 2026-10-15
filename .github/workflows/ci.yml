@@ -1,0 +1,64 @@
+# CI: PR ごとに make verify（api: Pint チェック + PHPUnit / web: tsc + ESLint）を回す。
+# Stop フック（.claude/hooks/verify-loop.sh）は手元の速い合否、CI はチームの関門（main のブランチ保護で必須にする）。
+# Rails でいえば GitHub Actions で rspec と rubocop を回すのと同じ。
+# テストは api/phpunit.xml で SQLite（:memory:）・array キャッシュ・sync キューに固定しているので、Redis も .env も要らない。
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# 同じブランチの古い実行は止める（push し直したときに無駄に回さない）
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: make verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # api/composer.json の "php": "^8.4"
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_sqlite, sqlite3, mbstring, intl, pcntl, posix
+          coverage: none
+          tools: composer:v2
+
+      # web/package.json に engines がないので、Next 16 が動く LTS（20.9 以上）の 22 に固定する
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: composer のキャッシュの場所
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+        working-directory: api
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-${{ runner.os }}-${{ hashFiles('api/composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - name: composer install
+        run: composer install --no-interaction --no-progress --prefer-dist
+        working-directory: api
+
+      - name: npm ci
+        run: npm ci --no-audit --no-fund
+        working-directory: web
+
+      - name: make verify
+        run: make verify

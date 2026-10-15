@@ -38,8 +38,8 @@ api-pint-test: ## Pint の整形チェック（書き換えない）
 	cd api && vendor/bin/pint --test
 api-routes: ## ルート一覧
 	cd api && php artisan route:list
-web-typecheck: ## TypeScript の型チェック
-	cd web && npx tsc --noEmit
+web-typecheck: ## TypeScript の型チェック（先に next typegen で LayoutProps などのルートの型を生成する。.next/ がない worktree と CI 用）
+	cd web && npx next typegen && npx tsc --noEmit
 web-lint: ## ESLint
 	cd web && npm run lint
 web-format: ## Prettier で整形
