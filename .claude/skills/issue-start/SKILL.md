@@ -13,7 +13,7 @@ argument-hint: <issue 番号>
 ## 前提
 - このスキルは **main の作業ツリー（司令塔）** で使う。main ではコードを書かない（`.claude/rules/common/git-workflow.md`）
 - 1 issue = 1 ブランチ `issue/<番号>` = 1 worktree。置き場所は `~/orca/workspaces/next_team/issue-<番号>`。名前は付けない（中身は issue のタイトルで分かる）（Orca から開ける。レビュー用の `レビュー用` と並ぶ）
-- `.env` / `.env.local` は Claude が読まない・書かない。存在の確認（`test -f`）だけする
+- `.env` / `.env.local` は Claude が読まない・書かない。コピーは `make worktree-env` に任せる（中身を出さない）
 - サーバーは起動しない（api 8002 / web 3002 はどの worktree も同じ番号。動かすのは一度に 1 つ）
 - `git reset --hard` / `git clean -f` は使わない（フックで禁止）
 - 別の作業ツリーの中で操作するときは `cd` しない。`git -C <場所>`、`composer -d <場所>/api`、`npm --prefix <場所>/web`、`make -C <場所>` を使う
@@ -59,17 +59,11 @@ test -d <WT>/web/node_modules  || npm ci --prefix <WT>/web
 ```
 （2 で既存の worktree を使った場合も、`composer.lock` / `package-lock.json` が main と違えば入れ直す）
 
-### 5. `.env` を確かめる
+### 5. `.env` をコピーする
 ```bash
-test -f <WT>/api/.env && echo api-ok
-test -f <WT>/web/.env.local && echo web-ok
+make worktree-env WT=<WT>
 ```
-ない方があれば止めて、人に `!` 付きでコピーしてもらう（Claude はコピーしない。中身を見ないため）:
-```
-! cp ~/Desktop/Study/myteam_practices/next_team/api/.env <WT>/api/.env
-! cp ~/Desktop/Study/myteam_practices/next_team/web/.env.local <WT>/web/.env.local
-```
-初回だけ `! grep '^DB_' <WT>/api/.env` で、DB が**絶対パスで main の DB を指していない**かを人に見てもらう（指していると main と DB を共有してしまう）。
+main（`git worktree list` の先頭）の `api/.env` と `web/.env.local` を、中身を表示せずにコピーする。すでにあるファイルは上書きしない。`DB_DATABASE` が絶対パス（main の DB を共有してしまう）なら値を出さずに失敗するので、そのときは止めて人に直してもらう。Claude は `.env` を `cat` / `cp` で直接触らない（このターゲットだけが `settings.json` で許可されている）。
 
 ### 6. DB を作る
 DB は SQLite の `api/database/database.sqlite`（git 管理外なので worktree には無い）。worktree ごとに別の DB になる。
@@ -81,7 +75,7 @@ make -C <WT> fresh
 
 ### 7. 報告
 - issue の番号・タイトル、`BRANCH`、`WT`、元にした main のコミット
-- 実行した準備（composer / npm / fresh）と、人の作業が残っていればそれ（`.env` のコピーなど）
+- 実行した準備（composer / npm / `.env` のコピー / fresh）と、人の作業が残っていればそれ（`DB_DATABASE` の修正など）
 - 次の一手（この順で人が行う）:
   1. Orca で `WT` を開く（または `cd <WT> && claude`）。**worktree の直下で起動する**（フックが効く。SessionStart に今の issue 番号が出る）
   2. タスクが複数なら `/epic-flow <番号>`、1 件なら `/issue-flow <番号>`

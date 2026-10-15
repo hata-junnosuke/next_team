@@ -4,7 +4,7 @@
 
 .PHONY: help up down ps api-serve web-dev horizon schedule fresh \
         api-test api-pint api-pint-test api-routes web-typecheck web-lint web-format web-format-check web-build \
-        verify verify-full ports
+        verify verify-full worktree-env ports
 
 help: ## ターゲット一覧
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -51,6 +51,24 @@ web-build: ## 本番ビルド（遅いので Stop フックでは回さない。
 
 verify: api-pint-test api-test web-typecheck web-lint ## Stop フック相当を手で回す
 verify-full: verify web-format-check web-build ## + 整形チェックと本番ビルド
+
+# --- worktree ---
+# main の作業ツリー（git worktree list の先頭）の .env / .env.local を WT にコピーする。中身は表示しない。
+# すでにあるファイルは上書きしない。DB_DATABASE が絶対パスだと worktree が main の DB を共有するので、値を出さずに失敗する
+MAIN_TREE := $(shell git worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p')
+worktree-env: ## main の api/.env と web/.env.local を worktree にコピー（make worktree-env WT=<場所>）
+	@test -n "$(WT)" || { echo "WT=<worktree の場所> を指定してください"; exit 1; }
+	@test -d "$(WT)/api" && test -d "$(WT)/web" || { echo "$(WT) に api/ と web/ がありません"; exit 1; }
+	@test "$$(cd "$(WT)" && pwd -P)" != "$$(cd "$(MAIN_TREE)" && pwd -P)" || { echo "WT が main の作業ツリーです"; exit 1; }
+	@test -f "$(MAIN_TREE)/api/.env" || { echo "main に api/.env がありません"; exit 1; }
+	@if grep -Eq '^DB_DATABASE=["'\'']?/' "$(MAIN_TREE)/api/.env"; then \
+	  echo "main の api/.env の DB_DATABASE が絶対パスです（値は表示しません）。コピーすると main と DB を共有するので止めました。人が相対パスか未設定にしてください"; exit 1; fi
+	@if [ -f "$(WT)/api/.env" ]; then echo "api/.env: すでにあるのでそのまま"; else cp "$(MAIN_TREE)/api/.env" "$(WT)/api/.env" && echo "api/.env: コピーしました"; fi
+	@if [ -f "$(WT)/web/.env.local" ]; then echo "web/.env.local: すでにあるのでそのまま"; \
+	elif [ -f "$(MAIN_TREE)/web/.env.local" ]; then cp "$(MAIN_TREE)/web/.env.local" "$(WT)/web/.env.local" && echo "web/.env.local: コピーしました"; \
+	else echo "main に web/.env.local がありません"; exit 1; fi
+	@if grep -Eq '^DB_DATABASE=["'\'']?/' "$(WT)/api/.env"; then \
+	  echo "$(WT)/api/.env の DB_DATABASE が絶対パスです（値は表示しません）。人が直してください"; exit 1; fi
 
 ports: ## 8002 / 3002 を誰が使っているか（別の弾のサーバーを見ていないかの確認）
 	@for p in 8002 3002; do pid=$$(lsof -tiTCP:$$p -sTCP:LISTEN 2>/dev/null | head -1); \
