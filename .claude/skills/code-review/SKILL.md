@@ -6,8 +6,6 @@ argument-hint: [対象パスまたはタスクID]（省略時は git diff の全
 
 # /code-review — 多軸レビュー
 
-`.claude/contexts/review.md` を先に読むこと。
-
 対象: **$ARGUMENTS**
 
 ## 変更の概要（自動取得）

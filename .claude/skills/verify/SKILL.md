@@ -7,8 +7,6 @@ allowed-tools: Bash(make:*), Bash(git diff:*), Bash(git status:*)
 
 # /verify — 検証（$ARGUMENTS）
 
-`.claude/contexts/review.md` を先に読むこと。
-
 ## 現在の状態（自動取得）
 - 変更ファイル: !`cd "$CLAUDE_PROJECT_DIR" && git status --short | head -30`
 - api Pint: !`cd "$CLAUDE_PROJECT_DIR" && make -s api-pint-test 2>&1 | tail -5`

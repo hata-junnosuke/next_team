@@ -7,7 +7,7 @@ disable-model-invocation: true
 
 # /epic-flow — アウターループ
 
-`.claude/contexts/dev.md` を先に読むこと。仕組みの詳細は `docs/04_ループエンジニアリング.md` 2〜3 章。
+仕組みの詳細は `docs/04_ループエンジニアリング.md` 2〜3 章。
 
 エピック: **$ARGUMENTS**
 

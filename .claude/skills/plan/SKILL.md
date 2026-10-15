@@ -6,8 +6,6 @@ argument-hint: <issue 番号 または 対象。例: #3、F-20 確定通知メ�
 
 # /plan — 計画
 
-`.claude/contexts/research.md` を先に読むこと（読み取りのみ、結論は表で）。
-
 対象: **$ARGUMENTS**
 
 タスクの正は **GitHub Issues**（issue #4 で `STATE.md` から移した）。1 issue = 1 ブランチ `issue/<番号>`。

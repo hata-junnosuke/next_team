@@ -6,7 +6,7 @@ argument-hint: <issue 番号> [タスクID。例: 3 D-2]
 
 # /issue-flow — インナーループ（タスク 1 件）
 
-`.claude/contexts/dev.md` を先に読むこと。仕組みの詳細は `docs/04_ループエンジニアリング.md` 3 章。
+仕組みの詳細は `docs/04_ループエンジニアリング.md` 3 章。
 
 対象: **$ARGUMENTS**
 
