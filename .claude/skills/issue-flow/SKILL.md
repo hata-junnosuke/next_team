@@ -46,7 +46,7 @@ argument-hint: <issue 番号> [タスクID。例: 3 D-2]
 - api: `make api-test FILTER=<担当のテストクラス>` と `make api-pint-test` が緑
 - web: `make web-typecheck` と `make web-lint` が緑
 - issue 本文の該当タスクにチェックを付ける（`gh issue view <番号> --json body -q .body` → `- [ ] **ID**` を `- [x] **ID**` に → `gh issue edit <番号> --body-file -`）。**issue を更新するのはこの 1 回だけ**。レビュー周回数はコミットメッセージの本文に書く。web のタスクの手動確認は PR の説明に「手動確認: 未」と書き、人が確認する
-- 小さな issue そのものがタスクなら、チェックは付けずに PR を作る（本文に `Closes #<番号>`）。マージは人が行う
+- 小さな issue そのものがタスクなら、チェックは付けずに `/pr-create <番号>` で PR を作る。マージは人が行う（epic-flow の中なら PR は epic-flow の最後に 1 つだけ）
 - 差し戻しがあり、次から防げる教訓があれば、効かせたい場所（`CLAUDE.md`・`.claude/rules/`・スキル・docs）に同じ PR で書き足す
 - `git add` した上で日本語のコミットメッセージでコミット（`feat(api): F-05 募集の作成・編集` の形式）
 

@@ -36,7 +36,7 @@ disable-model-invocation: true
 - 赤ならその時点で Stop フックの検証ループが働く。緑になるまで直す（`build-error-resolver`）
 
 ### 5. 人の最終確認（チェックポイント 2）
-- push して PR を作る（本文に `Closes #<番号>`、タスク一覧、`make verify` の結果、差し戻し回数）。次を人に提示する
+- `/pr-create <番号>` で PR を作り、CI が緑になるのを確かめる。次を人に提示する
   - PR の URL、`make verify` と CI の結果、レビューの差し戻し回数
   - `myteam-acceptance` の手動確認手順のうち、このエピックで確認できるようになった項目
   - 人の作業が必要なこと（`.env` の反映、マイグレーションのロック）
