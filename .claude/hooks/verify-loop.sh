@@ -2,7 +2,7 @@
 # Stop フック = 検証ループ（最内ループ）。
 #   api: Pint → PHPUnit            （常に回す。速いので毎回）
 #   web: tsc --noEmit → ESLint     （web/ に変更があるときだけ。next build は遅いので /verify full に任せる）
-#   受け入れ条件（必須テストファイルの存在。フェーズで増える）
+#   受け入れ条件（必須テストファイル 6 本の存在。常に検査する）
 #   赤なら {"decision":"block","reason":"..."} で Claude を止めずに修正させる。
 #   ハードストップ: 最大 MAX 回（.claude/.loop-count）。上限に達したら素通しして人に報告させる。
 #
@@ -12,8 +12,8 @@
 #   ※ true で即 exit すると 1 周しか回らないので、そうしない。
 #
 # 第2弾との違い:
-#   - フェーズ 0 でも回す（ゲート確認で「わざと赤にして差し戻される」ことを確かめるため）
 #   - 2 スタック。web は「変更があるときだけ」検査する（判断材料は git status と .claude/.dirty-web）
+# 差し戻しの履歴はファイルに残さない（issue #8）。チームの合否と履歴は CI（.github/workflows/ci.yml）と PR で見る
 set -u
 
 # PHPUnit / Pint は非 TTY では JSON を出す（laravel/pao）。人が読める行に整形する
@@ -35,11 +35,9 @@ format_pint() {
 ROOT="${CLAUDE_PROJECT_DIR:-$PWD}"
 COUNTER="$ROOT/.claude/.loop-count"
 DIRTY_WEB="$ROOT/.claude/.dirty-web"
-LOG="$ROOT/.claude/state/loop-log.md"
 MAX=5
 INPUT="$(cat)"
 ACTIVE="$(printf '%s' "$INPUT" | jq -r '.stop_hook_active // false')"
-PHASE="$(cat "$ROOT/.claude/.phase" 2>/dev/null || echo 0)"
 cd "$ROOT" || exit 0
 
 # (0) どちらのスタックも依存未導入なら素通し
@@ -82,7 +80,6 @@ COUNT="$(cat "$COUNTER" 2>/dev/null || echo 0)"
 # (2) ハードストップ
 if [ "$COUNT" -ge "$MAX" ]; then
   rm -f "$COUNTER"
-  printf -- "- %s | フェーズ %s | 打ち切り | 検証ループが %d 回に達したため素通し。人の判断が必要\n" "$(date '+%Y-%m-%d %H:%M')" "$PHASE" "$MAX" >> "$LOG"
   echo "検証ループが ${MAX} 回に達したため打ち切りました。残った失敗を人に報告し、作業中の issue に requires-human ラベルを付けて理由をコメントしてください。" >&2
   exit 0
 fi
@@ -113,22 +110,16 @@ fi
 # 受け入れ条件（必須テストファイル）。ファイル名は docs/01_技術仕様_next.md 9 章の契約
 require() { [ -f "$1" ] || FAIL="${FAIL}## 受け入れ条件: $1 がありません（$2）
 "; }
-if [ "$PHASE" -ge 3 ]; then
-  require api/tests/Feature/ApplicationTest.php "要件 7 章: 定員超過の拒否"
-  require api/tests/Unit/PayrollCalculatorTest.php "要件 7 章: 報酬計算"
-  require api/tests/Unit/ApplicationStatusTest.php "要件 7 章: 状態遷移の拒否"
-  require api/tests/Feature/AcceptanceScenarioTest.php "要件 5 章: 動線 10 ステップ（API 経由）"
-fi
-if [ "$PHASE" -ge 5 ]; then
-  require api/tests/Feature/NotificationIdempotencyTest.php "要件 7 章: 同じ通知を二重に送らない"
-  require api/tests/Feature/FailedJobTest.php "要件 7 章: 失敗が記録され再実行できる"
-fi
+require api/tests/Feature/ApplicationTest.php "要件 7 章: 定員超過の拒否"
+require api/tests/Unit/PayrollCalculatorTest.php "要件 7 章: 報酬計算"
+require api/tests/Unit/ApplicationStatusTest.php "要件 7 章: 状態遷移の拒否"
+require api/tests/Feature/AcceptanceScenarioTest.php "要件 5 章: 動線 10 ステップ（API 経由）"
+require api/tests/Feature/NotificationIdempotencyTest.php "要件 7 章: 同じ通知を二重に送らない"
+require api/tests/Feature/FailedJobTest.php "要件 7 章: 失敗が記録され再実行できる"
 
 # (4) 差し戻し
 if [ -n "$FAIL" ]; then
   COUNT=$((COUNT + 1)); echo "$COUNT" > "$COUNTER"
-  SUMMARY="$(printf '%s' "$FAIL" | grep -E '^## ' | sed -e 's/^## //' -e 's/（.*//' | tr '\n' ' ')"
-  printf -- "- %s | フェーズ %s | %d/%d 回目 | %s\n" "$(date '+%Y-%m-%d %H:%M')" "$PHASE" "$COUNT" "$MAX" "$SUMMARY" >> "$LOG"
   jq -n --arg r "検証ループ ${COUNT}/${MAX}: 以下を修正してから終了してください。修正後にもう一度終了すると再検証します。
 
 ${FAIL}" '{decision:"block", reason:$r}'
@@ -136,8 +127,5 @@ ${FAIL}" '{decision:"block", reason:$r}'
 fi
 
 # (5) 成功
-if [ "$COUNT" -gt 0 ]; then
-  printf -- "- %s | フェーズ %s | 完了 | %d 回の差し戻しの後に緑\n" "$(date '+%Y-%m-%d %H:%M')" "$PHASE" "$COUNT" >> "$LOG"
-fi
 rm -f "$COUNTER" "$DIRTY_WEB"
 exit 0
