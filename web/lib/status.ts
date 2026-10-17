@@ -16,16 +16,16 @@ export const statusTones = {
   },
   // CancelReason
   cancelReason: { company: "amber", worker: "gray" },
-  // NotificationKind（P4）
+  // NotificationKind
   notificationKind: {
     application_confirmed: "green",
     posting_cancelled: "red",
     shift_reminder: "blue",
     export_ready: "purple",
   },
-  // NotificationStatus（P4）
+  // NotificationStatus
   notificationStatus: { pending: "amber", sent: "green", failed: "red" },
-  // ReportExportStatus（P4）
+  // ReportExportStatus
   reportExportStatus: {
     queued: "gray",
     processing: "blue",

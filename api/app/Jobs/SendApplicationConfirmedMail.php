@@ -16,11 +16,11 @@ use Illuminate\Support\Facades\Mail;
 use Throwable;
 
 /**
- * F-20 確定通知を 1 通送るジョブ（docs/03 3.1、async-rules。Rails の ActiveJob + deliver_now に相当）。
+ * F-20 確定通知を 1 通送るジョブ（async-rules。Rails の ActiveJob + deliver_now に相当）。
  *
- * 最初は Mail::to()->queue() で Mailable をそのままキューに入れていた（docs/03 3.1 の学習手順）。
- * それだと「実行時に最新の状態を見る」「claim → 送信 → markSent」を挟む場所がない（SendQueuedMailable が
- * いきなり送る）ので、送る前後の手順を自分で書けるようにジョブに包み直した。
+ * Mail::to()->queue() で Mailable をそのままキューに入れると、「実行時に最新の状態を見る」
+ * 「claim → 送信 → markSent」を挟む場所がない（SendQueuedMailable がいきなり送る）ので、
+ * 送る前後の手順を自分で書けるようにジョブにしている。
  *
  * - コンストラクタは応募ID だけ。実行時に読み直し、もう確定でなければ送らない（確定の直後にキャンセルされた等）
  * - 企業は積んだときの Context（CurrentCompany）がワーカーで戻る。auth() は使わない。
@@ -37,7 +37,7 @@ class SendApplicationConfirmedMail implements ShouldQueue
      *
      * $tries = 3 だと、キューへ戻された回（流量制限の RateLimited など）も試行に数えられ、戻される回が続くと
      * 1 通も送ろうとしないまま failed になる。しかも claim の前なので notification_logs に行が残らず、
-     * 「届いていない」が画面から見えない（要件 7 章に反する。P4-03 の中止通知で tester が再現）。
+     * 「届いていない」が画面から見えない（要件 7 章に反する。中止通知で tester が再現）。
      * メールのジョブは tries=0 + maxExceptions + retryUntil にそろえる（async-rules）。
      * https://readouble.com/laravel/13.x/ja/queues.html#max-exceptions
      */
@@ -76,7 +76,7 @@ class SendApplicationConfirmedMail implements ShouldQueue
      *   RateLimiter::for('mails')。超えた分は送らずにキューへ戻す）。ロックを取る前に判定するので先に置く
      *
      * 同じ通知のジョブを同時に 2 つ走らせない（キャッシュのロック。キーは dedupe_key）。notification_logs の UNIQUE が
-     * 止めるのは「送信済みの後」だけなので、同時に送信待ちの行を受け取る 2 本目はここで止める（docs/03 3.3）。
+     * 止めるのは「送信済みの後」だけなので、同時に送信待ちの行を受け取る 2 本目はここで止める。
      *
      * - dontRelease(): 重なった 2 本目は戻さずに捨てる（成功として終わる）。1 本目が送るので要らない。
      *   戻すと後回しの回が再試行を重ね、1 本目が送った後でも 2 本目が failed() まで行って誤った「失敗」が残りうる。

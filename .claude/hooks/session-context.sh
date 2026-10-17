@@ -28,7 +28,7 @@ echo "- 検証ループのカウンタを 0 にリセットしました（Stop �
 echo "- 要件: ../00_要件定義.md / 契約: docs/01_技術仕様_next.md"
 echo "- コマンドは make 経由（make help）。api=8002 / web=3002 / mailpit=8025"
 
-# 別の弾のサーバーを見ていないか（第2弾の教訓: 8000 番が第1弾のサーバーだった）
+# 別のプロジェクトのサーバーを見ていないか（同じポートで別のアプリが動いていると、手動確認の結果がそのアプリのものになる）
 for p in 8002 3002; do
   pid="$(lsof -tiTCP:$p -sTCP:LISTEN 2>/dev/null | head -1)"
   [ -n "$pid" ] || continue

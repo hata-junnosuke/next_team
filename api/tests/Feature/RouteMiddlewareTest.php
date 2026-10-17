@@ -37,7 +37,7 @@ class RouteMiddlewareTest extends TestCase
     }
 
     /**
-     * docs/01 6.2〜6.8 の全パス。P2-01 で先に全部登録し、未実装のものは 501 を返す（10.1）。
+     * docs/01 6.2〜6.8 の全パス。先に全部登録し、未実装のものは 501 を返す（10.1）。
      * 並列担当（A / B / C）が routes/api.php を触らずに済むようにするための契約の固定。
      */
     public function test_6章の全ルートが登録されている(): void

@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
 use LogicException;
 
 /**
- * 集計出力の依頼（F-23）。作る・状態を変えるのは ReportExportService とそのジョブ（P4-05）。
+ * 集計出力の依頼（F-23）。作る・状態を変えるのは ReportExportService とそのジョブ。
  * status は #[Fillable] に入れず、transitionTo() だけが変える。
  * batch_id / file_path / row_count / completed_at / failed_at も #[Fillable] に入れない
  * （file_path をリクエストの値で書き換えさせない。ダウンロードはこの列だけを使う）。

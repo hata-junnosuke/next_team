@@ -11,8 +11,7 @@
 #   false = ユーザー起点の新しい終了。カウンタを 0 に戻す
 #   ※ true で即 exit すると 1 周しか回らないので、そうしない。
 #
-# 第2弾との違い:
-#   - 2 スタック。web は「変更があるときだけ」検査する（判断材料は git status と .claude/.dirty-web）
+# web は「変更があるときだけ」検査する（判断材料は git status と .claude/.dirty-web）
 # 差し戻しの履歴はファイルに残さない（issue #8）。チームの合否と履歴は CI（.github/workflows/ci.yml）と PR で見る
 #
 # 変更がなければ検査しない（issue #8）:

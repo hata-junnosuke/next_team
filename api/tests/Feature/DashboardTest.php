@@ -156,7 +156,7 @@ class DashboardTest extends TestCase
         $this->postingWithConfirmed(capacity: 3, confirmed: 1);
         $this->getDashboard()->assertOk();
 
-        // キャッシュに助けられないよう、測る前に毎回消す（P4-07 から 2 回目はキャッシュから返るため）
+        // キャッシュに助けられないよう、測る前に毎回消す（2 回目はキャッシュから返るため）
         Cache::flush();
         DB::enableQueryLog();
         $this->getDashboard()->assertOk();
@@ -172,7 +172,7 @@ class DashboardTest extends TestCase
         $this->assertSame($one, count(DB::getQueryLog()));
     }
 
-    // ---- ここから tester が補強（P2-06） ----
+    // ---- ここから tester が補強 ----
 
     public function test_データがなければ空の一覧と0件(): void
     {
@@ -325,7 +325,7 @@ class DashboardTest extends TestCase
             ->assertJsonPath('data.upcoming_postings.0.end_time', '17:00');
     }
 
-    // ---- P4-07 キャッシュ（docs/01 8 章、docs/03 3.5） ----
+    // ---- キャッシュ（docs/01 8 章） ----
 
     /**
      * ダッシュボードを集計するクエリ（募集・応募のテーブルを読むもの）だけを数える。認証やセッションのクエリは数えない

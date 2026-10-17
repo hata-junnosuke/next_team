@@ -1,18 +1,18 @@
-# myteam 第3弾 `next_team` — Next.js + Laravel API + 非同期処理 × ループエンジニアリング
+# `next_team` — Next.js + Laravel API + 非同期処理 × ループエンジニアリング
 
 企業側管理画面（拠点・ワーカー・募集・応募/確定・勤怠/報酬・月次集計・通知）を、`api/`（Laravel 13 の JSON API）と `web/`（Next.js 16）の 2 スタックで実装する。主題は **Job / Queue を中心とした非同期処理**。
 
 - 要件: `../00_要件定義.md`
 - 契約（テーブル・API・画面）: `docs/01_技術仕様_next.md`
 
-**このセッションは必ず `next_team/` で起動する。** 親フォルダで起動するとフックが一切効かない（第2弾で実際に起きた）。
+**このセッションは必ず `next_team/` で起動する。** 親フォルダで起動するとフックが一切効かない。
 
 ## 絶対ルール
 1. 業務ルールは `api/` のサービスに置く。コントローラは薄く、検証は FormRequest。**`web/` に業務ルールと検証を二重に書かない**
 2. `status` はサービス経由（`transitionTo()`）でしか変えない。企業の判定は `CurrentCompany::id()` だけ
 3. `api/` は JSON しか返さない。`web/` は `lib/api.ts` を通さずに `fetch` しない。レスポンスは zod で `parse` する
 4. api と web の境界は `docs/01` の 6 章だけ。web 担当は `api/` のコードを読まない。形がずれていたら web で吸収せず報告する
-5. 第1弾・第2弾のコードを読まない（README だけ可）。パッケージを勝手に足さない
+5. このリポジトリの外（親フォルダの他のプロジェクト）のコードを読まない。パッケージを勝手に足さない
 6. `.env`・`vendor/`・`node_modules/`・ロック後のマイグレーションは触らない（フックが止める）。フックと `settings.json` の編集は毎回人の承認を挟む（フックが承認ダイアログを出す）
 7. 赤のまま終わらない（Stop フックが差し戻す。5 回で打ち切り → 人に報告）。PR は CI（`make verify`）が緑であること
 8. 実装前に `/plan`。計画の承認と `main` へのマージは人が行う。リードが代行しない。承認後の実装・push・PR 作成・CI の確認は止まらずに進める
@@ -20,7 +20,7 @@
 10. `web/` を書く前に `web/node_modules/next/dist/docs/` の該当ページを読む（Next 16 は学習データと違う）
 
 ## 現在地の見方
-- タスク状態: **GitHub Issues**（本文のチェックリスト、`requires-human` ラベル）。ブランチは `issue/<番号>`。合否と差し戻しの履歴は CI と PR で見る（旧 `STATE.md` と P0〜P5 の記録は issue #8 で削除。git の履歴にある）
+- タスク状態: **GitHub Issues**（本文のチェックリスト、`requires-human` ラベル）。ブランチは `issue/<番号>`。合否と差し戻しの履歴は CI と PR で見る
 - 教訓は効かせたい場所（この `CLAUDE.md`・`.claude/rules/`・スキル）に PR で直接書く
 - 起動時に SessionStart フックが open の issue と直近のコミットを要約して出す
 

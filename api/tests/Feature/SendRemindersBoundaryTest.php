@@ -24,7 +24,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
- * F-22 前日リマインドの境界（P4-04 のテスト補強。SendRemindersCommandTest の続き）。
+ * F-22 前日リマインドの境界（テスト補強。SendRemindersCommandTest の続き）。
  *
  * - 「翌日」は Asia/Tokyo の日付で決まる（UTC ではない）。0 時の前後・月末・年末・うるう年
  * - 締切の募集の確定応募には送る／中止した募集（確定は企業都合キャンセルになる）には送らない

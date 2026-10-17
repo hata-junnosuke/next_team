@@ -33,7 +33,7 @@ use RuntimeException;
 use Tests\TestCase;
 
 /**
- * F-23 月次集計の非同期出力の補強（tester。P4-05）。ReportExportTest にない受け入れ条件を 1 条件 1 本で足す:
+ * F-23 月次集計の非同期出力の補強（tester）。ReportExportTest にない受け入れ条件を 1 条件 1 本で足す:
  * 受付が生成を待たないこと（database キューで実際に積んでワーカーで回す）、CSV の中身（同期 CSV との一致・6 種の先頭文字・
  * 確定の勤怠だけ・他社が混ざらない）、拠点の多い月、チャンクの一部失敗と再試行、同じ月の続けての依頼、署名付き URL の境界、
  * download_url と progress、通知の宛先、Storage の後片付け。

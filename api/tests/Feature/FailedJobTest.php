@@ -29,7 +29,7 @@ use Symfony\Component\Mailer\SentMessage;
 use Tests\TestCase;
 
 /**
- * 失敗が記録され、再実行できる（要件 7 章「失敗した送信は記録が残り、再実行できる」、docs/03 3.2・5 章。docs/01 9.1 の必須テスト）。
+ * 失敗が記録され、再実行できる（要件 7 章「失敗した送信は記録が残り、再実行できる」。docs/01 9.1 の必須テスト）。
  * F-21 中止通知のジョブで確かめる。database キューに実際に積み、ワーカー（queue:work --once）で 1 回ずつ実行する
  * （maxExceptions / retryUntil / backoff / failed() / failed_jobs はワーカーが動かすので、handle() の直呼びでは確かめられない）。
  *
@@ -223,7 +223,7 @@ class FailedJobTest extends TestCase
         $this->assertSame(NotificationStatus::Sent, NotificationLog::query()->sole()->status);
     }
 
-    // ---- 流量制限と打ち切り（P4-03 の差し戻し。tries=0 + maxExceptions + retryUntil） ----
+    // ---- 流量制限と打ち切り（差し戻し。tries=0 + maxExceptions + retryUntil） ----
 
     public function test_流量の上限で4回以上戻されてもfailedにならず枠が空いたら送られてsentになる(): void
     {

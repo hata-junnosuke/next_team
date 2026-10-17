@@ -23,7 +23,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
- * P2-01 のドメイン基盤（docs/01 3.1・3.4・4.3）。並列担当（A / B / C）が前提にするものを固定する。
+ * ドメイン基盤（docs/01 3.1・3.4・4.3）。並列担当（A / B / C）が前提にするものを固定する。
  * - モデルの既定値・cast、transitionTo() の基本動作（遷移表そのものは tests/Unit/ApplicationStatusTest.php）
  * - ファクトリの状態（confirmed() が時給・交通費をコピーする、など）
  * - DB の制約（UNIQUE・restrictOnDelete）と SQLite の設定
@@ -354,7 +354,7 @@ class DomainFoundationTest extends TestCase
         Attendance::factory()->for(Application::factory())->create();
     }
 
-    // ---- 以下 tester 追加（P2-01 のテスト補強） ----
+    // ---- 以下 tester 追加（テスト補強） ----
 
     /**
      * 応募の 16 組を DB 越しに確かめる。許可される組だけ書き、それ以外は DomainException で保存されないこと
@@ -376,7 +376,7 @@ class DomainFoundationTest extends TestCase
     public function test_応募のtransition_toは全16組で遷移表どおりに保存または拒否する(ApplicationStatus $from, ApplicationStatus $to, bool $allowed): void
     {
         $application = Application::factory()->create(['status' => $from]);
-        // P2-01 の差し戻し 3: 確定・キャンセルへの遷移は付随する列が必須になったので、契約どおりの列を渡す
+        // 差し戻し 3: 確定・キャンセルへの遷移は付随する列が必須になったので、契約どおりの列を渡す
         $attributes = match ($to) {
             ApplicationStatus::Confirmed => ['confirmed_at' => now(), 'confirmed_hourly_wage' => 1300, 'confirmed_transport_allowance' => 500],
             ApplicationStatus::Cancelled => ['cancel_reason' => CancelReason::Worker, 'cancelled_at' => now()],

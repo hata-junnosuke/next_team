@@ -25,12 +25,12 @@ use LogicException;
 use Tests\TestCase;
 
 /**
- * P4-01 非同期の土台（docs/01 3.2・3.3・4.2・4.3）を DB とモデルに直接当てて確かめる。
+ * 非同期の土台（docs/01 3.2・3.3・4.2・4.3）を DB とモデルに直接当てて確かめる。
  * - マイグレーション: 索引・UNIQUE・既定値・NOT NULL・外部キー
  * - morph map の強制: *_type にクラス名が入らない、未登録のモデルは例外
  * - テナント分離: NotificationLog / ReportExport のグローバルスコープ、他社の管理者を依頼者にできない
  * - Fillable: company_id と status（と ReportExport の成果物の列）は一括代入できない
- * API はまだないので HTTP は叩かない（P4-05 の ReportExportTest で叩く）。
+ * API はまだないので HTTP は叩かない（ReportExportTest で叩く）。
  */
 class AsyncFoundationTest extends TestCase
 {

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { enumValueSchema, paginated } from "./common";
 
 // 通知履歴（docs/01 6.10 の NotificationLogResource）。型は z.infer からだけ作る。
-// null になりうるのは sent_at・failed_at・error の 3 つだけ（P5-01 で決定）
+// null になりうるのは sent_at・failed_at・error の 3 つだけ
 
 export const notificationLogSchema = z.object({
   id: z.number().int(),

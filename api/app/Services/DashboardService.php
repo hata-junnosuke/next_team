@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Cache;
 
 /**
  * ダッシュボード（F-19、docs/01 6.8）。
- * 戻り値は 6.8 の data の形そのままの配列。この配列をキャッシュに入れる（P4-07。docs/01 8 章、docs/03 3.5）。
+ * 戻り値は 6.8 の data の形そのままの配列。この配列をキャッシュに入れる（docs/01 8 章）。
  * 企業はグローバルスコープ（CurrentCompany::id()）で絞られる。キャッシュのキーにも企業ID を入れる（入れないと A 社の値が B 社に見える）。
  *
  * キャッシュ（Rails の Rails.cache.fetch に相当）: https://readouble.com/laravel/13.x/ja/cache.html
@@ -58,7 +58,7 @@ class DashboardService
     /**
      * 有効期限は「設定の秒数後」と「翌日 0:00」の早い方。
      *
-     * 日付をまたいだ扱い（P2-06 のレビューの申し送り）: upcoming_postings は生成時点の「今日以降」なので、
+     * 日付をまたいだ扱い（レビューの申し送り）: upcoming_postings は生成時点の「今日以降」なので、
      * 23:58 に作ったキャッシュを 0:01 に返すと昨日の募集が残る。対策は 2 案あり、こちらを選んだ:
      * - 採用: キーは dashboard:{company_id} のまま、有効期限を日付の終わりまでに制限する。
      *   キーが契約（docs/01 8 章）どおりで、forget() は 1 キーを消すだけで済む（日付を計算して消し漏れる心配がない）

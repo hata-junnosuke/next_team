@@ -23,7 +23,7 @@ use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 /**
- * F-22 前日リマインドのジョブ SendShiftReminderMail（docs/03 3.3、async-rules）。
+ * F-22 前日リマインドのジョブ SendShiftReminderMail（async-rules）。
  *
  * 「実行したらどうなるか」をジョブの handle() / failed() を直接呼んで確かめる（Mail::fake() で送信を記録する）。
  * コマンドが積むかは SendRemindersCommandTest、二重に送らないことは NotificationIdempotencyTest、失敗後の再実行は FailedJobTest。

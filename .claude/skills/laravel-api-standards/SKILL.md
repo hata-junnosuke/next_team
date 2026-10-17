@@ -1,9 +1,9 @@
 ---
 name: laravel-api-standards
-description: myteam 第3弾の Laravel API 実装規約。層の分け方（ルート → FormRequest → コントローラ → サービス → Resource）、エラー形式、Resource の書き方、ページネーション、テナント分離、Sanctum + Fortify の設定。implementer-api と code-reviewer が従う
+description: next_team の Laravel API 実装規約。層の分け方（ルート → FormRequest → コントローラ → サービス → Resource）、エラー形式、Resource の書き方、ページネーション、テナント分離、Sanctum + Fortify の設定。implementer-api と code-reviewer が従う
 ---
 
-# Laravel API 実装規約（myteam 第3弾）
+# Laravel API 実装規約（next_team）
 
 契約（クラス名・フィールド名）は `docs/01_技術仕様_next.md` が正。ここは書き方。
 

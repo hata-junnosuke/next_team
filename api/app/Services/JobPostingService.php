@@ -49,7 +49,7 @@ class JobPostingService
     }
 
     /**
-     * 締切（F-07）。新規応募の受付を止めるだけで、応募中の応募は締切後も承認できる（P2-04 の ApplicationService）。
+     * 締切（F-07）。新規応募の受付を止めるだけで、応募中の応募は締切後も承認できる（承認は ApplicationService）。
      */
     public function close(JobPosting $posting): JobPosting
     {

@@ -13,7 +13,7 @@ use Tests\TestCase;
 
 /**
  * 状態遷移（F-14、要件 7 章の必須テスト）。遷移表は Enum の canTransitionTo() の 1 箇所にある（docs/01 4.1）。
- * P2-01 で Enum の分、P2-04 で Application::transitionTo()（状態を変える唯一の入口）の例外の分を足した。
+ * Enum の遷移表と、Application::transitionTo()（状態を変える唯一の入口）の例外の両方を確かめる。
  *
  * transitionTo() は DB を読み直してから判定する（refresh）ので、アプリと DB を起動する Tests\TestCase を使う
  * （Enum だけのテストもそのまま動く。Rails のモデルのユニットテストに相当）。
@@ -187,7 +187,7 @@ class ApplicationStatusTest extends TestCase
         $this->assertSame(ApplicationStatus::Confirmed, $confirmed->fresh()->status);
     }
 
-    // ---- テスト補強（P2-04 tester） ----
+    // ---- テスト補強（tester） ----
 
     /**
      * 遷移先ごとの「契約どおりの付随列」。禁止の遷移が付随列の不足ではなく遷移表で拒否されることを見るために、列は揃えて渡す

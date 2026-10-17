@@ -348,7 +348,7 @@ class MonthlyReportTest extends TestCase
         }
     }
 
-    // ---- ここから tester が補強（P2-06） ----
+    // ---- ここから tester が補強 ----
 
     public function test_月初0時に始まる勤務は対象月に入る(): void
     {

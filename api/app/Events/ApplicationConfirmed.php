@@ -6,7 +6,7 @@ use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
 use Illuminate\Foundation\Events\Dispatchable;
 
 /**
- * 応募が確定した（F-11）。P4 のリスナーが確定通知のジョブを積む（F-20、docs/03）。
+ * 応募が確定した（F-11）。リスナーが確定通知のジョブを積む（F-20）。
  *
  * - ShouldDispatchAfterCommit: 承認の DB::transaction がコミットされてから発火する。ロールバックされたら発火しない
  *   （Rails の after_commit に相当）。https://readouble.com/laravel/13.x/ja/events.html#dispatching-events-after-database-transactions

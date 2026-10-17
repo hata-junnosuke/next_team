@@ -38,7 +38,7 @@ return [
             'database' => env('DB_DATABASE', database_path('database.sqlite')),
             'prefix' => '',
             'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
-            // docs/01 3.4。Web とキューワーカー（P4）が同じファイルを同時に読み書きするための設定
+            // docs/01 3.4。Web とキューワーカーが同じファイルを同時に読み書きするための設定
             // WAL: 読み取りが書き込みを待たない。busy_timeout: ロック待ちを即エラーにせず 5 秒待つ
             'busy_timeout' => 5000,
             'journal_mode' => 'wal',

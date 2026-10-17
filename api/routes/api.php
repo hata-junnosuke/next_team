@@ -14,9 +14,9 @@ use Illuminate\Support\Facades\Route;
 
 /*
  * /api/* はすべて auth:sanctum（ログイン必須）+ company（CurrentCompany の設定）の中に置く。
- * 例外は署名付きURL のダウンロードだけ（P4。signed ミドルウェア必須）。
+ * 例外は署名付きURL のダウンロードだけ（signed ミドルウェア必須）。
  *
- * docs/01 6 章の全ルートを P2-01 で先に登録する（10.1）。未実装のアクションは 501 を返し、
+ * docs/01 6 章の全ルートを先に登録する（10.1）。未実装のアクションは 501 を返し、
  * 並列担当（A / B / C）は自分のコントローラの中身だけを書けばよい（このファイルは触らない）。
  * Rails の routes.rb の resources + member ルートに相当。
  * https://readouble.com/laravel/13.x/ja/controllers.html#api-resource-routes
@@ -61,10 +61,10 @@ Route::middleware(['auth:sanctum', 'company'])->group(function () {
     // F-19 ダッシュボード（担当 C）
     Route::get('/dashboard', [DashboardController::class, 'show'])->name('dashboard');
 
-    // F-23 月次集計の非同期出力（P4）。受付は 202。パラメータ名は {report_export}
+    // F-23 月次集計の非同期出力。受付は 202。パラメータ名は {report_export}
     Route::apiResource('report-exports', ReportExportController::class)->only(['index', 'store', 'show']);
 
-    // F-24 通知履歴（P5）。読み取りだけ
+    // F-24 通知履歴。読み取りだけ
     Route::get('/notification-logs', [NotificationLogController::class, 'index'])->name('notification-logs.index');
 });
 

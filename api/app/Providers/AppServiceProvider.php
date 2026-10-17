@@ -54,12 +54,12 @@ class AppServiceProvider extends ServiceProvider
         // https://readouble.com/laravel/13.x/ja/mail.html#markdown-mailables
         Markdown::withSecuredEncoding();
 
-        // メール送信の流量（メールを送るジョブ（確定通知・中止通知・前日リマインド）の RateLimited('mails') が使う。docs/03 3.2）。
+        // メール送信の流量（メールを送るジョブ（確定通知・中止通知・前日リマインド）の RateLimited('mails') が使う）。
         // 上限はメールサーバーの都合なので企業ごとに分けず全社共通（by() を付けない）。超えたジョブは送らずにキューへ戻る。
         // https://readouble.com/laravel/13.x/ja/queues.html#rate-limiting
         RateLimiter::for('mails', fn () => Limit::perMinute((int) config('myteam.mails_per_minute')));
 
-        // ダッシュボードのキャッシュの破棄（F-19。docs/03 3.5）。応募・募集・拠点が保存・削除されたらコミット後に消す。
+        // ダッシュボードのキャッシュの破棄（F-19）。応募・募集・拠点が保存・削除されたらコミット後に消す。
         // 拠点は location_name を表示しているため（名前を変えても最長 5 分古いままにしない。リードの決定）。
         // モデルに #[ObservedBy] を付けず、ここで登録する（どのモデルに付いているかをこの 1 箇所で見渡せるようにするため。
         // モデルは別担当の所有でもある）。https://readouble.com/laravel/13.x/ja/eloquent.html#observers

@@ -1,4 +1,4 @@
-# 第3弾の周辺サービス。DB は SQLite（api/database/database.sqlite）なのでここには置かない。
+# 周辺サービス。DB は SQLite（api/database/database.sqlite）なのでここには置かない。
 # 起動: docker compose up -d / 停止: docker compose down
 services:
   redis:

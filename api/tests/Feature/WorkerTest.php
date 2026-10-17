@@ -318,7 +318,7 @@ class WorkerTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['email' => 'メールアドレスは必須項目です。']);
 
-        // 電話だけでは登録できない（第2弾までの「いずれか必須」ではない）
+        // 電話だけでは登録できない（メールは必須）
         $this->assertDatabaseCount('workers', 0);
     }
 
@@ -347,7 +347,7 @@ class WorkerTest extends TestCase
 
     public function test_更新と切り替えの応答はworker_resourceの形そのもの(): void
     {
-        // 電話番号は Faker の optional で入ったり入らなかったりするので、期待値の null に固定する（P2-04 で揺れを発見）
+        // 電話番号は Faker の optional で入ったり入らなかったりするので、期待値の null に固定する
         $worker = Worker::factory()->create(['phone' => null]);
 
         $this->actingAsAdmin()

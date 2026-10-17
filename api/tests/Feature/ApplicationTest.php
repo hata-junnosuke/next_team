@@ -567,7 +567,7 @@ class ApplicationTest extends TestCase
         $this->assertSame(ApplicationStatus::Confirmed, $theirConfirmed->fresh()->status);
     }
 
-    // ---- テスト補強（P2-04 tester） ----
+    // ---- テスト補強（tester） ----
 
     public function test_定員1は1件目を承認でき2件目は拒否される(): void
     {

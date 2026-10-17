@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Mail;
 use Throwable;
 
 /**
- * F-21 中止通知を 1 通送るジョブ（docs/03 3.2、async-rules）。型は SendApplicationConfirmedMail と同じ。
+ * F-21 中止通知を 1 通送るジョブ（async-rules）。型は SendApplicationConfirmedMail と同じ。
  *
  * 募集を中止すると、確定 → 企業都合キャンセルになった応募 1 件ごとに 1 ジョブ積まれる（1 ジョブで全員に送らない）。
  * 1 人への送信が失敗しても、他の人のジョブは別に動くので届く。失敗した 1 つだけが backoff で再試行され、
@@ -37,7 +37,7 @@ class SendPostingCancelledMail implements ShouldQueue
      *
      * $tries = 3 だと、流量制限（RateLimited）でキューへ戻された回も試行に数えられ、上限を超える分が続くと
      * 1 通も送ろうとしないまま failed になる。しかも claim の前なので notification_logs に行が残らず、
-     * 「届いていない」が画面から見えない（要件 7 章に反する。P4-03 で tester が再現）。メールのジョブは
+     * 「届いていない」が画面から見えない（要件 7 章に反する。テストで再現した）。メールのジョブは
      * tries=0 + maxExceptions + retryUntil にそろえる（async-rules）。
      * https://readouble.com/laravel/13.x/ja/queues.html#max-exceptions
      */

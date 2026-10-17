@@ -12,7 +12,7 @@ use Illuminate\Database\Query\JoinClause;
 use InvalidArgumentException;
 
 /**
- * 月次集計（F-17）と CSV の行（F-18。P4 の非同期出力 F-23 でも使う）。docs/01 4.5・4.6・6.7。
+ * 月次集計（F-17）と CSV の行（F-18。非同期出力 F-23 でも使う）。docs/01 4.5・4.6・6.7。
  *
  * - 対象は「募集の勤務日（job_postings.work_date）が対象月に入る」かつ「応募が確定」の勤怠（6.6）
  * - 月の範囲は半開区間（>= 月初 AND < 翌月初）。work_date は "Y-m-d" の文字列で保存しているので文字列で比べる。
@@ -105,7 +105,7 @@ class MonthlyReportService
     }
 
     /**
-     * その月に集計対象の勤怠がある自社の拠点 ID（昇順）。P4 の非同期出力（F-23）で拠点ごとにジョブを分けるのに使う
+     * その月に集計対象の勤怠がある自社の拠点 ID（昇順）。非同期出力（F-23）で拠点ごとにジョブを分けるのに使う
      *
      * @return list<int>
      */

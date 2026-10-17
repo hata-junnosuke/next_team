@@ -1,6 +1,6 @@
 # next_team の入口。リード（next_team/ で起動した Claude Code）も人もここから叩く。
 # api/ と web/ に cd しなくて済むようにするのが目的（フックと permissions もこのターゲット名を前提にしている）。
-# ポート: api=8002 / web=3002 / mailpit=8025 / redis=6379（8000 は第1弾、8001 は第2弾、3000 は別プロジェクトが使うので避ける）
+# ポート: api=8002 / web=3002 / mailpit=8025 / redis=6379（8000・8001・3000 は他のプロジェクトが使うので避ける）
 
 .PHONY: help up down ps api-serve web-dev horizon schedule fresh \
         api-test api-pint api-pint-test api-routes web-typecheck web-lint web-format web-format-check web-build \
@@ -70,6 +70,6 @@ worktree-env: ## main の api/.env と web/.env.local を worktree にコピー�
 	@if grep -Eq '^DB_DATABASE=["'\'']?/' "$(WT)/api/.env"; then \
 	  echo "$(WT)/api/.env の DB_DATABASE が絶対パスです（値は表示しません）。人が直してください"; exit 1; fi
 
-ports: ## 8002 / 3002 を誰が使っているか（別の弾のサーバーを見ていないかの確認）
+ports: ## 8002 / 3002 を誰が使っているか（別のプロジェクトのサーバーを見ていないかの確認）
 	@for p in 8002 3002; do pid=$$(lsof -tiTCP:$$p -sTCP:LISTEN 2>/dev/null | head -1); \
 	  if [ -n "$$pid" ]; then echo "$$p: pid $$pid cwd=$$(lsof -a -p $$pid -d cwd -Fn 2>/dev/null | sed -n 's/^n//p')"; else echo "$$p: 空き"; fi; done

@@ -14,7 +14,7 @@ use Illuminate\Console\Command;
 use Throwable;
 
 /**
- * F-22 前日リマインドを積むコマンド（docs/03 3.3。Rails の rake タスクに当たる）。
+ * F-22 前日リマインドを積むコマンド（Rails の rake タスクに当たる）。
  *
  * routes/console.php のスケジュールが毎日 config('myteam.reminder_time') に呼ぶ。手でも実行できる:
  *   php artisan app:send-reminders                    # 翌日の勤務

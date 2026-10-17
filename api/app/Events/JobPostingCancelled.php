@@ -6,7 +6,7 @@ use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
 use Illuminate\Foundation\Events\Dispatchable;
 
 /**
- * 募集が中止された（F-07）。P4 のリスナーが、確定済みだった応募ごとに中止通知のジョブを積む（F-21、docs/03 3.2）。
+ * 募集が中止された（F-07）。リスナーが、確定済みだった応募ごとに中止通知のジョブを積む（F-21）。
  *
  * - ShouldDispatchAfterCommit: DB::transaction がコミットされてから発火する。ロールバックされたら発火しない
  *   （Rails の after_commit に相当）。https://readouble.com/laravel/13.x/ja/events.html#dispatching-events-after-database-transactions

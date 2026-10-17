@@ -13,7 +13,7 @@ use Tests\TestCase;
 
 /**
  * F-01 拠点の登録・一覧・編集・削除（docs/01 6.2）。
- * job_postings_count は withCount('jobPostings') の実値、deletable は「募集が 0 件なら true」（P2-02）。
+ * job_postings_count は withCount('jobPostings') の実値、deletable は「募集が 0 件なら true」。
  */
 class LocationTest extends TestCase
 {

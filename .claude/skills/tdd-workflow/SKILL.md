@@ -3,7 +3,7 @@ name: tdd-workflow
 description: Laravel API での RED→GREEN→REFACTOR の手順。Feature（JSON の HTTP 経由）と Unit の使い分け、テスト名の付け方、TestCase のヘルパ、レスポンスの形の検証、1 サイクル 1 テスト。implementer-api と tester が従う
 ---
 
-# TDD ワークフロー（Laravel API / myteam 第3弾）
+# TDD ワークフロー（Laravel API / next_team）
 
 ## サイクル
 1. **RED**: 受け入れ条件 1 つを表すテストを 1 本書く。`make api-test FILTER=<テスト名>` で **赤を目で確認する**（赤にならないテストは何も検証していない）

@@ -28,7 +28,7 @@ use Symfony\Component\Mailer\Exception\TransportException;
 use Tests\TestCase;
 
 /**
- * F-20 確定通知（docs/01 8 章、docs/03 3.1、async-rules）。
+ * F-20 確定通知（docs/01 8 章、async-rules）。
  *
  * - 「積まれたか」は Queue::fake() で確かめる（ジョブは実行しない）
  * - 「実行したらどうなるか」はジョブの handle() を直接呼んで確かめる（Mail::fake() で送信を記録する）
@@ -208,7 +208,7 @@ class ApplicationConfirmedMailTest extends TestCase
         $this->assertSame([10, 60], $job->backoff());
     }
 
-    // ---- テスト補強（P4-02 tester）: 積まれたか（fake） ----
+    // ---- テスト補強（tester）: 積まれたか（fake） ----
 
     public function test_承認の応答はメールを送らずジョブを積むだけで返る(): void
     {
@@ -263,7 +263,7 @@ class ApplicationConfirmedMailTest extends TestCase
         $this->assertStringNotContainsString('App\\\\Models\\\\Application', $row->payload); // モデルを直列化していない
     }
 
-    // ---- テスト補強（P4-02 tester）: 実行したらどうなるか（handle() / failed() を直接呼ぶ） ----
+    // ---- テスト補強（tester）: 実行したらどうなるか（handle() / failed() を直接呼ぶ） ----
 
     public function test_承認の直後にapiでキャンセルされた応募には送らない(): void
     {
@@ -429,7 +429,7 @@ class ApplicationConfirmedMailTest extends TestCase
         $this->assertSame(120, $middleware[1]->expiresAfter);
     }
 
-    // ---- レビュー反映（P4-02） ----
+    // ---- レビュー反映 ----
 
     public function test_名前や拠点名のmarkdown記号はリンクや表の列にならない(): void
     {

@@ -20,7 +20,7 @@ abstract class Controller
     }
 
     /**
-     * P2-01 で全ルートを先に登録したときの、未実装のアクションの応答（docs/01 10.1）。
+     * 全ルートを先に登録したときの、未実装のアクションの応答（docs/01 10.1）。
      * 担当（A / B / C）が実装したら呼び出しを消す。全部消えたらこのメソッドも消す
      */
     protected function notImplemented(): JsonResponse

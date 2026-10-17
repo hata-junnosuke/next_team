@@ -33,7 +33,7 @@ use RuntimeException;
 use Tests\TestCase;
 
 /**
- * F-23 月次集計の非同期出力（docs/01 6.9・8 章、docs/03 3.4）。
+ * F-23 月次集計の非同期出力（docs/01 6.9・8 章）。
  *
  * phpunit.xml は QUEUE_CONNECTION=sync なので、Bus::batch()->dispatch() の中でチャンク・then・FinalizeReportExport まで
  * その場で走り、POST の応答の時点で completed になっている。「積まれたか」は Bus::fake() で、
