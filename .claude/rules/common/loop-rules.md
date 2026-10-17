@@ -21,7 +21,7 @@
 ## メモリ
 - タスクの状態は **GitHub Issues** が正（本文のチェックリスト、`requires-human` ラベル、PR の `Closes #<番号>`）。工程ごとには書き換えず、タスクの完了時にチェックを 1 回付けるだけ
 - SessionStart フックが open の issue と直近のコミットを読み戻す
-- `.claude/state/STATE.md` は 2026-10-13 に廃止（issue #4）。P0〜P5 の記録は `.claude/state/archive/STATE_P0-P5.md`（編集しない）
+- `.claude/state/STATE.md` は 2026-10-13 に廃止（issue #4）。P0〜P5 の記録は issue #8 で削除（`git show 3d14e5b:.claude/state/archive/STATE_P0-P5.md`）
 - 1 issue = 1 ブランチ `issue/<番号>`。並列に進めるときは issue ごとに worktree を分ける
 - 差し戻し・重大指摘・想定外の挙動から得た教訓は、効かせたい場所（`CLAUDE.md`・`.claude/rules/`・スキル・docs）に **PR で直接書く**。教訓だけを貯める置き場は作らない（issue #8 で教訓の記録ファイルと専用スキルを廃止）
 

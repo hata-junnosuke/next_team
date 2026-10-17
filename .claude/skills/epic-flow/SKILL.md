@@ -11,7 +11,7 @@ disable-model-invocation: true
 
 エピック: **$ARGUMENTS**
 
-エピック = タスクが複数ある GitHub issue 1 つ。タスクの正は issue 本文のチェックリスト（`STATE.md` は issue #4 で廃止。P0〜P5 の記録は `.claude/state/archive/`）。ブランチは `issue/<番号>`。
+エピック = タスクが複数ある GitHub issue 1 つ。タスクの正は issue 本文のチェックリスト（`STATE.md` は issue #4 で廃止。P0〜P5 の記録は issue #8 で削除）。ブランチは `issue/<番号>`。
 
 ## 手順
 

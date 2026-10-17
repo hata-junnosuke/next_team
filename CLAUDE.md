@@ -23,7 +23,7 @@
 10. `web/` を書く前に `web/node_modules/next/dist/docs/` の該当ページを読む（Next 16 は学習データと違う）
 
 ## 現在地の見方
-- タスク状態: **GitHub Issues**（本文のチェックリスト、`requires-human` ラベル）。ブランチは `issue/<番号>`。合否と差し戻しの履歴は CI と PR で見る（旧 `STATE.md` と P0〜P5 の記録は `.claude/state/archive/` に凍結）
+- タスク状態: **GitHub Issues**（本文のチェックリスト、`requires-human` ラベル）。ブランチは `issue/<番号>`。合否と差し戻しの履歴は CI と PR で見る（旧 `STATE.md` と P0〜P5 の記録は issue #8 で削除。git の履歴にある）
 - 教訓は効かせたい場所（この `CLAUDE.md`・`.claude/rules/`・スキル・docs）に PR で直接書く
 - 起動時に SessionStart フックが open の issue と直近のコミットを要約して出す
 
