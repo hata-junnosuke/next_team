@@ -25,7 +25,7 @@ if [ "$TOPLEVEL" != "$ROOT" ] || [ ! -d api ] || [ ! -d web ]; then
 fi
 echo "- api のテスト関数: ${TEST_COUNT} 件 / 未コミット変更: ${DIRTY} ファイル"
 echo "- 検証ループのカウンタを 0 にリセットしました（Stop 時に api は Pint + PHPUnit、web は変更があれば tsc + ESLint が走ります）"
-echo "- 要件: ../00_要件定義.md / 契約: docs/01_技術仕様_next.md / ループ: docs/04_ループエンジニアリング.md / 計画: docs/00_計画と決定事項.md"
+echo "- 要件: ../00_要件定義.md / 契約: docs/01_技術仕様_next.md"
 echo "- コマンドは make 経由（make help）。api=8002 / web=3002 / mailpit=8025"
 
 # 別の弾のサーバーを見ていないか（第2弾の教訓: 8000 番が第1弾のサーバーだった）

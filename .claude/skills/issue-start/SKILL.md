@@ -50,7 +50,7 @@ git fetch origin main
 git worktree add -b <BRANCH> <WT> origin/main
 git -C <WT> log -1 --oneline
 ```
-main の作業ツリーに未コミットの変更があっても、worktree は `origin/main` から切るので持ち込まない。逆に「main にまだ push していない変更（例: 計画を書いた docs）」があるなら、先に人に push / PR してもらうか聞く。
+main の作業ツリーに未コミットの変更があっても、worktree は `origin/main` から切るので持ち込まない。逆に「main にまだ push していない変更（例: issue の計画に合わせて直した契約の `docs/01`）」があるなら、先に人に push / PR してもらうか聞く。
 
 ### 4. 依存を入れる
 ```bash

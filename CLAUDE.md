@@ -3,10 +3,7 @@
 企業側管理画面（拠点・ワーカー・募集・応募/確定・勤怠/報酬・月次集計・通知）を、`api/`（Laravel 13 の JSON API）と `web/`（Next.js 16）の 2 スタックで実装する。主題は **Job / Queue を中心とした非同期処理**。
 
 - 要件: `../00_要件定義.md`
-- 決定の経緯とフェーズ: `docs/00_計画と決定事項.md`
 - 契約（テーブル・API・画面）: `docs/01_技術仕様_next.md`
-- 非同期の設計: `docs/03_非同期処理の設計.md`
-- ループの仕組みとゲート確認: `docs/04_ループエンジニアリング.md`
 
 **このセッションは必ず `next_team/` で起動する。** 親フォルダで起動するとフックが一切効かない（第2弾で実際に起きた）。
 
@@ -24,7 +21,7 @@
 
 ## 現在地の見方
 - タスク状態: **GitHub Issues**（本文のチェックリスト、`requires-human` ラベル）。ブランチは `issue/<番号>`。合否と差し戻しの履歴は CI と PR で見る（旧 `STATE.md` と P0〜P5 の記録は issue #8 で削除。git の履歴にある）
-- 教訓は効かせたい場所（この `CLAUDE.md`・`.claude/rules/`・スキル・docs）に PR で直接書く
+- 教訓は効かせたい場所（この `CLAUDE.md`・`.claude/rules/`・スキル）に PR で直接書く
 - 起動時に SessionStart フックが open の issue と直近のコミットを要約して出す
 
 ## スキル（`/名前` で起動）
@@ -32,7 +29,7 @@
 知識スキル: `tdd-workflow` `myteam-domain-rules` `laravel-api-standards` `next-coding-standards` `async-rules` `myteam-acceptance`
 
 ## エージェント（`.claude/agents/`）
-planner, implementer-api, implementer-web, tester, spec-reviewer, code-reviewer, security-reviewer, database-reviewer, build-error-resolver。使い分けは `.claude/rules/common/agents.md`。契約（`docs/01`）と docs の更新はリードが行う。モデルは **計画段階（planner）が `fable`、それ以外は `opus`**。リード（このセッション）は `fable` で進め、利用上限に達したら `/model` で `opus` に切り替える。**同時に実装 3 体・レビュー 4 体まで。issue-flow の工程は直列**
+planner, implementer-api, implementer-web, tester, spec-reviewer, code-reviewer, security-reviewer, database-reviewer, build-error-resolver。使い分けは `.claude/rules/common/agents.md`。契約（`docs/01`）の更新はリードが行う。モデルは **計画段階（planner）が `fable`、それ以外は `opus`**。リード（このセッション）は `fable` で進め、利用上限に達したら `/model` で `opus` に切り替える。**同時に実装 3 体・レビュー 4 体まで。issue-flow の工程は直列**
 
 ## よく使うコマンド（`make help` で一覧）
 ```bash
@@ -53,4 +50,3 @@ make ports                        # 8002 / 3002 を誰が使っているか
 - 読者は **Ruby on Rails の経験者**。Laravel の機能を説明するときは Rails の対応概念を一言添える
 - 解説には日本語ドキュメントの URL を付ける: Laravel は `https://readouble.com/laravel/13.x/ja/<ページ>.html`、PHP は `https://www.php.net/manual/ja/`
 - 認証など Laravel 公式パッケージがあるものは公式を使う。技術の選択で迷ったら勝手に決めず、各案のメリット・デメリットを表にして質問する
-- 学習が目的。動くだけでなく「なぜそう書くか」を docs に残す

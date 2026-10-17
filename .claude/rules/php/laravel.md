@@ -30,4 +30,4 @@ paths:
 - メールを送るジョブは `NotificationLogService::claim()` → 送信 → `markSent()` の順を守る
 - イベントは `ShouldDispatchAfterCommit` を実装する
 - 試行回数の設定（メールは `$tries = 0` + `$maxExceptions` + `retryUntil()`、それ以外は `$tries`）と `backoff()` `failed()` を必ず書く。キュー名は `mails` か `default` を明示する
-- 詳細は `.claude/skills/async-rules/SKILL.md` と `docs/03_非同期処理の設計.md`
+- 詳細は `.claude/skills/async-rules/SKILL.md`

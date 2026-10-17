@@ -7,8 +7,6 @@ disable-model-invocation: true
 
 # /epic-flow — アウターループ
 
-仕組みの詳細は `docs/04_ループエンジニアリング.md` 2〜3 章。
-
 エピック: **$ARGUMENTS**
 
 エピック = タスクが複数ある GitHub issue 1 つ。タスクの正は issue 本文のチェックリスト（`STATE.md` は issue #4 で廃止。P0〜P5 の記録は issue #8 で削除）。ブランチは `issue/<番号>`。
