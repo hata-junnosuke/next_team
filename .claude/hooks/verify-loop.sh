@@ -14,6 +14,11 @@
 # 第2弾との違い:
 #   - 2 スタック。web は「変更があるときだけ」検査する（判断材料は git status と .claude/.dirty-web）
 # 差し戻しの履歴はファイルに残さない（issue #8）。チームの合否と履歴は CI（.github/workflows/ci.yml）と PR で見る
+#
+# 変更がなければ検査しない（issue #8）:
+#   緑のときに作業ツリーの指紋（HEAD + 追跡ファイルの差分 + 未追跡ファイルの中身のハッシュ）を .claude/.verify-green に残し、
+#   次の終了で指紋が同じなら検査を飛ばす。質問に答えるだけの応答で毎回 25 秒かけて全テストを回さないため。
+#   検査中は Claude Code が入力待ちにならず、Orca がフックとターミナルのタイトルの両方で「終わった」を拾って通知が 2 回出ていた
 set -u
 
 # PHPUnit / Pint は非 TTY では JSON を出す（laravel/pao）。人が読める行に整形する
@@ -35,6 +40,7 @@ format_pint() {
 ROOT="${CLAUDE_PROJECT_DIR:-$PWD}"
 COUNTER="$ROOT/.claude/.loop-count"
 DIRTY_WEB="$ROOT/.claude/.dirty-web"
+GREEN="$ROOT/.claude/.verify-green"
 MAX=5
 INPUT="$(cat)"
 ACTIVE="$(printf '%s' "$INPUT" | jq -r '.stop_hook_active // false')"
@@ -62,6 +68,23 @@ if [ -d "$RUNNING_DIR" ]; then
     jq -n --arg m "検証ループ: 担当 ${N} 体が稼働中のため検査を保留しました（${RUNNING% }）。最後の担当が終わった後の終了で検査します。担当が中断されて印が残った場合は .claude/.running/ を消してください。" '{systemMessage:$m}'
     exit 0
   fi
+fi
+
+# (0.7) 前回の緑から作業ツリーが変わっていなければ検査しない。
+#   .gitignore 済みのもの（vendor・.env・このフックの印）は指紋に含めない。git がなければ毎回検査する
+tree_fingerprint() {
+  git rev-parse --git-dir >/dev/null 2>&1 || return 1
+  {
+    git rev-parse HEAD 2>/dev/null
+    git diff HEAD --binary 2>/dev/null
+    git ls-files -o --exclude-standard -z 2>/dev/null | xargs -0 shasum 2>/dev/null
+  } | shasum | cut -d' ' -f1
+}
+FP="$(tree_fingerprint || true)"
+if [ -n "$FP" ] && [ -f "$GREEN" ] && [ "$(cat "$GREEN")" = "$FP" ]; then
+  rm -f "$COUNTER"
+  jq -n '{systemMessage:"検証ループ: 前回の緑から変更がないので検査を省略しました"}'
+  exit 0
 fi
 
 # web を検査するか: 編集の印がある / git が web/ の変更を報告している
@@ -120,6 +143,7 @@ require api/tests/Feature/FailedJobTest.php "要件 7 章: 失敗が記録され
 
 # (4) 差し戻し
 if [ -n "$FAIL" ]; then
+  rm -f "$GREEN"
   COUNT=$((COUNT + 1)); echo "$COUNT" > "$COUNTER"
   jq -n --arg r "検証ループ ${COUNT}/${MAX}: 以下を修正してから終了してください。修正後にもう一度終了すると再検証します。
 
@@ -127,6 +151,7 @@ ${FAIL}" '{decision:"block", reason:$r}'
   exit 0
 fi
 
-# (5) 成功
+# (5) 成功。検査を始めた時点の指紋を残す（検査中に変わっていれば次の終了で検査し直す）
 rm -f "$COUNTER" "$DIRTY_WEB"
+[ -n "$FP" ] && printf '%s\n' "$FP" > "$GREEN"
 exit 0
