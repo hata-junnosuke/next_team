@@ -21,5 +21,5 @@ labels: [bug]
 <!-- 「再実行したら直った」は原因ではない -->
 
 ## 完了条件
-<!-- api: 再現するテスト名（先に赤を確認する）。web: make web-typecheck / make web-lint が緑 ＋ 手動チェック項目の番号 -->
+<!-- api: 再現するテスト名（先に赤を確認する）。web: make web-typecheck / make web-lint が緑 ＋ 人が画面で確かめる項目 -->
 - [ ] 

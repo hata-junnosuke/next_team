@@ -24,7 +24,7 @@ PR の **形** は `.github/pull_request_template.md` が決め、このスキ�
    - 変更: `git log main..HEAD --oneline` と issue のタスク ID から、タスクごとに 1〜3 行
    - 理由: 判断の理由
    - 検証: 2 の結果。レビュー（`/code-review` / issue-flow の手順 3）の重大の件数と差し戻しの周回数
-   - 人の確認: 画面の手動確認（`myteam-acceptance` の番号。web の変更があれば「手動確認: 未」）、`.env` の反映、マイグレーションのロック、issue で「人が行う」とされたタスク
+   - 人の確認: 画面の手動確認（issue の完了条件に書いた項目。web の変更があれば「手動確認: 未」）、`.env` の反映、マイグレーションのロック、issue で「人が行う」とされたタスク
    - 末尾に `🤖 Generated with [Claude Code](https://claude.com/claude-code)`
 4. タイトル: issue のタイトルに合わせる（`feat(api): ...` / `chore: issue #<番号> ...` など。日本語）
 5. push して作る: `git push -u origin issue/<番号>` → `gh pr create --base main --title "<タイトル>" --body-file <一時ファイル>`

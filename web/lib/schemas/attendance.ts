@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { single } from "./common";
 
-// 勤怠・報酬（docs/01 6.6 の AttendanceResource）。型は z.infer からだけ作る
+// 勤怠・報酬（docs/01 の API 契約の AttendanceResource）。型は z.infer からだけ作る
 
 export const attendanceSchema = z.object({
   /** 日時（ISO 8601） */

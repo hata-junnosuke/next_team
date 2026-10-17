@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
- * F-02〜F-04 ワーカーの登録・編集・有効/無効・一覧と検索（docs/01 6.3）。
+ * F-02〜F-04 ワーカーの登録・編集・有効/無効・一覧と検索（docs/01 のワーカーの API）。
  * WorkerResource: {id, name, email, phone, is_active}
  */
 class WorkerTest extends TestCase

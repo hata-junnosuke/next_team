@@ -37,7 +37,7 @@ class SendApplicationConfirmedMail implements ShouldQueue
      *
      * $tries = 3 だと、キューへ戻された回（流量制限の RateLimited など）も試行に数えられ、戻される回が続くと
      * 1 通も送ろうとしないまま failed になる。しかも claim の前なので notification_logs に行が残らず、
-     * 「届いていない」が画面から見えない（要件 7 章に反する。中止通知で tester が再現）。
+     * 「届いていない」が画面から見えない（要件の非機能要件に反する。中止通知で tester が再現）。
      * メールのジョブは tries=0 + maxExceptions + retryUntil にそろえる（async-rules）。
      * https://readouble.com/laravel/13.x/ja/queues.html#max-exceptions
      */
@@ -114,7 +114,7 @@ class SendApplicationConfirmedMail implements ShouldQueue
      * 例外 3 回（maxExceptions）か期限切れ（retryUntil）で打ち切った後に 1 回だけ呼ばれる。業務の記録を failed にする:
      * - claim の後に失敗していれば、その行を failed にする
      * - 行がない（claim の前に打ち切られた。例: 流量制限で戻され続けて期限切れ）なら、まだ送るべき対象のときだけ
-     *   recordFailure() で failed の行を作る（「届いていない」を画面から見えるように。要件 7 章）。対象でなければ作らない
+     *   recordFailure() で failed の行を作る（「届いていない」を画面から見えるように。要件の非機能要件）。対象でなければ作らない
      * failed() から例外が漏れるとワーカーの失敗処理が途中で止まるので、記録の失敗は report() してログに残すだけにする。
      * 生の例外は failed_jobs とログに残る
      */

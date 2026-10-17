@@ -11,8 +11,8 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * ダッシュボード（F-19、docs/01 6.8）。
- * 戻り値は 6.8 の data の形そのままの配列。この配列をキャッシュに入れる（docs/01 8 章）。
+ * ダッシュボード（F-19、docs/01 の API 契約（ダッシュボード））。
+ * 戻り値は docs/01 のダッシュボード API の data の形そのままの配列。この配列をキャッシュに入れる（docs/01 の非同期の契約）。
  * 企業はグローバルスコープ（CurrentCompany::id()）で絞られる。キャッシュのキーにも企業ID を入れる（入れないと A 社の値が B 社に見える）。
  *
  * キャッシュ（Rails の Rails.cache.fetch に相当）: https://readouble.com/laravel/13.x/ja/cache.html
@@ -61,7 +61,7 @@ class DashboardService
      * 日付をまたいだ扱い（レビューの申し送り）: upcoming_postings は生成時点の「今日以降」なので、
      * 23:58 に作ったキャッシュを 0:01 に返すと昨日の募集が残る。対策は 2 案あり、こちらを選んだ:
      * - 採用: キーは dashboard:{company_id} のまま、有効期限を日付の終わりまでに制限する。
-     *   キーが契約（docs/01 8 章）どおりで、forget() は 1 キーを消すだけで済む（日付を計算して消し漏れる心配がない）
+     *   キーが契約（docs/01 の非同期の契約）どおりで、forget() は 1 キーを消すだけで済む（日付を計算して消し漏れる心配がない）
      * - 不採用: キーに日付を含める（dashboard:{company_id}:{Y-m-d}）。日付が変われば別キーになるが、
      *   forget() が「どの日のキーを消すか」を知る必要があり、0:00 をまたいだ破棄で前日のキーが残る
      * 日付は app.timezone（Asia/Tokyo）で決まる。now() / today() と同じ。
@@ -119,7 +119,7 @@ class DashboardService
     /**
      * 充足率（整数の％）。round() は .5 を 0 から遠い方へ丸める（12.5 → 13）。
      * ただし確定数が定員に届いていなければ上限 99（199/200 = 99.5 を 100% と出すと満員に見えるため。リードの決定）。
-     * 定員は検証で 1 以上なので 0 除算は起きない前提（docs/01 6.4）
+     * 定員は検証で 1 以上なので 0 除算は起きない前提（docs/01 の API 契約（募集））
      * https://www.php.net/manual/ja/function.round.php
      */
     private static function fillRate(int $confirmed, int $capacity): int

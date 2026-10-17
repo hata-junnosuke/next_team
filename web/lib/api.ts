@@ -6,7 +6,7 @@ import type { z } from "zod";
 import type { FormState } from "./form-state";
 import { toErrorDisplay } from "./schemas/common";
 
-// サーバ側（Server Component / Server Action / Route Handler）から Laravel を叩く唯一の入口（docs/01 7.2）。
+// サーバ側（Server Component / Server Action / Route Handler）から Laravel を叩く唯一の入口（docs/01 の lib/api.ts）。
 // ブラウザの Cookie は Next サーバの fetch には自動で付かないので、ここで転送する。
 
 /** 401 以外の失敗。422 の項目別エラーは errors に入る。タイムアウトは status 0 */

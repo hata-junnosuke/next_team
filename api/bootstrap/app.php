@@ -42,7 +42,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // api は JSON 専用。Accept ヘッダやパスに関係なく、例外はすべて JSON で返す（HTML のエラー画面を出さない）
         $exceptions->shouldRenderJsonWhen(fn () => true);
 
-        // 業務ルール違反は 422 {message, errors}。field があれば errors.<field> に入れる（docs/01 4.4）
+        // 業務ルール違反は 422 {message, errors}。field があれば errors.<field> に入れる（docs/01 の例外）
         $exceptions->render(function (DomainException $e) {
             return response()->json([
                 'message' => $e->getMessage(),
@@ -50,7 +50,7 @@ return Application::configure(basePath: dirname(__DIR__))
             ], 422);
         });
 
-        // 存在しない・他社のデータはどちらも同じ 404。モデル名を出さない（docs/01 6.1 のエラー形式）
+        // 存在しない・他社のデータはどちらも同じ 404。モデル名を出さない（docs/01 の API 契約の共通のエラー形式）
         $exceptions->render(function (NotFoundHttpException $e) {
             return response()->json(['message' => '見つかりませんでした。', 'errors' => (object) []], 404);
         });

@@ -22,8 +22,8 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
- * F-09〜F-14 応募・確定（docs/01 6.5、6.4 の applicable-workers、4.5、4.6）。
- * 定員超過の拒否は要件 7 章の必須テスト。
+ * F-09〜F-14 応募・確定（docs/01 の応募・確定の API、募集の API の applicable-workers、サービス契約、業務ルールの決定）。
+ * 定員超過の拒否は要件の非機能要件で求める必須テスト。
  */
 class ApplicationTest extends TestCase
 {
@@ -213,7 +213,7 @@ class ApplicationTest extends TestCase
 
     public function test_無効にしたワーカーの応募中も承認できる(): void
     {
-        // 無効化は新規応募を止めるだけで、既存の応募は影響を受けない（docs/01 4.6）
+        // 無効化は新規応募を止めるだけで、既存の応募は影響を受けない（docs/01 の業務ルールの決定）
         $worker = Worker::factory()->create();
         $applied = Application::factory()->for($worker)->create();
         $worker->update(['is_active' => false]);
@@ -490,7 +490,7 @@ class ApplicationTest extends TestCase
             ->assertJsonPath('data.2.cancel_reason', ['value' => 'worker', 'label' => 'ワーカー都合'])
             ->assertJsonPath('data.2.can', ['confirm' => false, 'reject' => false, 'cancel' => false, 'attend' => false]);
 
-        // 勤怠は AttendanceResource の形（docs/01 6.6）
+        // 勤怠は AttendanceResource の形（docs/01 の勤怠・報酬の API）
         $this->assertSame(
             ['clock_in', 'clock_out', 'is_overnight', 'break_minutes', 'worked_minutes', 'wage_pay', 'transport_allowance', 'total_pay'],
             array_keys($response->json('data.1.attendance')),
@@ -754,7 +754,7 @@ class ApplicationTest extends TestCase
             'clock_in' => '09:00', 'clock_out' => '17:00', 'break_minutes' => 60,
         ])->assertOk();
 
-        // 勤怠の後にキャンセルしても勤怠の行は残り、AttendanceResource の形で返る（docs/01 6.6）
+        // 勤怠の後にキャンセルしても勤怠の行は残り、AttendanceResource の形で返る（docs/01 の勤怠・報酬の API）
         $this->postJson("/api/applications/{$applied->id}/cancel", ['reason' => 'company'])
             ->assertOk()
             ->assertJsonStructure(['data' => ['attendance' => [
@@ -828,7 +828,7 @@ class ApplicationTest extends TestCase
         $this->assertSame('applicationId', $params[0]->getName());
         $this->assertSame('int', (string) $params[0]->getType());
         $this->assertSame(['applicationId'], array_map(fn (\ReflectionProperty $p) => $p->getName(), $class->getProperties()));
-        // SerializesModels に頼らない（docs/01 12 章「ジョブに ID を渡す」）
+        // SerializesModels に頼らない（docs/01 の設計判断「ジョブに ID を渡す」）
         $this->assertNotContains(SerializesModels::class, class_uses_recursive(ApplicationConfirmed::class));
     }
 

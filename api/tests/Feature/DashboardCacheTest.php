@@ -18,7 +18,7 @@ use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /**
- * F-19 ダッシュボードのキャッシュ（docs/01 8 章、async-rules の「キャッシュ」）の補強。
+ * F-19 ダッシュボードのキャッシュ（docs/01 の非同期の契約、async-rules の「キャッシュ」）の補強。
  * DashboardTest のキャッシュの節で足りない分（全ての変更経路、ネストしたトランザクション、企業の分離、
  * 設定 0 以下、日付の終わりの直前）をここに置く。
  *

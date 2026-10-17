@@ -1,6 +1,6 @@
-// 状態の value → バッジの色。対応表はここ 1 箇所だけ（docs/01 6.1・7.5）。
+// 状態の value → バッジの色。対応表はここ 1 箇所だけ（docs/01 の API 契約の共通・表示の規約）。
 // ラベルは API の label をそのまま表示する。ここには色しか置かない。
-// 値は docs/01 4.1 の Enum（非同期の状態も含む）
+// 値は docs/01 の Enum（非同期の状態も含む）
 
 export type Tone = "gray" | "blue" | "green" | "amber" | "red" | "purple";
 
@@ -51,7 +51,7 @@ export function statusClass(kind: StatusKind, value: string): string {
   return toneClasses[tones[value] ?? "gray"];
 }
 
-// ReportExportStatus のうち「生成中」にあたる value（docs/01 4.1・6.9）。
+// ReportExportStatus のうち「生成中」にあたる value（docs/01 の Enum・API 契約の非同期出力）。
 // 進捗を出すか・「更新すると最新になります」の注記を出すかの表示の判断にだけ使う（依頼を受け付けるかは API の 422）
 const inProgressExportStatuses: readonly string[] = ["queued", "processing"];
 

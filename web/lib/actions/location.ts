@@ -6,7 +6,7 @@ import { ApiError, apiSend, toFormState } from "@/lib/api";
 import { isValidId } from "@/lib/actions/helpers";
 import type { FormState } from "@/lib/form-state";
 
-// 拠点の登録・編集・削除（docs/01 6.2、7.3）。
+// 拠点の登録・編集・削除（docs/01 の API 契約の拠点、Server Action と FormState）。
 // Server Action は公開エンドポイントと同じ扱い。引数（bind した id を含む）は信用しない。
 // ここで見るのは id の形だけで、存在しない・他社の拠点は Laravel が 404 を返すのに任せる。
 // 検証も Laravel が正（名称の必須など）

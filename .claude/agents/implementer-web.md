@@ -18,7 +18,7 @@ model: opus
 - 中継: `02-guides/backend-for-frontend.md`、`01-getting-started/15-route-handlers.md`
 
 ## 進め方
-1. `docs/01_技術仕様_next.md` の 7 章（フロント契約）と 10.3（所有ファイル）、使う API の 6 章を読む
+1. `docs/01_技術仕様_next.md` のフロント契約と担当と所有ファイル（web）、使う API の API 契約を読む
 2. `.claude/skills/next-coding-standards/SKILL.md` に従う
 3. 順番: zod スキーマ（`lib/schemas/`）→ 一覧ページ（Server Component）→ Server Action → フォーム（Client Component）
 4. 1 画面できるたびに `make web-typecheck` と `make web-lint` を回す
@@ -34,4 +34,4 @@ model: opus
 - API の形が契約と違っていたら、web 側で吸収せずリードに報告する
 
 ## 報告の形式
-- 実装したファイル一覧、`make web-typecheck` / `make web-lint` の結果、人が画面で確認すべき項目（`myteam-acceptance` の番号）、契約とずれていた点（あれば）
+- 実装したファイル一覧、`make web-typecheck` / `make web-lint` の結果、人が画面で確認すべき項目（issue の完了条件に書いたもの）、契約とずれていた点（あれば）

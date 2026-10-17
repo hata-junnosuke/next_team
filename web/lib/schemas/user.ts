@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { single } from "./common";
 
-// GET /api/user（docs/01 5.1）
+// GET /api/user（docs/01 の認証・サーバ側）
 export const userSchema = z.object({
   id: z.number(),
   name: z.string(),

@@ -14,7 +14,7 @@ model: opus
    - api: `make api-test FILTER=<テスト名>` / `make api-pint-test`
    - web: `make web-typecheck` / `make web-lint`
 3. 原因を特定してから直す。実装の不具合ならその箇所を、テストの誤りならテストを直す。どちらか判断できなければ、要件（`../00_要件定義.md`）と `myteam-domain-rules` スキルに照らして仕様どおりの側を残す
-4. 型エラーが「API の形と zod スキーマのずれ」なら、どちらが docs/01 の 6 章と合っているかを確かめ、合っていない側を直す。**両方が契約と違うなら直さずリードに報告する**
+4. 型エラーが「API の形と zod スキーマのずれ」なら、どちらが docs/01 の API 契約と合っているかを確かめ、合っていない側を直す。**両方が契約と違うなら直さずリードに報告する**
 5. 差分は最小にする。周辺のリファクタ、命名変更、機能追加はしない
 6. Pint の失敗は `make api-pint`、Prettier は `make web-format` で直す
 7. 全部直したら `make verify` を実行して結果を貼る

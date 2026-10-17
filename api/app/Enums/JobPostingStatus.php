@@ -3,7 +3,7 @@
 namespace App\Enums;
 
 /**
- * 募集の状態（F-07）。遷移表はこの canTransitionTo() の 1 箇所だけに置く（docs/01 4.1）。
+ * 募集の状態（F-07）。遷移表はこの canTransitionTo() の 1 箇所だけに置く（docs/01 の Enum）。
  *
  *   open   → closed / cancelled
  *   closed → cancelled

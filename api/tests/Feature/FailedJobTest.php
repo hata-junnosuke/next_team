@@ -29,7 +29,7 @@ use Symfony\Component\Mailer\SentMessage;
 use Tests\TestCase;
 
 /**
- * 失敗が記録され、再実行できる（要件 7 章「失敗した送信は記録が残り、再実行できる」。docs/01 9.1 の必須テスト）。
+ * 失敗が記録され、再実行できる（要件の非機能要件「失敗した送信は記録が残り、再実行できる」。docs/01 の必須テストファイル）。
  * F-21 中止通知のジョブで確かめる。database キューに実際に積み、ワーカー（queue:work --once）で 1 回ずつ実行する
  * （maxExceptions / retryUntil / backoff / failed() / failed_jobs はワーカーが動かすので、handle() の直呼びでは確かめられない）。
  *
@@ -275,7 +275,7 @@ class FailedJobTest extends TestCase
         Mail::assertNotSent(PostingCancelledMail::class);
         $this->assertSame(0, DB::table('jobs')->count());
         $this->assertStringContainsString('MaxAttemptsExceededException', DB::table('failed_jobs')->sole()->exception);
-        // claim の前に打ち切られても、宛先と対象が分かるので「届いていない」記録を作る（要件 7 章。F-24 の画面に出る）
+        // claim の前に打ち切られても、宛先と対象が分かるので「届いていない」記録を作る（要件の非機能要件。F-24 の画面に出る）
         $log = DB::table('notification_logs')->where('kind', NotificationKind::PostingCancelled->value)->sole();
         $this->assertSame(NotificationStatus::Failed->value, $log->status);
         $this->assertSame('hanako@example.com', $log->recipient_email);

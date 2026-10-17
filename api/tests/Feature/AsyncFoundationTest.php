@@ -25,7 +25,7 @@ use LogicException;
 use Tests\TestCase;
 
 /**
- * 非同期の土台（docs/01 3.2・3.3・4.2・4.3）を DB とモデルに直接当てて確かめる。
+ * 非同期の土台（docs/01 の非同期用のテーブル・フレームワークのテーブル・テナント分離・モデル）を DB とモデルに直接当てて確かめる。
  * - マイグレーション: 索引・UNIQUE・既定値・NOT NULL・外部キー
  * - morph map の強制: *_type にクラス名が入らない、未登録のモデルは例外
  * - テナント分離: NotificationLog / ReportExport のグローバルスコープ、他社の管理者を依頼者にできない

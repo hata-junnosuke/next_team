@@ -1,4 +1,4 @@
-// 金額・時間・日付 → 表示文字列（docs/01 7.5）。日付ライブラリは入れない
+// 金額・時間・日付 → 表示文字列（docs/01 の表示の規約）。日付ライブラリは入れない
 
 const numberFormat = new Intl.NumberFormat("ja-JP");
 

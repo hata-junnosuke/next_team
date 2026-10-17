@@ -55,7 +55,7 @@ export function NotificationLogTable({
           </Td>
           <Td>{log.sent_at === null ? "—" : dateTime(log.sent_at)}</Td>
           <Td>{log.failed_at === null ? "—" : dateTime(log.failed_at)}</Td>
-          {/* エラー列だけ折り返す（docs/01 7.5 の例外。例外メッセージは長くなる）。
+          {/* エラー列だけ折り返す（docs/01 の表示の規約の例外。例外メッセージは長くなる）。
               Td は折り返さない共通部品なので、ここだけ td を直接書く。中身は文字列として出す */}
           <td className="px-4 py-2 align-top">
             {/* td の max-width は表の自動レイアウトで効かないので、幅は中の div で決める。

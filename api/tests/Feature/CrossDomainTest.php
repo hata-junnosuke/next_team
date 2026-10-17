@@ -111,7 +111,7 @@ class CrossDomainTest extends TestCase
         $lines = $this->csvDataLines('2026-09');
         $this->assertCount(1, $lines);
         $this->assertStringContainsString('残る人', $lines[0]);
-        // 勤怠の行自体は消えない（集計の対象から外れるだけ。docs/01 6.6）
+        // 勤怠の行自体は消えない（集計の対象から外れるだけ。docs/01 の勤怠・報酬の API）
         $this->assertDatabaseHas('attendances', ['application_id' => $leaveApplicationId]);
     }
 
@@ -163,7 +163,7 @@ class CrossDomainTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonPath('errors.worker_id.0', '無効のワーカーは応募できません。');
 
-        // 無効にする前の確定には勤怠を入力でき、集計にも残る（docs/01 4.6「既存の確定・応募は影響を受けない」）
+        // 無効にする前の確定には勤怠を入力でき、集計にも残る（docs/01 の業務ルールの決定「既存の確定・応募は影響を受けない」）
         $this->putJson("/api/applications/{$applicationId}/attendance", [
             'clock_in' => '09:00', 'clock_out' => '17:00', 'break_minutes' => 60,
         ])->assertOk()->assertJsonPath('data.total_pay', 9600);

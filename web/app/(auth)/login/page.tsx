@@ -8,7 +8,7 @@ import { Field } from "@/components/ui/Field";
 import { login } from "@/lib/browser-api";
 import type { FormState } from "@/lib/form-state";
 
-// ログイン。Cookie を受け取る操作なのでブラウザから Laravel を直接叩く（docs/01 5.2）。
+// ログイン。Cookie を受け取る操作なのでブラウザから Laravel を直接叩く（docs/01 の認証・クライアント側の流れ）。
 // <form action> ではなく onSubmit にしているのは、React 19 が action 完了後にフォームを
 // リセットし、422 のときに入力したメールアドレスが消えるのを避けるため
 

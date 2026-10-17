@@ -32,7 +32,7 @@ class JobPosting extends Model
     use HasFactory;
 
     /**
-     * DB の既定値と揃える（docs/01 4.3）
+     * DB の既定値と揃える（docs/01 のモデル）
      *
      * @var array<string, mixed>
      */
@@ -56,7 +56,7 @@ class JobPosting extends Model
     }
 
     /**
-     * 状態を変える唯一の入口。遷移表は JobPostingStatus::canTransitionTo()（docs/01 4.3）。
+     * 状態を変える唯一の入口。遷移表は JobPostingStatus::canTransitionTo()（docs/01 のモデル）。
      *
      * DB の最新の状態を読み直してから判定する（$this->refresh()）。**サービスはこれを DB::transaction の中で呼ぶ**こと
      * （中止と承認・締切が同時に来ても、古いインスタンスの status で判定しない。直列化は SQLite の IMMEDIATE）。

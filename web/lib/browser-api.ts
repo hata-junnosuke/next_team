@@ -2,7 +2,7 @@ import type { FormState } from "./form-state";
 import { toErrorDisplay } from "./schemas/common";
 import { loginResponse } from "./schemas/user";
 
-// ブラウザから Laravel を直接叩くのはログインとログアウトだけ（docs/01 5.2）。
+// ブラウザから Laravel を直接叩くのはログインとログアウトだけ（docs/01 の認証・クライアント側の流れ）。
 // Cookie（セッション・XSRF-TOKEN）を受け取る／消す操作なので、Next サーバを経由しない。
 // それ以外の API は lib/api.ts（サーバ側）を通す。
 

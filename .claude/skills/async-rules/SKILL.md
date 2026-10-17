@@ -156,7 +156,7 @@ class SendApplicationConfirmedMail implements ShouldQueue
 | 署名付きURL | 正しい URL は 200、`expires` を過ぎたら 403（`$this->travel(31)->minutes()`）、`signature` を変えたら 403 |
 | キャッシュの破棄 | ダッシュボード取得 → 確定 → もう一度取得 → 値が変わっている |
 
-`phpunit.xml` は `QUEUE_CONNECTION=sync` `CACHE_STORE=array` `MAIL_MAILER=array` なので、Redis と Mailpit がなくてもテストは通る。**実物（Redis・Horizon・Mailpit）での確認は README の手動チェックリストで行う。**
+`phpunit.xml` は `QUEUE_CONNECTION=sync` `CACHE_STORE=array` `MAIL_MAILER=array` なので、Redis と Mailpit がなくてもテストは通る。**実物（Redis・Horizon・Mailpit）での確認が要る変更は、issue の完了条件に人の確認項目として書く。**
 
 ## 参考（日本語）
 - キュー: https://readouble.com/laravel/13.x/ja/queues.html

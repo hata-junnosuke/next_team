@@ -6,7 +6,7 @@ import { isValidId, text, toInPageFormState } from "@/lib/actions/helpers";
 import type { FormState } from "@/lib/form-state";
 import { applicationResponse } from "@/lib/schemas/application";
 
-// 応募の追加（F-09）・承認（F-10、F-11）・却下（F-12）・キャンセル（F-13）（docs/01 6.5、7.3）。
+// 応募の追加（F-09）・承認（F-10、F-11）・却下（F-12）・キャンセル（F-13）（docs/01 の API 契約の応募・確定、Server Action と FormState）。
 // どれも募集詳細の中の操作なので redirect せず、詳細ページを再検証して同じページに留まる。
 // Server Action は公開エンドポイントと同じ扱い。引数（bind した id を含む）は信用しない。
 // ここで見るのは id の形だけ。存在しない・他社のデータは Laravel の 404、

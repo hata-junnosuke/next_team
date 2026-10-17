@@ -2,7 +2,7 @@ import { z } from "zod";
 import { attendanceSchema } from "./attendance";
 import { enumValueSchema, list, single } from "./common";
 
-// 応募・確定（docs/01 6.5 の ApplicationResource）。型は z.infer からだけ作る
+// 応募・確定（docs/01 の API 契約の ApplicationResource）。型は z.infer からだけ作る
 
 export const applicationSchema = z.object({
   id: z.number().int(),

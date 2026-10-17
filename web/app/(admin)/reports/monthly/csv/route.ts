@@ -2,10 +2,10 @@ import type { NextRequest } from "next/server";
 import { ApiError, apiFetch } from "@/lib/api";
 
 // 月次集計の CSV（F-18。同期）の中継。ブラウザは Laravel を直接叩かないので、
-// Next サーバが Cookie を転送して GET /api/reports/monthly/csv を取り、本文とヘッダを返す（docs/01 12 章）。
+// Next サーバが Cookie を転送して GET /api/reports/monthly/csv を取り、本文とヘッダを返す（docs/01 の設計判断と理由）。
 // 401 は apiFetch が /login へ redirect する。month の検証は Laravel が正
 
-/** Laravel の応答から引き継ぐヘッダ（docs/01 6.7） */
+/** Laravel の応答から引き継ぐヘッダ（docs/01 の API 契約の月次集計） */
 const PASS_HEADERS = ["Content-Type", "Content-Disposition"];
 
 function errorResponse(status: number, message: string): Response {

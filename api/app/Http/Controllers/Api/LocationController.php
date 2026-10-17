@@ -14,7 +14,7 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 
 /**
- * 拠点（F-01、docs/01 6.2）。Rails の resources :locations（new / edit を除く）に相当。
+ * 拠点（F-01、docs/01 の API 契約（拠点））。Rails の resources :locations（new / edit を除く）に相当。
  * 他社の ID は Location のグローバルスコープでルートモデルバインディングが見つけられず 404 になる。
  * https://readouble.com/laravel/13.x/ja/controllers.html#api-resource-routes
  */

@@ -40,7 +40,7 @@ use Tests\TestCase;
  */
 class ReportExportCoverageTest extends TestCase
 {
-    /** docs/01 6.9 の ReportExportResource のキー */
+    /** docs/01 の非同期出力の API にある ReportExportResource のキー */
     private const RESOURCE_KEYS = ['id', 'month', 'status', 'progress', 'row_count', 'requested_at', 'completed_at', 'download_url'];
 
     protected function setUp(): void
@@ -170,7 +170,7 @@ class ReportExportCoverageTest extends TestCase
         Notification::assertSentToTimes($this->admin, ReportExportReady::class, 1);
     }
 
-    // ---- 同じ月の続けての依頼（docs/01 12 章）----
+    // ---- 同じ月の続けての依頼（docs/01 の設計判断）----
 
     public function test_同じ月を続けて2回依頼すると2回目は422で行もバッチも1つ(): void
     {

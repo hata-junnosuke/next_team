@@ -13,8 +13,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 /**
- * ワーカー（F-02〜F-04、docs/01 6.3）。業務ルールのない CRUD なのでサービスを作らず Eloquent を直接呼ぶ。
- * 削除はしない（無効化する。要件 7 章）ので destroy はない。
+ * ワーカー（F-02〜F-04、docs/01 の API 契約（ワーカー））。業務ルールのない CRUD なのでサービスを作らず Eloquent を直接呼ぶ。
+ * 削除はしない（無効化する。要件の非機能要件）ので destroy はない。
  * モデルを型宣言しているので、他社の ID はルートモデルバインディング（グローバルスコープ）で 404 になる。
  * https://readouble.com/laravel/13.x/ja/controllers.html#api-resource-routes
  */

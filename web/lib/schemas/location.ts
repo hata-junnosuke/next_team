@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { paginated, single } from "./common";
 
-// 拠点（docs/01 6.2 の LocationResource）。型は z.infer からだけ作る
+// 拠点（docs/01 の API 契約の LocationResource）。型は z.infer からだけ作る
 
 export const locationSchema = z.object({
   id: z.number(),

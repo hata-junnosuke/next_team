@@ -37,7 +37,7 @@ class SendPostingCancelledMail implements ShouldQueue
      *
      * $tries = 3 だと、流量制限（RateLimited）でキューへ戻された回も試行に数えられ、上限を超える分が続くと
      * 1 通も送ろうとしないまま failed になる。しかも claim の前なので notification_logs に行が残らず、
-     * 「届いていない」が画面から見えない（要件 7 章に反する。テストで再現した）。メールのジョブは
+     * 「届いていない」が画面から見えない（要件の非機能要件に反する。テストで再現した）。メールのジョブは
      * tries=0 + maxExceptions + retryUntil にそろえる（async-rules）。
      * https://readouble.com/laravel/13.x/ja/queues.html#max-exceptions
      */
@@ -109,7 +109,7 @@ class SendPostingCancelledMail implements ShouldQueue
      * 例外 3 回（maxExceptions）か期限切れ（retryUntil）で打ち切った後に 1 回だけ呼ばれる。業務の記録を failed にする:
      * - claim の後に失敗していれば、その行を failed にする
      * - 行がない（claim の前に打ち切られた。例: 流量制限で戻され続けて期限切れ）なら、まだ送るべき対象のときだけ
-     *   recordFailure() で failed の行を作る（「届いていない」を画面から見えるように。要件 7 章）。対象でなければ作らない
+     *   recordFailure() で failed の行を作る（「届いていない」を画面から見えるように。要件の非機能要件）。対象でなければ作らない
      * failed() から例外が漏れるとワーカーの失敗処理が途中で止まるので、記録の失敗は report() してログに残すだけにする。
      * 生の例外は failed_jobs とログに残る
      */
@@ -149,7 +149,7 @@ class SendPostingCancelledMail implements ShouldQueue
     }
 
     /**
-     * posting_cancelled:application:{応募ID}。対象は募集ではなく応募（宛先のワーカーごとに 1 通。docs/01 3.2）。
+     * posting_cancelled:application:{応募ID}。対象は募集ではなく応募（宛先のワーカーごとに 1 通。docs/01 の非同期用のテーブル）。
      * ID だけを持つ未保存のインスタンスを渡す（DB は読まない。failed() は応募が消えていても呼ばれる）
      */
     private function dedupeKey(): string

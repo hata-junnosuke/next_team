@@ -21,7 +21,7 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Throwable;
 
 /**
- * F-23 月次集計の非同期出力（docs/01 4.5・6.9・8 章）。
+ * F-23 月次集計の非同期出力（docs/01 のサービス契約・非同期出力の API・非同期の契約）。
  *
  * 流れ: request()（queued で作る）→ Bus::batch（拠点ごとの BuildLocationCsvChunk）
  *   → before: markProcessing()（processing + batch_id）
@@ -43,7 +43,7 @@ class ReportExportService
      *
      * 0. 締め切り（config myteam.report_export_stale_minutes）より古い queued / processing は止まったものとして failed にし、生成中に数えない
      * 1. 「生成中がないか」の確認と作成を 1 つのトランザクションにする（IMMEDIATE で開始時に書き込みロックを取るので、
-     *    同時の 2 つの依頼は直列になり、後の方は先の方の行を見て 422 になる。docs/01 12 章）
+     *    同時の 2 つの依頼は直列になり、後の方は先の方の行を見て 422 になる。docs/01 の設計判断）
      * 2. コミットした後に積む（ロールバックされた行のジョブを積まない。ワーカーが行を読めないまま走らない）
      * 3. 拠点が 0 件の月は空のバッチを作らず、FinalizeReportExport だけを積む（ヘッダだけの CSV で queued → completed）
      *
@@ -55,7 +55,7 @@ class ReportExportService
         [$export, $staleExports] = DB::transaction(function () use ($user, $month) {
             // 同じ企業の依頼を直列にする印。SQLite は lockForUpdate() を無視するが、IMMEDIATE がトランザクションの開始で
             // 書き込みロックを取るので直列になる。MySQL に移したときは、この行ロックで「確認 → 作成」の間に別の依頼が割り込めない
-            // （report_exports の行は、まだないものはロックできないので、親の企業の行をロックする。docs/01 12 章）
+            // （report_exports の行は、まだないものはロックできないので、親の企業の行をロックする。docs/01 の設計判断）
             Company::query()->lockForUpdate()->findOrFail(CurrentCompany::id());
 
             $inProgress = ReportExport::query()

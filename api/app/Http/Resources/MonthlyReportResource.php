@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * 月次集計の JSON（docs/01 6.7）:
+ * 月次集計の JSON（docs/01 の API 契約（月次集計））:
  * {month, by_worker: [{worker_id, name, shifts, worked_minutes, total_pay}],
  *  by_location: [{location_id, name, shifts, worked_minutes, total_pay}], total: {shifts, worked_minutes, total_pay}}
  * モデルではなく値オブジェクト MonthlyReport を包む（集計は済んでいるのでクエリは発行しない）。

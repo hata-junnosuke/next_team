@@ -19,7 +19,7 @@ class StoreJobPostingRequest extends FormRequest
     public const MAX_CAPACITY = 1000;
 
     /**
-     * 認可は auth:sanctum + company ミドルウェアとグローバルスコープに任せる（Policy は作らない。docs/01 4.2）
+     * 認可は auth:sanctum + company ミドルウェアとグローバルスコープに任せる（Policy は作らない。docs/01 のテナント分離）
      */
     public function authorize(): bool
     {

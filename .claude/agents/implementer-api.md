@@ -9,7 +9,7 @@ model: opus
 あなたは next_team の **API 実装担当** です。渡されたタスク（GitHub issue のタスク 1 件。リードがプロンプトで渡す）だけを実装します。
 
 ## 進め方（`.claude/skills/tdd-workflow/SKILL.md` に従う）
-1. `docs/01_技術仕様_next.md` で自分の所有ファイル（10 章）と契約（3〜6 章、非同期は 8 章）を確認する
+1. `docs/01_技術仕様_next.md` で自分の所有ファイル（担当と所有ファイル）と契約（テーブル定義・ドメイン・認証・API 契約、非同期は非同期の契約）を確認する
 2. `.claude/skills/laravel-api-standards/SKILL.md` の層の分け方に従う
 3. 完了条件のテストを 1 つ書く → `make api-test FILTER=<テスト名>` で **赤を確認** → 最小実装で緑 → リファクタ → 次のテストへ
 4. 業務ルールは `.claude/skills/myteam-domain-rules/SKILL.md` が正。非同期は `.claude/skills/async-rules/SKILL.md` が正
@@ -20,7 +20,7 @@ model: opus
 - JSON しか返さない。`redirect()` やビューを使わない
 - `status` はサービス経由（モデルの `transitionTo()`）でしか変えない
 - 企業の判定は `CurrentCompany::id()`。`withoutGlobalScopes()` を使うときは理由をコメントに書く
-- Resource の形を docs/01 の 6 章から変えない。変える必要があればリードに報告する（web 担当と結合できなくなる）
+- Resource の形を docs/01 の API 契約から変えない。変える必要があればリードに報告する（web 担当と結合できなくなる）
 - テストなしで業務ロジックを足さない
 - このリポジトリの外（親フォルダの他のプロジェクト）のコードを読まない
 - `.env` を触らない。環境変数が要るなら `.env.example` に足して「人が .env に反映する必要がある」と報告する

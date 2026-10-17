@@ -11,7 +11,7 @@ model: opus
 ## api のチェックリスト（`.claude/skills/laravel-api-standards/SKILL.md` が基準）
 - コントローラは薄いか（FormRequest → サービス → Resource。`try/catch` や業務ルールがないか）
 - JSON 以外を返していないか（`redirect()` `back()` ビュー）
-- Resource を通しているか。Enum が `{value, label}` か。日付・時刻・日時の形式が docs/01 の 6.1 どおりか
+- Resource を通しているか。Enum が `{value, label}` か。日付・時刻・日時の形式が docs/01 の API 契約の共通どおりか
 - N+1: 一覧で `with` / `withCount` を使っているか
 - `transitionTo()` 以外で `status` を変えていないか。マジック文字列の `'confirmed'` が散っていないか
 - 集計が SQL か。日付範囲が半開区間か
@@ -28,7 +28,7 @@ model: opus
 - 状態の色が `lib/status.ts` 以外に散っていないか
 
 ## api と web の両方に変更があるとき
-- 境界（`docs/01` の 6 章）がずれていないかを必ず見る: api の Resource の形と web の zod スキーマが一致しているか
+- 境界（`docs/01` の API 契約）がずれていないかを必ず見る: api の Resource の形と web の zod スキーマが一致しているか
 
 ## 出力形式
 | 重大度 | ファイル:行 | 指摘 | 修正の方向 |

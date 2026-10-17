@@ -2,7 +2,7 @@ import type { FormState } from "@/lib/form-state";
 
 // FormState の message を表示する。ok なら成功、そうでなければエラー。
 // 項目エラーは Field、項目に紐づかないエラー（errors が空の 422・業務ルール違反・429 など）はここ。
-// その振り分けはこの 1 箇所で行う（docs/01 7.3）。呼ぶ側で条件を書かない
+// その振り分けはこの 1 箇所で行う（docs/01 の Server Action と FormState）。呼ぶ側で条件を書かない
 
 type AlertProps = {
   state: FormState;

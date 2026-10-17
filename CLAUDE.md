@@ -11,7 +11,7 @@
 1. 業務ルールは `api/` のサービスに置く。コントローラは薄く、検証は FormRequest。**`web/` に業務ルールと検証を二重に書かない**
 2. `status` はサービス経由（`transitionTo()`）でしか変えない。企業の判定は `CurrentCompany::id()` だけ
 3. `api/` は JSON しか返さない。`web/` は `lib/api.ts` を通さずに `fetch` しない。レスポンスは zod で `parse` する
-4. api と web の境界は `docs/01` の 6 章だけ。web 担当は `api/` のコードを読まない。形がずれていたら web で吸収せず報告する
+4. api と web の境界は `docs/01` の API 契約だけ。web 担当は `api/` のコードを読まない。形がずれていたら web で吸収せず報告する
 5. このリポジトリの外（親フォルダの他のプロジェクト）のコードを読まない。パッケージを勝手に足さない
 6. `.env`・`vendor/`・`node_modules/`・ロック後のマイグレーションは触らない（フックが止める）。フックと `settings.json` の編集は毎回人の承認を挟む（フックが承認ダイアログを出す）
 7. 赤のまま終わらない（Stop フックが差し戻す。5 回で打ち切り → 人に報告）。PR は CI（`make verify`）が緑であること
@@ -26,7 +26,7 @@
 
 ## スキル（`/名前` で起動）
 `/issue-start` issue の worktree を作る（main で使う）/ `/epic-flow` アウターループ（人が起動）/ `/issue-flow` インナーループ / `/plan` / `/verify [quick|pre-commit|full]` / `/code-review` / `/issue-create` issue をテンプレートどおりに作る / `/pr-create` PR を作って CI を確かめる。
-知識スキル: `tdd-workflow` `myteam-domain-rules` `laravel-api-standards` `next-coding-standards` `async-rules` `myteam-acceptance`
+知識スキル: `tdd-workflow` `myteam-domain-rules` `laravel-api-standards` `next-coding-standards` `async-rules`
 
 ## エージェント（`.claude/agents/`）
 planner, implementer-api, implementer-web, tester, spec-reviewer, code-reviewer, security-reviewer, database-reviewer, build-error-resolver。使い分けは `.claude/rules/common/agents.md`。契約（`docs/01`）の更新はリードが行う。モデルは **計画段階（planner）が `fable`、それ以外は `opus`**。リード（このセッション）は `fable` で進め、利用上限に達したら `/model` で `opus` に切り替える。**同時に実装 3 体・レビュー 4 体まで。issue-flow の工程は直列**

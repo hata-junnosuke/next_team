@@ -28,11 +28,11 @@ use Symfony\Component\Mailer\Exception\TransportException;
 use Tests\TestCase;
 
 /**
- * F-20 確定通知（docs/01 8 章、async-rules）。
+ * F-20 確定通知（docs/01 の非同期の契約、async-rules）。
  *
  * - 「積まれたか」は Queue::fake() で確かめる（ジョブは実行しない）
  * - 「実行したらどうなるか」はジョブの handle() を直接呼んで確かめる（Mail::fake() で送信を記録する）
- * - Context の引き継ぎ（docs/01 13 章 #4）は、database キューに実際に積んでワーカー（queue:work）で実行して確かめる。
+ * - Context の引き継ぎ（docs/01 の「実装時に確かめること」#4）は、database キューに実際に積んでワーカー（queue:work）で実行して確かめる。
  *   setUp の CurrentCompany ではなく「積んだジョブのペイロードの Context」で動くことを示すため、積んだ後に Context を消す
  * 二重送信しないことは NotificationIdempotencyTest。
  */
@@ -401,7 +401,7 @@ class ApplicationConfirmedMailTest extends TestCase
         $this->assertSame(1, DB::table('failed_jobs')->count());
         $this->assertSame(NotificationStatus::Failed->value, DB::table('notification_logs')->sole()->status);
 
-        // メールサーバーが直った → failed_jobs から再実行（要件 7 章「失敗した送信は記録が残り、再実行できる」）
+        // メールサーバーが直った → failed_jobs から再実行（要件の非機能要件「失敗した送信は記録が残り、再実行できる」）
         $this->stopFailingMailer();
         Mail::fake();
         $this->artisan('queue:retry', ['id' => ['all']])->assertExitCode(0);

@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
 
 /**
- * F-05〜F-08 募集の作成・編集・一覧・締切・中止・複製（docs/01 6.4、4.5、4.6）。
+ * F-05〜F-08 募集の作成・編集・一覧・締切・中止・複製（docs/01 の募集の API、サービス契約、業務ルールの決定）。
  */
 class JobPostingTest extends TestCase
 {

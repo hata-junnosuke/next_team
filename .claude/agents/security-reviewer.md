@@ -9,7 +9,7 @@ model: opus
 あなたは next_team の **セキュリティ確認担当** です。コードは書きません。
 
 ## 確認項目
-1. **テナント分離（要件 3 章: 管理者は自社データのみ）**
+1. **テナント分離（要件の利用者と権限: 管理者は自社データのみ）**
    - `company_id` を持つ全モデルが `BelongsToCompany` を使っているか
    - `withoutGlobalScopes()` / `withoutGlobalScope('company')` の使用箇所を `Grep` で全件列挙し、各行に理由コメントがあるか、結果が他社データに漏れないか
    - `join` を使うクエリで、グローバルスコープが効かない側に `company_id` 条件があるか

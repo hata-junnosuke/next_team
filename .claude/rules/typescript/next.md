@@ -18,5 +18,5 @@ paths:
 - 共通部品は `components/ui/` の 7 つ（`Table` `Field` `Button` `Alert` `Badge` `Pagination` `LogoutButton`）。足したくなったらリードに報告する
 - 状態のラベルは API の `label` をそのまま出す。色は `lib/status.ts` の対応表だけ
 - 表のセル・バッジ・ボタンには `whitespace-nowrap`
-- `api/` のコードを読まない。契約は `docs/01_技術仕様_next.md` 6 章と実際のレスポンス
+- `api/` のコードを読まない。契約は `docs/01_技術仕様_next.md` の API 契約と実際のレスポンス
 - 詳細は `.claude/skills/next-coding-standards/SKILL.md`

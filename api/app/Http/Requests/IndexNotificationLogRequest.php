@@ -8,7 +8,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * 通知履歴の絞り込み（F-24、docs/01 6.10）。すべて任意。空なら絞り込まない。Enum にない値は黙って無視せず 422 にする。
+ * 通知履歴の絞り込み（F-24、docs/01 の API 契約（通知履歴））。すべて任意。空なら絞り込まない。Enum にない値は黙って無視せず 422 にする。
  * https://readouble.com/laravel/13.x/ja/validation.html#rule-enum
  */
 class IndexNotificationLogRequest extends FormRequest

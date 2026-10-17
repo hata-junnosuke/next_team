@@ -17,7 +17,7 @@ description: Laravel API での RED→GREEN→REFACTOR の手順。Feature（JSO
 | エンドポイント・検証・認証・テナント分離・レスポンスの形 | Feature（HTTP） | `api/tests/Feature/<機能>Test.php` | `$this->actingAsAdmin()->postJson("/api/applications/{$a->id}/confirm")->assertStatus(422)->assertJsonPath('message', '定員に達しているため承認できません。')` |
 | サービスの業務ルール | Unit または Feature | `api/tests/Unit/<Service>Test.php` | `ApplicationService::confirm()` の定員超過 |
 | Enum・純粋計算 | Unit | `api/tests/Unit/<Enum|Calculator>Test.php` | `PayrollCalculator::calculate()` |
-| 動線 10 ステップ | Feature 1 本 | `api/tests/Feature/AcceptanceScenarioTest.php` | 要件 5 章を API 呼び出しでそのまま |
+| 動線 10 ステップ | Feature 1 本 | `api/tests/Feature/AcceptanceScenarioTest.php` | 要件の主要動線を API 呼び出しでそのまま |
 | 非同期 | Feature | `api/tests/Feature/<機能>Test.php` | `async-rules` スキルの「テストの型」 |
 
 ## 書き方の規約

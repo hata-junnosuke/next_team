@@ -12,7 +12,7 @@ abstract class Controller
     private const MAX_PER_PAGE = 100;
 
     /**
-     * 一覧の 1 ページの件数（docs/01 6.1）。?per_page= を 1〜100 に丸める。未指定なら 20。
+     * 一覧の 1 ページの件数（docs/01 の API 契約の共通）。?per_page= を 1〜100 に丸める。未指定なら 20。
      */
     protected function perPage(Request $request): int
     {
@@ -20,7 +20,7 @@ abstract class Controller
     }
 
     /**
-     * 全ルートを先に登録したときの、未実装のアクションの応答（docs/01 10.1）。
+     * 全ルートを先に登録したときの、未実装のアクションの応答（docs/01 の担当と所有ファイル（基盤））。
      * 担当（A / B / C）が実装したら呼び出しを消す。全部消えたらこのメソッドも消す
      */
     protected function notImplemented(): JsonResponse

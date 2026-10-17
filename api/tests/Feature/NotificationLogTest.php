@@ -22,7 +22,7 @@ use Symfony\Component\Mailer\Exception\TransportException;
 use Tests\TestCase;
 
 /**
- * F-24 通知履歴（docs/01 6.10）。GET /api/notification-logs?kind=&status=&page=
+ * F-24 通知履歴（docs/01 の通知履歴の API）。GET /api/notification-logs?kind=&status=&page=
  *
  * NotificationLogResource: {id, kind: {value, label}, recipient: {type, name, email}, subject: {type, id, label},
  * status: {value, label}, sent_at, failed_at, error, created_at}
@@ -305,7 +305,7 @@ class NotificationLogTest extends TestCase
 
     public function test_対象が募集のときは職種と勤務日のラベルで返る(): void
     {
-        // 本番のジョブは募集を対象にしないが、docs/01 6.10 の契約にあるので形を固定する
+        // 本番のジョブは募集を対象にしないが、docs/01 の通知履歴の API の契約にあるので形を固定する
         $posting = JobPosting::factory()->create(['job_title' => '仕分け', 'work_date' => '2026-11-03']);
         $worker = Worker::factory()->create();
         $log = NotificationLog::factory()->state([

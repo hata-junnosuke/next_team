@@ -7,7 +7,7 @@ import { text } from "@/lib/actions/helpers";
 import type { FormState } from "@/lib/form-state";
 import { reportExportResponse } from "@/lib/schemas/report-export";
 
-// 月次集計の CSV を非同期で生成する依頼（F-23。docs/01 6.9、7.3）。
+// 月次集計の CSV を非同期で生成する依頼（F-23。docs/01 の API 契約の非同期出力、Server Action と FormState）。
 // API は受付だけして 202 を返す（生成はキューのジョブ）。状態は出力一覧で確かめる。
 // 「同じ月の出力が生成中です。」（422）や month の形の検証は Laravel が正。web で同じ判定をしない
 

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-// docs/01 6.1 の共通の形。機能ごとのスキーマはここの部品を組み合わせて作る
+// docs/01 の API 契約の共通の形。機能ごとのスキーマはここの部品を組み合わせて作る
 
 /** 状態などの Enum。ラベルは API が返したものをそのまま表示する */
 export const enumValueSchema = z.object({

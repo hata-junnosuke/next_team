@@ -40,7 +40,7 @@ export function ExportTable({ exports }: ExportTableProps) {
           </Td>
           <Td>
             {/* download_url は completed のときだけ API が入れる。署名付き URL をブラウザで直接開く
-                （Cookie を使わないので lib/api.ts を通さない。docs/01 6.9 の例外）。
+                （Cookie を使わないので lib/api.ts を通さない。docs/01 の API 契約の非同期出力にある例外）。
                 新しいタブで開き、開いた先から元の画面を操作させない（noopener）・URL を Referer で渡さない（noreferrer） */}
             {exp.download_url !== null && (
               <a
@@ -52,7 +52,7 @@ export function ExportTable({ exports }: ExportTableProps) {
                 ダウンロード
               </a>
             )}
-            {/* 失敗した月は新しく依頼し直せる（docs/01 4.1。受け付けるかの判定は API の 422） */}
+            {/* 失敗した月は新しく依頼し直せる（docs/01 の Enum。受け付けるかの判定は API の 422） */}
             {isFailedExportStatus(exp.status.value) && (
               <Link
                 href={`/reports/monthly?month=${encodeURIComponent(exp.month)}`}

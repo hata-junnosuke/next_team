@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Route;
  * /api/* はすべて auth:sanctum（ログイン必須）+ company（CurrentCompany の設定）の中に置く。
  * 例外は署名付きURL のダウンロードだけ（signed ミドルウェア必須）。
  *
- * docs/01 6 章の全ルートを先に登録する（10.1）。未実装のアクションは 501 を返し、
+ * docs/01 の API 契約の全ルートを先に登録する（担当と所有ファイルの基盤）。未実装のアクションは 501 を返し、
  * 並列担当（A / B / C）は自分のコントローラの中身だけを書けばよい（このファイルは触らない）。
  * Rails の routes.rb の resources + member ルートに相当。
  * https://readouble.com/laravel/13.x/ja/controllers.html#api-resource-routes
@@ -69,7 +69,7 @@ Route::middleware(['auth:sanctum', 'company'])->group(function () {
 });
 
 /*
- * F-23 のダウンロードだけは auth:sanctum の外（docs/01 6.9・12 章）。メールのリンクやブラウザの直接遷移では
+ * F-23 のダウンロードだけは auth:sanctum の外（docs/01 の非同期出力の API・設計判断）。メールのリンクやブラウザの直接遷移では
  * Sanctum の stateful 判定（Origin / Referer）を満たせないことがあるため。代わりに signed で、期限（30 分）と署名を検査する。
  * 期限切れ・改ざん（ID・expires の書き換えを含む）は 403。Rails の ActiveStorage の署名付き URL（signed_id + expires_in）に近い。
  * https://readouble.com/laravel/13.x/ja/urls.html#validating-signed-route-requests

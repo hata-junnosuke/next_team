@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 /**
- * 通知履歴（F-24、docs/01 6.10）。読み取りだけで業務ルールがないので、サービスを作らず Eloquent を直接呼ぶ（WorkerController と同じ）。
+ * 通知履歴（F-24、docs/01 の API 契約（通知履歴））。読み取りだけで業務ルールがないので、サービスを作らず Eloquent を直接呼ぶ（WorkerController と同じ）。
  * 他社の行は NotificationLog のグローバルスコープ（BelongsToCompany）で出ない。
  */
 class NotificationLogController extends Controller

@@ -5,16 +5,16 @@ namespace App\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * 勤怠の保存（F-15、docs/01 6.6）。形式だけを検証する。
+ * 勤怠の保存（F-15、docs/01 の API 契約（勤怠・報酬））。形式だけを検証する。
  * 「確定済みの応募だけ」「同時刻はエラー」「休憩が労働時間を超えない」は時刻の組み立て（深夜跨ぎ）と
- * 切り離せないので AttendanceService の 1 箇所で判定する（docs/01 4.6）。
+ * 切り離せないので AttendanceService の 1 箇所で判定する（docs/01 の業務ルールの決定）。
  * 金額（worked_minutes / wage_pay / total_pay）は受け取らない。サーバーで計算する。
  * https://readouble.com/laravel/13.x/ja/validation.html#rule-date-format
  */
 class SaveAttendanceRequest extends FormRequest
 {
     /**
-     * 認可は auth:sanctum + company ミドルウェアとグローバルスコープに任せる（Policy は作らない。docs/01 4.2）
+     * 認可は auth:sanctum + company ミドルウェアとグローバルスコープに任せる（Policy は作らない。docs/01 のテナント分離）
      */
     public function authorize(): bool
     {

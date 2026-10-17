@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { single } from "./common";
 
-// ダッシュボード（docs/01 6.8 の GET /api/dashboard）。
+// ダッシュボード（docs/01 の API 契約の GET /api/dashboard）。
 // fill_rate（充足率）と pending_applications_count（未処理の応募数）は API が数える。web で計算しない
 
 export const upcomingPostingSchema = z.object({

@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * ワーカー（F-02〜F-04）。削除せず is_active で無効化する（要件 7 章）。
+ * ワーカー（F-02〜F-04）。削除せず is_active で無効化する（要件の非機能要件）。
  * company_id は #[Fillable] に入れない（BelongsToCompany が CurrentCompany::id() で埋める）。
  */
 #[Fillable(['name', 'email', 'phone', 'is_active'])]
@@ -23,7 +23,7 @@ class Worker extends Model
     use HasFactory;
 
     /**
-     * DB の既定値と揃える（create() 直後のメモリ上の値が null にならないように。docs/01 4.3）
+     * DB の既定値と揃える（create() 直後のメモリ上の値が null にならないように。docs/01 のモデル）
      *
      * @var array<string, mixed>
      */

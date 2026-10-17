@@ -31,7 +31,7 @@ class Application extends Model
     use HasFactory;
 
     /**
-     * DB の既定値と揃える（docs/01 4.3）
+     * DB の既定値と揃える（docs/01 のモデル）
      *
      * @var array<string, mixed>
      */
@@ -55,7 +55,7 @@ class Application extends Model
     }
 
     /**
-     * 状態を変える唯一の入口。遷移表は ApplicationStatus::canTransitionTo()（docs/01 4.3）。
+     * 状態を変える唯一の入口。遷移表は ApplicationStatus::canTransitionTo()（docs/01 のモデル）。
      *
      * 1. DB の最新の状態を読み直してから判定する（$this->refresh()）。別のリクエストが先に却下・承認・中止していても、
      *    古いインスタンスの status で判定しない。**サービスはこれを DB::transaction の中で呼ぶ**こと。

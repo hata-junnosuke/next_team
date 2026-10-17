@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * ワーカーの JSON（docs/01 6.3）: {id, name, email, phone, is_active}
+ * ワーカーの JSON（docs/01 の API 契約（ワーカー））: {id, name, email, phone, is_active}
  *
  * @mixin Worker
  */

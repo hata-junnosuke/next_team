@@ -6,7 +6,7 @@ import { isValidId, text, toInPageFormState } from "@/lib/actions/helpers";
 import type { FormState } from "@/lib/form-state";
 import { attendanceResponse } from "@/lib/schemas/attendance";
 
-// 勤怠の入力（F-15）。PUT /api/applications/{id}/attendance（作成でも更新でも 200）（docs/01 6.6、7.3）。
+// 勤怠の入力（F-15）。PUT /api/applications/{id}/attendance（作成でも更新でも 200）（docs/01 の API 契約の勤怠・報酬、Server Action と FormState）。
 // 報酬（F-16）は API が計算して返す。web では計算しない。
 // 形式・同時刻（errors.clock_out）・休憩超過（errors.break_minutes）・確定済みでない応募（errors が空）は
 // すべて Laravel の 422。深夜跨ぎ（退勤 <= 出勤なら翌日）の判定も API

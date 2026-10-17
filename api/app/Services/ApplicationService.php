@@ -17,11 +17,11 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 
 /**
- * 応募・確定の業務ルール（F-09〜F-14、docs/01 4.5・4.6）。
+ * 応募・確定の業務ルール（F-09〜F-14、docs/01 のサービス契約・業務ルールの決定）。
  *
  * 状態は Application::transitionTo() だけで変える。どれも DB::transaction の中で呼ぶ
  * （SQLite の transaction_mode=IMMEDIATE でトランザクションの開始が直列化されるので、承認と承認・承認と中止が同時に来ても
- * 後の方は先の方のコミットを待ってから読む。docs/01 12 章「定員チェックの一貫性」）。
+ * 後の方は先の方のコミットを待ってから読む。docs/01 の設計判断「定員チェックの一貫性」）。
  * lockForUpdate() は SQLite では何もしない（文法が空）が、意図を示すのと MySQL に移したときにそのまま効くように書く。
  * ロックの順は常に「募集 → 応募」にそろえる（JobPostingService::cancel も募集を先に変える）。順が逆の経路があると MySQL でデッドロックする。
  * https://readouble.com/laravel/13.x/ja/database.html#database-transactions
@@ -83,7 +83,7 @@ class ApplicationService
             $locked = Application::query()->lockForUpdate()->findOrFail($application->id);
             $this->assertCanTransition($locked, ApplicationStatus::Confirmed);
 
-            // 中止すると応募中は却下になるので普通は残らないが、残っていても承認しない（F-07、docs/01 4.6）
+            // 中止すると応募中は却下になるので普通は残らないが、残っていても承認しない（F-07、docs/01 の業務ルールの決定）
             if ($posting->status === JobPostingStatus::Cancelled) {
                 throw new DomainException('中止された募集の応募は承認できません。');
             }
@@ -137,7 +137,7 @@ class ApplicationService
     }
 
     /**
-     * 応募できるワーカー（docs/01 6.4 の applicable-workers）。有効で、まだこの募集に応募していない自社のワーカー。
+     * 応募できるワーカー（docs/01 の API 契約（募集）の applicable-workers）。有効で、まだこの募集に応募していない自社のワーカー。
      * 却下・キャンセル済みの応募があるワーカーも、UNIQUE (job_posting_id, worker_id) で再応募できないので出さない。
      *
      * @return Collection<int, Worker>

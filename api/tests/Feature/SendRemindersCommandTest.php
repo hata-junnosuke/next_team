@@ -24,7 +24,7 @@ use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 /**
- * F-22 前日リマインド（docs/01 8 章、async-rules「スケジューラ」）。
+ * F-22 前日リマインド（docs/01 の非同期の契約、async-rules「スケジューラ」）。
  *
  * - コマンド（app:send-reminders）は「積むだけ」。積まれたかを Queue::fake() で確かめる
  * - 企業ごとに Context が設定されることは、database キューに積んでワーカー（queue:work --once）で実行して確かめる

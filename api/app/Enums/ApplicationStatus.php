@@ -3,7 +3,7 @@
 namespace App\Enums;
 
 /**
- * 応募の状態（F-14）。遷移表はこの canTransitionTo() の 1 箇所だけに置く（docs/01 4.1）。
+ * 応募の状態（F-14）。遷移表はこの canTransitionTo() の 1 箇所だけに置く（docs/01 の Enum）。
  * Rails の enum + AASM の遷移定義に相当。status を実際に変えるのは Application::transitionTo() だけ。
  *
  *   applied   → confirmed / rejected

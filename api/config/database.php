@@ -38,13 +38,13 @@ return [
             'database' => env('DB_DATABASE', database_path('database.sqlite')),
             'prefix' => '',
             'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
-            // docs/01 3.4。Web とキューワーカーが同じファイルを同時に読み書きするための設定
+            // docs/01 の SQLite の設定。Web とキューワーカーが同じファイルを同時に読み書きするための設定
             // WAL: 読み取りが書き込みを待たない。busy_timeout: ロック待ちを即エラーにせず 5 秒待つ
             'busy_timeout' => 5000,
             'journal_mode' => 'wal',
             'synchronous' => null,
             // IMMEDIATE: DB::transaction() の開始時（BEGIN IMMEDIATE）に書き込みロックを取る。
-            // 2 つの承認が同時に来ても後の方は先のコミットを待ってから確定数を数えるので、定員チェックが一貫する（docs/01 12 章）。
+            // 2 つの承認が同時に来ても後の方は先のコミットを待ってから確定数を数えるので、定員チェックが一貫する（docs/01 の設計判断）。
             // SQLite は lockForUpdate() を無視するため、これが定員の一貫性の本体
             'transaction_mode' => 'IMMEDIATE',
         ],

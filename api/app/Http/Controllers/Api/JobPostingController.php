@@ -15,8 +15,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 /**
- * 募集（F-05〜F-08、docs/01 6.4）。Rails の resources :job_postings + member ルート（close / cancel / duplicate）に相当。
- * 削除はしない（中止する。要件 7 章）ので destroy はない。
+ * 募集（F-05〜F-08、docs/01 の API 契約（募集））。Rails の resources :job_postings + member ルート（close / cancel / duplicate）に相当。
+ * 削除はしない（中止する。要件の非機能要件）ので destroy はない。
  * 他社の ID は JobPosting のグローバルスコープでルートモデルバインディングが見つけられず 404 になる。
  */
 class JobPostingController extends Controller

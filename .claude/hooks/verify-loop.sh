@@ -130,15 +130,15 @@ $(printf '%s' "$LINT_OUT" | grep -vE '^\s*$' | head -30)
 "
 fi
 
-# 受け入れ条件（必須テストファイル）。ファイル名は docs/01_技術仕様_next.md 9 章の契約
+# 受け入れ条件（必須テストファイル）。ファイル名は docs/01_技術仕様_next.md の必須テストファイルの契約
 require() { [ -f "$1" ] || FAIL="${FAIL}## 受け入れ条件: $1 がありません（$2）
 "; }
-require api/tests/Feature/ApplicationTest.php "要件 7 章: 定員超過の拒否"
-require api/tests/Unit/PayrollCalculatorTest.php "要件 7 章: 報酬計算"
-require api/tests/Unit/ApplicationStatusTest.php "要件 7 章: 状態遷移の拒否"
-require api/tests/Feature/AcceptanceScenarioTest.php "要件 5 章: 動線 10 ステップ（API 経由）"
-require api/tests/Feature/NotificationIdempotencyTest.php "要件 7 章: 同じ通知を二重に送らない"
-require api/tests/Feature/FailedJobTest.php "要件 7 章: 失敗が記録され再実行できる"
+require api/tests/Feature/ApplicationTest.php "定員超過の拒否"
+require api/tests/Unit/PayrollCalculatorTest.php "報酬計算"
+require api/tests/Unit/ApplicationStatusTest.php "状態遷移の拒否"
+require api/tests/Feature/AcceptanceScenarioTest.php "受け入れ動線 10 ステップ（API 経由）"
+require api/tests/Feature/NotificationIdempotencyTest.php "同じ通知を二重に送らない"
+require api/tests/Feature/FailedJobTest.php "失敗が記録され再実行できる"
 
 # (4) 差し戻し
 if [ -n "$FAIL" ]; then

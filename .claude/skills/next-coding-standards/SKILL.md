@@ -5,7 +5,7 @@ description: next_team の Next.js 16 実装規約。Server Component でのデ�
 
 # Next.js 実装規約（next_team）
 
-契約（ディレクトリ・関数の形・画面と API の対応）は `docs/01_技術仕様_next.md` 7 章が正。ここは書き方。
+契約（ディレクトリ・関数の形・画面と API の対応）は `docs/01_技術仕様_next.md` のフロント契約が正。ここは書き方。
 
 **書く前に `web/node_modules/next/dist/docs/01-app/` を読む。** Next 16 は以前の版と違う。下のコードは形を示すもので、API の細部は同梱ドキュメントを正とする。
 

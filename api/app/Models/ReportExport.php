@@ -29,7 +29,7 @@ class ReportExport extends Model
     use HasFactory;
 
     /**
-     * DB の既定値と揃える（docs/01 4.3）
+     * DB の既定値と揃える（docs/01 のモデル）
      *
      * @var array<string, mixed>
      */

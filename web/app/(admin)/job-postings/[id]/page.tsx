@@ -18,7 +18,7 @@ import {
   jobPostingResponse,
 } from "@/lib/schemas/job-posting";
 
-// 募集詳細（F-07、F-09〜F-16。docs/01 7.4 の中心の画面）。
+// 募集詳細（F-07、F-09〜F-16。docs/01 の画面と使う API で中心の画面）。
 // 募集・応募一覧・応募できるワーカーを並行して取る。存在しない・他社の募集は API の 404 → not-found。
 // ボタンを押せるかは API の can.* だけで決める（定員・状態遷移の判定は API の 422）。
 // 状態ボタンと勤怠の保存は redirect せず、Server Action がこのページを再検証する

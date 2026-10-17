@@ -7,7 +7,7 @@ import { isValidId, text, toInPageFormState } from "@/lib/actions/helpers";
 import type { FormState } from "@/lib/form-state";
 import { jobPostingResponse } from "@/lib/schemas/job-posting";
 
-// 募集の登録・編集（F-05）・複製（F-08）（docs/01 6.4、7.3）。
+// 募集の登録・編集（F-05）・複製（F-08）（docs/01 の API 契約の募集、Server Action と FormState）。
 // Server Action は公開エンドポイントと同じ扱い。引数（bind した id を含む）は信用しない。
 // ここで見るのは id の形だけで、存在しない・他社の募集は Laravel が 404 を返すのに任せる。
 // 検証（必須・終了 > 開始・最低賃金・上限・自社の拠点・中止済みは編集不可）も Laravel が正
@@ -39,7 +39,7 @@ function jobPostingPath(id: number): string {
   return `/api/job-postings/${id}`;
 }
 
-/** 201 の data.id（作った募集）の詳細へ移る。応募の追加など次の操作は詳細で行うため（docs/01 7.4） */
+/** 201 の data.id（作った募集）の詳細へ移る。応募の追加など次の操作は詳細で行うため（docs/01 の画面と使う API） */
 export async function createJobPosting(
   _prev: FormState,
   formData: FormData,

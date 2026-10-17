@@ -17,7 +17,7 @@ labels: []
 ## タスク（上から順に）
 <!-- /plan（planner）が埋める。人が承認したら見出しに「（YYYY-MM-DD 人が承認）」と書く
 各タスクの下に 担当 / 所有ファイル / 完了条件 / 依存・見積 を箇条で書く
-完了条件: api はテスト名、web は「make web-typecheck と make web-lint が緑」＋ myteam-acceptance の手動チェック項目の番号 -->
+完了条件: api はテスト名、web は「make web-typecheck と make web-lint が緑」＋ 人が画面で確かめる項目 -->
 - [ ] **T1** 
 
 ## 順番の制約

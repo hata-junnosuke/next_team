@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * 募集の JSON（docs/01 6.4）:
+ * 募集の JSON（docs/01 の API 契約（募集））:
  * {id, location: {id, name}, job_title, work_date, start_time, end_time, capacity, hourly_wage, transport_allowance,
  *  status: {value, label}, applications_count, confirmed_count, can: {edit, close, cancel, apply}}
  *

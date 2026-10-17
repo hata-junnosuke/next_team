@@ -2,10 +2,10 @@
 
 | 場面 | 委譲先 | 備考 |
 |---|---|---|
-| 機能を実装する前 | `planner`（`/plan`） | 完了条件はテスト名（web は手動チェック項目） |
+| 機能を実装する前 | `planner`（`/plan`） | 完了条件はテスト名（web は型と ESLint の緑 ＋ 人が画面で確かめる項目） |
 | 契約（テーブル・サービス・API の形・画面と API の対応）を変える | リード | `docs/01_技術仕様_next.md` の変更案を作り、人の承認を得てから書く |
 | `api/` のコードを書く | `implementer-api` | 1 担当 1 体。所有ファイルだけ |
-| `web/` のコードを書く | `implementer-web` | 同上。`api/` のコードは読まない（契約は docs/01 の 6 章） |
+| `web/` のコードを書く | `implementer-web` | 同上。`api/` のコードは読まない（契約は docs/01 の API 契約） |
 | テストの網羅を確認 | `tester` | 実装は直さない。`api/tests/` だけ書く |
 | レビュー | `spec-reviewer` ∥ `code-reviewer` ∥ `security-reviewer` を並列 | 読み取り専用 |
 | マイグレーション確定前・集計実装後・非同期のテーブル追加後 | `database-reviewer` | ロック可否を判定 |

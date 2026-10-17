@@ -7,7 +7,7 @@ import type { statusTones } from "@/lib/status";
 // 通知履歴の絞り込み（F-24）。GET のフォームで /notifications?kind=&status= に遷移するだけ（next/form）。
 // 値の検証（Enum にない値）は API の 422 で、そのエラーを errors で受けて出す。ページは 1 に戻る（page を送らない）。
 // kind / status 以外の項目エラー（URL を手で書き換えた page・per_page など。入力欄がない）は
-// フォームの下にまとめて出す（docs/01 7.5 の例外。複製フォームと同じ形）
+// フォームの下にまとめて出す（docs/01 の表示の規約の例外。複製フォームと同じ形）
 
 /** 一覧ページが URL から受け取った絞り込みの値（未指定は空文字） */
 export type NotificationFilterValues = {
@@ -18,8 +18,8 @@ export type NotificationFilterValues = {
 type KindValue = keyof (typeof statusTones)["notificationKind"];
 type StatusValue = keyof (typeof statusTones)["notificationStatus"];
 
-// 選択肢。API に Enum の一覧を返す口がないため、docs/01 4.1 の NotificationKind / NotificationStatus の
-// value → label をここに置く（docs/01 7.5 の例外。表のバッジは API の label をそのまま出す）
+// 選択肢。API に Enum の一覧を返す口がないため、docs/01 の Enum の NotificationKind / NotificationStatus の
+// value → label をここに置く（docs/01 の表示の規約の例外。表のバッジは API の label をそのまま出す）
 const kindOptions: { value: KindValue; label: string }[] = [
   { value: "application_confirmed", label: "確定通知" },
   { value: "posting_cancelled", label: "中止通知" },

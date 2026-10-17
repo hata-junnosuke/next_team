@@ -2,9 +2,9 @@
 
 ルールはすべて親の [`../CLAUDE.md`](../CLAUDE.md) と `../.claude/` にあります。ここで作業するときも、セッションは `next_team/` で起動します。
 
-- 契約: `../docs/01_技術仕様_next.md`（3〜6 章、8〜10 章）
+- 契約: `../docs/01_技術仕様_next.md`（テーブル定義・ドメイン・認証・API 契約・非同期の契約・テスト契約・担当と所有ファイル）
 - 書き方: `../.claude/skills/laravel-api-standards/SKILL.md`、`../.claude/rules/php/laravel.md`
 - 業務ルール: `../.claude/skills/myteam-domain-rules/SKILL.md`
 - 非同期: `../.claude/skills/async-rules/SKILL.md`
 
-雛形に入っていた「Laravel Boost を入れる」指示は外しました。パッケージは `docs/01` の 1 章にあるものだけを使います。
+雛形に入っていた「Laravel Boost を入れる」指示は外しました。パッケージは `docs/01` の構成（使うパッケージ）にあるものだけを使います。

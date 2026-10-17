@@ -13,8 +13,8 @@ import type { statusTones } from "@/lib/status";
 
 type ReasonValue = keyof (typeof statusTones)["cancelReason"];
 
-// 理由区分の選択肢。API に Enum の一覧を返す口がないため、docs/01 4.1 の CancelReason の
-// value → label をここに置く（docs/01 7.5 の例外と同じ扱い。表の表示は API の label をそのまま出す）
+// 理由区分の選択肢。API に Enum の一覧を返す口がないため、docs/01 の Enum の CancelReason の
+// value → label をここに置く（docs/01 の表示の規約の例外と同じ扱い。表の表示は API の label をそのまま出す）
 const reasonOptions: { value: ReasonValue; label: string }[] = [
   { value: "company", label: "企業都合" },
   { value: "worker", label: "ワーカー都合" },

@@ -73,7 +73,7 @@ class AttendanceFactory extends Factory
     {
         $wage = (int) self::application($attributes['application_id'])->confirmed_hourly_wage;
 
-        // 円未満切り上げ（docs/01 4.6 と同じ式）
+        // 円未満切り上げ（docs/01 の業務ルールの決定と同じ式）
         return intdiv(self::workedMinutes($attributes) * $wage + 59, 60);
     }
 

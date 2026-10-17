@@ -32,7 +32,7 @@ use RuntimeException;
 use Tests\TestCase;
 
 /**
- * 同じ通知を二重に送らない（要件 7 章。docs/01 9.1 の必須テスト）。
+ * 同じ通知を二重に送らない（要件の非機能要件。docs/01 の必須テストファイル）。
  * ジョブの handle() を直接呼び、「実行したら何通送られたか」を Mail::fake() で数える。
  * 出力完了は FinalizeReportExport の handle() を直接呼び、Notification::fake() で数える。
  */
