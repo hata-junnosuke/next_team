@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use LogicException;
 
 /**
- * ダッシュボードのキャッシュを破棄する Observer（F-19。docs/01 8 章、docs/03 3.5）。Rails の after_commit コールバックに相当。
+ * ダッシュボードのキャッシュを破棄する Observer（F-19。docs/01 の非同期の契約）。Rails の after_commit コールバックに相当。
  * Application と JobPosting と Location に付ける（AppServiceProvider::boot() の observe()）。
  * Location はダッシュボードに拠点名（location_name）を出しているため。
  *

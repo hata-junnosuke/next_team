@@ -27,7 +27,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Tests\TestCase;
 
 /**
- * F-21 中止通知（docs/01 8 章、docs/03 3.2、async-rules）。
+ * F-21 中止通知（docs/01 の非同期の契約、async-rules）。
  *
  * - 「積まれたか」は Queue::fake() で確かめる（ジョブは実行しない）
  * - 「実行したらどうなるか」はジョブの handle() を直接呼んで確かめる（Mail::fake() で送信を記録する）
@@ -46,7 +46,7 @@ class PostingCancelledMailTest extends TestCase
 
         $this->actingAsAdmin()->postJson("/api/job-postings/{$posting->id}/cancel")->assertOk();
 
-        // 1 つのジョブで 3 通送らない。1 応募 1 ジョブ（docs/03 3.2「失敗の分離」）
+        // 1 つのジョブで 3 通送らない。1 応募 1 ジョブ
         Queue::assertPushedOn('mails', SendPostingCancelledMail::class);
         Queue::assertCount(3);
         foreach ($ids as $id) {

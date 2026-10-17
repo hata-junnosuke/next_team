@@ -1,9 +1,9 @@
 ---
 name: laravel-api-standards
-description: myteam 第3弾の Laravel API 実装規約。層の分け方（ルート → FormRequest → コントローラ → サービス → Resource）、エラー形式、Resource の書き方、ページネーション、テナント分離、Sanctum + Fortify の設定。implementer-api と code-reviewer が従う
+description: next_team の Laravel API 実装規約。層の分け方（ルート → FormRequest → コントローラ → サービス → Resource）、エラー形式、Resource の書き方、ページネーション、テナント分離、Sanctum + Fortify の設定。implementer-api と code-reviewer が従う
 ---
 
-# Laravel API 実装規約（myteam 第3弾）
+# Laravel API 実装規約（next_team）
 
 契約（クラス名・フィールド名）は `docs/01_技術仕様_next.md` が正。ここは書き方。
 
@@ -14,7 +14,7 @@ description: myteam 第3弾の Laravel API 実装規約。層の分け方（ル�
 | FormRequest | `app/Http/Requests` | `rules()` / `attributes()`（日本語項目名）/ `after()`（項目間検査）。自社データの存在検証は `Rule::exists(...)->where('company_id', CurrentCompany::id())` | 業務ルール（定員・状態） |
 | コントローラ | `app/Http/Controllers/Api` | FormRequest を受ける → サービス or Eloquent → Resource を返す | `try/catch`、`$request->validate()`、`redirect()` |
 | サービス | `app/Services` | 業務ルール、`DB::transaction`、`DomainException`。結果は モデル or readonly DTO | HTTP（Request / Response）に触る |
-| Resource | `app/Http/Resources` | モデル → JSON の形。docs/01 の 6 章どおり | クエリを発行する（N+1 の元。`whenLoaded` / `whenCounted` を使う） |
+| Resource | `app/Http/Resources` | モデル → JSON の形。docs/01 の API 契約どおり | クエリを発行する（N+1 の元。`whenLoaded` / `whenCounted` を使う） |
 | モデル | `app/Models` | リレーション、cast、スコープ、`BelongsToCompany`、`transitionTo()` | 業務ルールの判断 |
 
 単純な CRUD（拠点・ワーカーの登録と更新）はサービスを作らず、コントローラから Eloquent を直接呼んでよい。**ルールがあるものだけサービスにする**。
@@ -69,7 +69,7 @@ return [
 - `CurrentCompany` を設定するのは `SetCurrentCompany` ミドルウェア・スケジューラのコマンド・テストだけ。サービスやコントローラで `set()` しない
 - join 先のテーブルにはスコープが効かない。`->where('job_postings.company_id', CurrentCompany::id())` を明示する
 
-## 認証（P1）
+## 認証
 - `php artisan install:api` → Sanctum。`composer require laravel/fortify` → `php artisan fortify:install`。**Fortify が作るビュー関連・2FA のマイグレーションは消す**
 - `config/fortify.php`: `'views' => false`、`'features' => []`
 - `bootstrap/app.php`: `$middleware->statefulApi();`、`$middleware->alias(['company' => SetCurrentCompany::class]);`

@@ -14,14 +14,14 @@ use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use Throwable;
 
 /**
- * 通知の記録と冪等性（同じ通知を二重に送らない。docs/03 4 章）。
+ * 通知の記録と冪等性（同じ通知を二重に送らない）。
  *
  * メールを送るジョブは必ず次の順に呼ぶ（async-rules）:
  *   $log = claim(...) → null なら return（送信済み）→ 送信 → markSent($log)
  *   例外 3 回か期限切れで打ち切った後、ジョブの failed() から markFailedByKey(dedupeKey(...), $e)。
  *   行がなければ（claim の前に打ち切られた。例: 流量制限で戻され続けて期限切れ）、まだ送るべき対象なら recordFailure(...)
  *
- * 「送信 → 記録」の順なので、送信の直後・記録の前に落ちると再試行でもう 1 通送る（at-least-once。docs/03 4.3）。
+ * 「送信 → 記録」の順なので、送信の直後・記録の前に落ちると再試行でもう 1 通送る（at-least-once）。
  * 企業は BelongsToCompany が CurrentCompany::id() で埋める（ジョブには Context で引き継がれる）。
  */
 class NotificationLogService
@@ -106,7 +106,7 @@ class NotificationLogService
     /**
      * 失敗を業務の記録に残す（「誰への何の通知が届いていないか」。F-24 の画面が読む）。
      * error には例外のクラス名と固定の文言だけを残す。生のメッセージには SQL のバインド値や宛先・認証情報が入りうるので、
-     * 画面に出る列には書かない（生の内容は failed_jobs とログが持つ。docs/03 5 章）。
+     * 画面に出る列には書かない（生の内容は failed_jobs とログが持つ）。
      * 送信済みの行は失敗に戻さない（届いた通知を「届いていない」と表示しない）。
      */
     public function markFailed(NotificationLog $log, ?Throwable $e): void

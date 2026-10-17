@@ -12,8 +12,8 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
- * 状態遷移（F-14、要件 7 章の必須テスト）。遷移表は Enum の canTransitionTo() の 1 箇所にある（docs/01 4.1）。
- * P2-01 で Enum の分、P2-04 で Application::transitionTo()（状態を変える唯一の入口）の例外の分を足した。
+ * 状態遷移（F-14、要件の非機能要件で求める必須テスト）。遷移表は Enum の canTransitionTo() の 1 箇所にある（docs/01 の Enum）。
+ * Enum の遷移表と、Application::transitionTo()（状態を変える唯一の入口）の例外の両方を確かめる。
  *
  * transitionTo() は DB を読み直してから判定する（refresh）ので、アプリと DB を起動する Tests\TestCase を使う
  * （Enum だけのテストもそのまま動く。Rails のモデルのユニットテストに相当）。
@@ -90,7 +90,7 @@ class ApplicationStatusTest extends TestCase
     }
 
     /**
-     * 応募の遷移表（docs/01 4.1、myteam-domain-rules）を「許可される組」だけ書き、残りは全部禁止として 4 × 4 = 16 組を総当たりする。
+     * 応募の遷移表（docs/01 の Enum、myteam-domain-rules）を「許可される組」だけ書き、残りは全部禁止として 4 × 4 = 16 組を総当たりする。
      * 実装の canTransitionTo() とは独立に、仕様の表をここに直接書く（実装を写さない）
      *
      * @return iterable<string, array{ApplicationStatus, ApplicationStatus, bool}>
@@ -114,7 +114,7 @@ class ApplicationStatusTest extends TestCase
     }
 
     /**
-     * 募集の遷移表（docs/01 4.1）: open → closed / cancelled、closed → cancelled。3 × 3 = 9 組を総当たりする
+     * 募集の遷移表（docs/01 の Enum）: open → closed / cancelled、closed → cancelled。3 × 3 = 9 組を総当たりする
      *
      * @return iterable<string, array{JobPostingStatus, JobPostingStatus, bool}>
      */
@@ -187,7 +187,7 @@ class ApplicationStatusTest extends TestCase
         $this->assertSame(ApplicationStatus::Confirmed, $confirmed->fresh()->status);
     }
 
-    // ---- テスト補強（P2-04 tester） ----
+    // ---- テスト補強（tester） ----
 
     /**
      * 遷移先ごとの「契約どおりの付随列」。禁止の遷移が付随列の不足ではなく遷移表で拒否されることを見るために、列は揃えて渡す

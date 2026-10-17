@@ -7,7 +7,7 @@ use App\Models\Worker;
 use Tests\TestCase;
 
 /**
- * 担当 A（拠点・ワーカー）/ B（募集・応募）/ C（勤怠・集計・ダッシュボード）の境界をまたぐ統合テスト（P2-07）。
+ * 担当 A（拠点・ワーカー）/ B（募集・応募）/ C（勤怠・集計・ダッシュボード）の境界をまたぐ統合テスト。
  * 各担当のテストはファクトリで状態を作って自分の機能を確かめている。ここでは状態の変化をすべて API で起こし、
  * 別の担当の機能（拠点の削除・応募できるワーカー・月次集計・CSV・ダッシュボード）にどう見えるかを確かめる。
  * 時刻は 2026-09-01 10:00 に固定し、勤務日 2026-09-20 をダッシュボードの「今日以降」に入れる。
@@ -111,7 +111,7 @@ class CrossDomainTest extends TestCase
         $lines = $this->csvDataLines('2026-09');
         $this->assertCount(1, $lines);
         $this->assertStringContainsString('残る人', $lines[0]);
-        // 勤怠の行自体は消えない（集計の対象から外れるだけ。docs/01 6.6）
+        // 勤怠の行自体は消えない（集計の対象から外れるだけ。docs/01 の勤怠・報酬の API）
         $this->assertDatabaseHas('attendances', ['application_id' => $leaveApplicationId]);
     }
 
@@ -163,7 +163,7 @@ class CrossDomainTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonPath('errors.worker_id.0', '無効のワーカーは応募できません。');
 
-        // 無効にする前の確定には勤怠を入力でき、集計にも残る（docs/01 4.6「既存の確定・応募は影響を受けない」）
+        // 無効にする前の確定には勤怠を入力でき、集計にも残る（docs/01 の業務ルールの決定「既存の確定・応募は影響を受けない」）
         $this->putJson("/api/applications/{$applicationId}/attendance", [
             'clock_in' => '09:00', 'clock_out' => '17:00', 'break_minutes' => 60,
         ])->assertOk()->assertJsonPath('data.total_pay', 9600);

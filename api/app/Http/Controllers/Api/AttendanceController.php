@@ -10,7 +10,7 @@ use App\Services\AttendanceService;
 use Illuminate\Http\JsonResponse;
 
 /**
- * 勤怠・報酬（F-15、F-16、docs/01 6.6）。
+ * 勤怠・報酬（F-15、F-16、docs/01 の API 契約（勤怠・報酬））。
  * 他社の応募 ID は Application のグローバルスコープでルートモデルバインディングが見つけられず 404 になる。
  */
 class AttendanceController extends Controller

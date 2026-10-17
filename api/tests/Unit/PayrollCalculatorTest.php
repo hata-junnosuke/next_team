@@ -8,7 +8,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * F-16 報酬計算（docs/01 4.6、必須テスト）。
+ * F-16 報酬計算（docs/01 の業務ルールの決定、必須テスト）。
  * 賃金 = intdiv(労働分 × 時給 + 59, 60)（円未満切り上げ）、合計 = 賃金 + 交通費。
  * DB を使わない純粋な計算なので PHPUnit の TestCase を直接使う。
  */

@@ -6,7 +6,7 @@ import { ApiError, apiSend, toFormState } from "@/lib/api";
 import { isValidId, toInPageFormState } from "@/lib/actions/helpers";
 import type { FormState } from "@/lib/form-state";
 
-// ワーカーの登録・編集・有効/無効の切替（docs/01 6.3、7.3）。
+// ワーカーの登録・編集・有効/無効の切替（docs/01 の API 契約のワーカー、Server Action と FormState）。
 // Server Action は公開エンドポイントと同じ扱い。引数（bind した id を含む）は信用しない。
 // ここで見るのは引数の形だけで、存在しない・他社のワーカーは Laravel が 404 を返すのに任せる。
 // 検証も Laravel が正（氏名・メールの必須、メール形式など）
@@ -74,7 +74,7 @@ export async function updateWorker(
 
 /**
  * 一覧（Server Component）で setWorkerActive.bind(null, worker.id, !worker.is_active) にして渡す。
- * 一覧に留まるので redirect せず再検証だけする（状態ボタン。docs/01 7.3）
+ * 一覧に留まるので redirect せず再検証だけする（状態ボタン。docs/01 の Server Action と FormState）
  */
 export async function setWorkerActive(
   id: number,

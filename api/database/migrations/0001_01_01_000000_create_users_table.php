@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * 管理者（users）とセッション。
- * Fortify の features は空なので、メール確認・パスワード再設定・2FA の列とテーブルは作らない（docs/01 3.1）。
+ * Fortify の features は空なので、メール確認・パスワード再設定・2FA の列とテーブルは作らない（docs/01 の業務テーブル）。
  */
 return new class extends Migration
 {

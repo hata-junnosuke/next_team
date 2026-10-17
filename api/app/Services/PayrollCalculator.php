@@ -5,7 +5,7 @@ namespace App\Services;
 use InvalidArgumentException;
 
 /**
- * 報酬計算（F-16、docs/01 4.6）。DB にも時刻にも触らない純粋な計算だけを置く。
+ * 報酬計算（F-16、docs/01 の業務ルールの決定）。DB にも時刻にも触らない純粋な計算だけを置く。
  * 時給・交通費は応募の確定時の値（confirmed_*）を呼び出し側が渡す。
  *
  * 賃金 = intdiv(労働分 × 時給 + 59, 60)。分単位の賃金を円未満切り上げにするため、

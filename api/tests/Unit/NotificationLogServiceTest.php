@@ -24,7 +24,7 @@ use Symfony\Component\Mailer\Exception\TransportException;
 use Tests\TestCase;
 
 /**
- * 通知の記録（docs/03 4 章の冪等性）。メールを送るジョブは claim → 送信 → markSent の順に呼ぶ。
+ * 通知の記録と冪等性。メールを送るジョブは claim → 送信 → markSent の順に呼ぶ。
  * claim の動き: 行がなければ pending で作る / sent なら null（送らない）/ pending・failed なら同じ行（送り直してよい）。
  * DB を使うので Tests\TestCase（RefreshDatabase と CurrentCompany の設定済み）を使う。
  */

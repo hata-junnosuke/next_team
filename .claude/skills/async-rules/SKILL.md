@@ -1,11 +1,11 @@
 ---
 name: async-rules
-description: myteam 第3弾の非同期処理の規約（Job / Queue / イベント / スケジューラ / バッチ / メール / 通知の記録 / キャッシュ）。ジョブの書き方の型、冪等性の守り方、失敗時の扱い、テストの型。P4 以降の implementer-api・tester・code-reviewer が従う
+description: next_team の非同期処理の規約（Job / Queue / イベント / スケジューラ / バッチ / メール / 通知の記録 / キャッシュ）。ジョブの書き方の型、冪等性の守り方、失敗時の扱い、テストの型。ジョブ・キュー・通知・キャッシュに触れるときの implementer-api・tester・code-reviewer が従う
 ---
 
-# 非同期処理の規約（P4 から）
+# 非同期処理の規約
 
-設計の全体と理由は `docs/03_非同期処理の設計.md`。ここは「書くときに守る型」。
+ここは「書くときに守る型」。
 
 ## ジョブの型（メールを送るジョブ）
 ```php
@@ -50,7 +50,7 @@ class SendApplicationConfirmedMail implements ShouldQueue
             return;                                           // 実行時点の最新状態を見る。もう確定でなければ送らない
         }
 
-        $log = $logs->claim(NotificationKind::ApplicationConfirmed, $application->worker, $application); // 宛先のアドレスは worker->email から決まる（P4-01 で決定）
+        $log = $logs->claim(NotificationKind::ApplicationConfirmed, $application->worker, $application); // 宛先のアドレスは worker->email から決まる
         if ($log === null) {
             return;                                           // 送信済み（再実行・二重投入）
         }
@@ -98,15 +98,15 @@ class SendApplicationConfirmedMail implements ShouldQueue
 | コンストラクタには ID を渡す | モデルを渡すと積んだ時点の姿に引きずられる。実行時に読み直す |
 | `handle()` の最初に「まだ送るべき状態か」を確かめる | 確定の直後にキャンセルされた応募に確定通知を送らない |
 | 業務ルールをジョブに書かない | 定員・状態遷移はサービスにある。ジョブは読んで送るだけ |
-| メールのジョブは `$tries = 0` + `$maxExceptions = 3` + `retryUntil()`（`$tries = 3` にしない） | `RateLimited` などでキューへ戻された回も tries に数えるので、戻されるだけで failed になり、claim の前なので `notification_logs` に何も残らず「届いていない」が見えない（P4-03 で再現）。打ち切りは例外の回数と期限で行う |
-| `failed()` は `markFailedByKey` → 行がなく `target()` が非 null なら `recordFailure`、全体を try / `report()` で包む | claim の前に打ち切られた通知も「届いていない」と記録に残す（P4-03 のレビュー）。failed() から例外を漏らさない |
-| F-23 の仕上げのジョブ（`FinalizeReportExport`）は例外: 流量制限なし・`$tries = 3`、ロック（`WithoutOverlapping` + `dontRelease()`）は仕上げ全体（連結 + 通知）にかけ、期限は `retry_after` より短く（60 秒、`$timeout` 50） | 管理者が自分で依頼した 1 件ごとの 1 通で、流量で戻すと連結の再試行の回数を食う。期限が retry_after より長いと、落ちた実行の再実行がロックで捨てられる（P4-05） |
+| メールのジョブは `$tries = 0` + `$maxExceptions = 3` + `retryUntil()`（`$tries = 3` にしない） | `RateLimited` などでキューへ戻された回も tries に数えるので、戻されるだけで failed になり、claim の前なので `notification_logs` に何も残らず「届いていない」が見えない。打ち切りは例外の回数と期限で行う |
+| `failed()` は `markFailedByKey` → 行がなく `target()` が非 null なら `recordFailure`、全体を try / `report()` で包む | claim の前に打ち切られた通知も「届いていない」と記録に残す。failed() から例外を漏らさない |
+| F-23 の仕上げのジョブ（`FinalizeReportExport`）は例外: 流量制限なし・`$tries = 3`、ロック（`WithoutOverlapping` + `dontRelease()`）は仕上げ全体（連結 + 通知）にかけ、期限は `retry_after` より短く（60 秒、`$timeout` 50） | 管理者が自分で依頼した 1 件ごとの 1 通で、流量で戻すと連結の再試行の回数を食う。期限が retry_after より長いと、落ちた実行の再実行がロックで捨てられる |
 | Markdown に差し込む利用者の入力は `App\Mail\Concerns\FormatsMarkdownText` の `singleLine()`（本文）/ `tableCell()`（表） | `withSecuredEncoding()` は改行と `\|` を残す。見出しや表の列を作らせない |
 | `claim → 送信 → markSent` の順 | 再実行しても 2 通目を送らない（冪等性） |
-| `claim()` は 3 引数（種類・宛先・対象）。宛先のアドレスは渡さない | アドレスは宛先のモデルの `email` から決まる。呼び出し側が別のアドレスを渡せないようにする（P4-01） |
-| `WithoutOverlapping` のキーは `NotificationLogService::dedupeKey()` から作り、`dontRelease()` と `expireAfter()` を必ず付ける | キーの書き方を 1 箇所に。戻すと重なった 2 本目が tries を食い、送れているのに failed が残る。`expireAfter` がないと落ちたワーカーのロックが残り続ける（P4-02） |
-| ワーカー宛てのメールにリンクを付けない（ボタンも、既定のヘッダーの `APP_URL` も） | ワーカーはログインできない。管理画面の URL を外部に配らない。`x-mail::message` ではなく `x-mail::layout` にリンクのないヘッダーを渡す（P4-02） |
-| Markdown メールは `Markdown::withSecuredEncoding()`（`AppServiceProvider`）。表のセルに入れる入力は `\|` と改行も潰す | 名前に `[x](https://...)` を入れるとリンクになる。secured encoding は `[` `<` `>` しかエスケープしないので、`\|` は列を壊す（P4-02） |
+| `claim()` は 3 引数（種類・宛先・対象）。宛先のアドレスは渡さない | アドレスは宛先のモデルの `email` から決まる。呼び出し側が別のアドレスを渡せないようにする |
+| `WithoutOverlapping` のキーは `NotificationLogService::dedupeKey()` から作り、`dontRelease()` と `expireAfter()` を必ず付ける | キーの書き方を 1 箇所に。戻すと重なった 2 本目が tries を食い、送れているのに failed が残る。`expireAfter` がないと落ちたワーカーのロックが残り続ける |
+| ワーカー宛てのメールにリンクを付けない（ボタンも、既定のヘッダーの `APP_URL` も） | ワーカーはログインできない。管理画面の URL を外部に配らない。`x-mail::message` ではなく `x-mail::layout` にリンクのないヘッダーを渡す |
+| Markdown メールは `Markdown::withSecuredEncoding()`（`AppServiceProvider`）。表のセルに入れる入力は `\|` と改行も潰す | 名前に `[x](https://...)` を入れるとリンクになる。secured encoding は `[` `<` `>` しかエスケープしないので、`\|` は列を壊す |
 | `$tries` `backoff()` `failed()` を必ず書く | 既定のままだと 1 回の失敗で終わる／失敗が記録に残らない |
 | キュー名を明示（`mails` / `default`） | Horizon でメールと重い処理を別々に観察・制御する |
 | ジョブの中の DB 書き込みは短く。**メール送信をトランザクションの中でしない** | SQLite は書き込みが 1 本。長く持つと Web 側が待たされる |
@@ -156,7 +156,7 @@ class SendApplicationConfirmedMail implements ShouldQueue
 | 署名付きURL | 正しい URL は 200、`expires` を過ぎたら 403（`$this->travel(31)->minutes()`）、`signature` を変えたら 403 |
 | キャッシュの破棄 | ダッシュボード取得 → 確定 → もう一度取得 → 値が変わっている |
 
-`phpunit.xml` は `QUEUE_CONNECTION=sync` `CACHE_STORE=array` `MAIL_MAILER=array` なので、Redis と Mailpit がなくてもテストは通る。**実物（Redis・Horizon・Mailpit）での確認は README の手動チェックリストで行う。**
+`phpunit.xml` は `QUEUE_CONNECTION=sync` `CACHE_STORE=array` `MAIL_MAILER=array` なので、Redis と Mailpit がなくてもテストは通る。**実物（Redis・Horizon・Mailpit）での確認が要る変更は、issue の完了条件に人の確認項目として書く。**
 
 ## 参考（日本語）
 - キュー: https://readouble.com/laravel/13.x/ja/queues.html

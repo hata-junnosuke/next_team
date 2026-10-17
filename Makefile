@@ -1,10 +1,10 @@
 # next_team の入口。リード（next_team/ で起動した Claude Code）も人もここから叩く。
 # api/ と web/ に cd しなくて済むようにするのが目的（フックと permissions もこのターゲット名を前提にしている）。
-# ポート: api=8002 / web=3002 / mailpit=8025 / redis=6379（8000 は第1弾、8001 は第2弾、3000 は別プロジェクトが使うので避ける）
+# ポート: api=8002 / web=3002 / mailpit=8025 / redis=6379（8000・8001・3000 は他のプロジェクトが使うので避ける）
 
 .PHONY: help up down ps api-serve web-dev horizon schedule fresh \
         api-test api-pint api-pint-test api-routes web-typecheck web-lint web-format web-format-check web-build \
-        verify verify-full ports
+        verify verify-full worktree-env ports
 
 help: ## ターゲット一覧
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -22,9 +22,9 @@ api-serve: ## Laravel API を http://localhost:8002 で起動
 	cd api && php artisan serve --port=8002
 web-dev: ## Next.js を http://localhost:3002 で起動
 	cd web && npm run dev -- --port 3002
-horizon: ## キューワーカー（P4 以降。http://localhost:8002/horizon）
+horizon: ## キューワーカー（http://localhost:8002/horizon）
 	cd api && php artisan horizon
-schedule: ## スケジューラをフォアグラウンドで回す（P4 以降）
+schedule: ## スケジューラをフォアグラウンドで回す
 	cd api && php artisan schedule:work
 fresh: ## DB を作り直してシードを入れる
 	cd api && php artisan migrate:fresh --seed
@@ -38,8 +38,8 @@ api-pint-test: ## Pint の整形チェック（書き換えない）
 	cd api && vendor/bin/pint --test
 api-routes: ## ルート一覧
 	cd api && php artisan route:list
-web-typecheck: ## TypeScript の型チェック
-	cd web && npx tsc --noEmit
+web-typecheck: ## TypeScript の型チェック（先に next typegen で LayoutProps などのルートの型を生成する。.next/ がない worktree と CI 用）
+	cd web && npx next typegen && npx tsc --noEmit
 web-lint: ## ESLint
 	cd web && npm run lint
 web-format: ## Prettier で整形
@@ -52,6 +52,24 @@ web-build: ## 本番ビルド（遅いので Stop フックでは回さない。
 verify: api-pint-test api-test web-typecheck web-lint ## Stop フック相当を手で回す
 verify-full: verify web-format-check web-build ## + 整形チェックと本番ビルド
 
-ports: ## 8002 / 3002 を誰が使っているか（別の弾のサーバーを見ていないかの確認）
+# --- worktree ---
+# main の作業ツリー（git worktree list の先頭）の .env / .env.local を WT にコピーする。中身は表示しない。
+# すでにあるファイルは上書きしない。DB_DATABASE が絶対パスだと worktree が main の DB を共有するので、値を出さずに失敗する
+MAIN_TREE := $(shell git worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p')
+worktree-env: ## main の api/.env と web/.env.local を worktree にコピー（make worktree-env WT=<場所>）
+	@test -n "$(WT)" || { echo "WT=<worktree の場所> を指定してください"; exit 1; }
+	@test -d "$(WT)/api" && test -d "$(WT)/web" || { echo "$(WT) に api/ と web/ がありません"; exit 1; }
+	@test "$$(cd "$(WT)" && pwd -P)" != "$$(cd "$(MAIN_TREE)" && pwd -P)" || { echo "WT が main の作業ツリーです"; exit 1; }
+	@test -f "$(MAIN_TREE)/api/.env" || { echo "main に api/.env がありません"; exit 1; }
+	@if grep -Eq '^DB_DATABASE=["'\'']?/' "$(MAIN_TREE)/api/.env"; then \
+	  echo "main の api/.env の DB_DATABASE が絶対パスです（値は表示しません）。コピーすると main と DB を共有するので止めました。人が相対パスか未設定にしてください"; exit 1; fi
+	@if [ -f "$(WT)/api/.env" ]; then echo "api/.env: すでにあるのでそのまま"; else cp "$(MAIN_TREE)/api/.env" "$(WT)/api/.env" && echo "api/.env: コピーしました"; fi
+	@if [ -f "$(WT)/web/.env.local" ]; then echo "web/.env.local: すでにあるのでそのまま"; \
+	elif [ -f "$(MAIN_TREE)/web/.env.local" ]; then cp "$(MAIN_TREE)/web/.env.local" "$(WT)/web/.env.local" && echo "web/.env.local: コピーしました"; \
+	else echo "main に web/.env.local がありません"; exit 1; fi
+	@if grep -Eq '^DB_DATABASE=["'\'']?/' "$(WT)/api/.env"; then \
+	  echo "$(WT)/api/.env の DB_DATABASE が絶対パスです（値は表示しません）。人が直してください"; exit 1; fi
+
+ports: ## 8002 / 3002 を誰が使っているか（別のプロジェクトのサーバーを見ていないかの確認）
 	@for p in 8002 3002; do pid=$$(lsof -tiTCP:$$p -sTCP:LISTEN 2>/dev/null | head -1); \
 	  if [ -n "$$pid" ]; then echo "$$p: pid $$pid cwd=$$(lsof -a -p $$pid -d cwd -Fn 2>/dev/null | sed -n 's/^n//p')"; else echo "$$p: 空き"; fi; done

@@ -9,7 +9,7 @@ import type { FormState } from "@/lib/form-state";
 // 募集の複製（F-08）。勤務日だけを入れて送り、成功すると新しい募集の詳細へ移る。
 // 「元の募集と同じ日」「最低賃金未満」などの判定は API の 422。
 // 最低賃金未満は errors.hourly_wage で返る（このフォームに時給の入力欄はない）ので、
-// work_date 以外の項目エラーをまとめて出す（docs/01 7.5 の例外）
+// work_date 以外の項目エラーをまとめて出す（docs/01 の表示の規約の例外）
 
 type DuplicateJobPostingFormProps = {
   /** Server Component で duplicateJobPosting.bind(null, posting.id) にしたもの */

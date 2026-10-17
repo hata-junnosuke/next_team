@@ -33,14 +33,14 @@ use RuntimeException;
 use Tests\TestCase;
 
 /**
- * F-23 月次集計の非同期出力の補強（tester。P4-05）。ReportExportTest にない受け入れ条件を 1 条件 1 本で足す:
+ * F-23 月次集計の非同期出力の補強（tester）。ReportExportTest にない受け入れ条件を 1 条件 1 本で足す:
  * 受付が生成を待たないこと（database キューで実際に積んでワーカーで回す）、CSV の中身（同期 CSV との一致・6 種の先頭文字・
  * 確定の勤怠だけ・他社が混ざらない）、拠点の多い月、チャンクの一部失敗と再試行、同じ月の続けての依頼、署名付き URL の境界、
  * download_url と progress、通知の宛先、Storage の後片付け。
  */
 class ReportExportCoverageTest extends TestCase
 {
-    /** docs/01 6.9 の ReportExportResource のキー */
+    /** docs/01 の非同期出力の API にある ReportExportResource のキー */
     private const RESOURCE_KEYS = ['id', 'month', 'status', 'progress', 'row_count', 'requested_at', 'completed_at', 'download_url'];
 
     protected function setUp(): void
@@ -170,7 +170,7 @@ class ReportExportCoverageTest extends TestCase
         Notification::assertSentToTimes($this->admin, ReportExportReady::class, 1);
     }
 
-    // ---- 同じ月の続けての依頼（docs/01 12 章）----
+    // ---- 同じ月の続けての依頼（docs/01 の設計判断）----
 
     public function test_同じ月を続けて2回依頼すると2回目は422で行もバッチも1つ(): void
     {

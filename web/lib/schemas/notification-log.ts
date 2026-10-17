@@ -1,12 +1,12 @@
 import { z } from "zod";
 import { enumValueSchema, paginated } from "./common";
 
-// 通知履歴（docs/01 6.10 の NotificationLogResource）。型は z.infer からだけ作る。
-// null になりうるのは sent_at・failed_at・error の 3 つだけ（P5-01 で決定）
+// 通知履歴（docs/01 の API 契約の NotificationLogResource）。型は z.infer からだけ作る。
+// null になりうるのは sent_at・failed_at・error の 3 つだけ
 
 export const notificationLogSchema = z.object({
   id: z.number().int(),
-  /** application_confirmed / posting_cancelled / shift_reminder / export_ready（docs/01 4.1 の NotificationKind） */
+  /** application_confirmed / posting_cancelled / shift_reminder / export_ready（docs/01 の Enum の NotificationKind） */
   kind: enumValueSchema,
   recipient: z.object({
     /** value は morph の短い名前、label は「ワーカー」「管理者」 */
@@ -23,7 +23,7 @@ export const notificationLogSchema = z.object({
     /** 表示用の文字列（例: 「倉庫内作業 2026/10/10（土） / 山田 太郎」「削除された応募」） */
     label: z.string(),
   }),
-  /** pending / sent / failed（docs/01 4.1 の NotificationStatus） */
+  /** pending / sent / failed（docs/01 の Enum の NotificationStatus） */
   status: enumValueSchema,
   /** 送信済みのときだけ入る */
   sent_at: z.iso.datetime({ offset: true }).nullable(),

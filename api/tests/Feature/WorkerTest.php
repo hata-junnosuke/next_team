@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
- * F-02〜F-04 ワーカーの登録・編集・有効/無効・一覧と検索（docs/01 6.3）。
+ * F-02〜F-04 ワーカーの登録・編集・有効/無効・一覧と検索（docs/01 のワーカーの API）。
  * WorkerResource: {id, name, email, phone, is_active}
  */
 class WorkerTest extends TestCase
@@ -202,7 +202,7 @@ class WorkerTest extends TestCase
 
     public function test_検索語の百分率記号と下線は文字としてそのまま扱う(): void
     {
-        // LIKE のワイルドカード（% と _）を入れても全件にならない（SQLite は ESCAPE の明示が必要。learnings）
+        // LIKE のワイルドカード（% と _）を入れても全件にならない（SQLite は ESCAPE の明示が必要）
         $percent = Worker::factory()->create(['name' => '100%田中']);
         Worker::factory()->create(['name' => '山田太郎']);
         $underscore = Worker::factory()->create(['name' => 'a_b']);
@@ -318,7 +318,7 @@ class WorkerTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['email' => 'メールアドレスは必須項目です。']);
 
-        // 電話だけでは登録できない（第2弾までの「いずれか必須」ではない）
+        // 電話だけでは登録できない（メールは必須）
         $this->assertDatabaseCount('workers', 0);
     }
 
@@ -347,7 +347,7 @@ class WorkerTest extends TestCase
 
     public function test_更新と切り替えの応答はworker_resourceの形そのもの(): void
     {
-        // 電話番号は Faker の optional で入ったり入らなかったりするので、期待値の null に固定する（P2-04 で揺れを発見）
+        // 電話番号は Faker の optional で入ったり入らなかったりするので、期待値の null に固定する
         $worker = Worker::factory()->create(['phone' => null]);
 
         $this->actingAsAdmin()

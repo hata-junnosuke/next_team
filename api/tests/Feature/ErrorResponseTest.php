@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
 /**
- * bootstrap/app.php の例外 → JSON の変換（docs/01 4.4・6.1）。
+ * bootstrap/app.php の例外 → JSON の変換（docs/01 の例外・API の共通）。
  * 検証用のルートはテストの中だけで登録する。
  */
 class ErrorResponseTest extends TestCase
@@ -64,7 +64,7 @@ class ErrorResponseTest extends TestCase
             ->assertHeader('Content-Type', 'application/json')
             ->assertExactJson(['message' => '見つかりませんでした。', 'errors' => []]);
 
-        // 空配列 [] ではなく空オブジェクト {} で返す（docs/01 6.1。web の zod は record として読む）
+        // 空配列 [] ではなく空オブジェクト {} で返す（docs/01 の API の共通。web の zod は record として読む）
         $this->assertStringContainsString('"errors":{}', $response->getContent());
     }
 

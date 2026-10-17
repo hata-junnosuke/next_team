@@ -12,7 +12,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 /**
- * 募集の業務ルール（F-05〜F-08、docs/01 4.5・4.6）。
+ * 募集の業務ルール（F-05〜F-08、docs/01 のサービス契約・業務ルールの決定）。
  * 作成は単純な CRUD なのでコントローラから Eloquent を直接呼ぶ。ルールがある編集・締切・中止・複製をここに置く。
  *
  * 状態は JobPosting::transitionTo() / Application::transitionTo() だけで変える。どちらも DB::transaction の中で呼ぶ
@@ -49,7 +49,7 @@ class JobPostingService
     }
 
     /**
-     * 締切（F-07）。新規応募の受付を止めるだけで、応募中の応募は締切後も承認できる（P2-04 の ApplicationService）。
+     * 締切（F-07）。新規応募の受付を止めるだけで、応募中の応募は締切後も承認できる（承認は ApplicationService）。
      */
     public function close(JobPosting $posting): JobPosting
     {

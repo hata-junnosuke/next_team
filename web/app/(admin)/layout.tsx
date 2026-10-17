@@ -5,7 +5,7 @@ import { userResponse } from "@/lib/schemas/user";
 
 // 管理画面の共通レイアウト。GET /api/user が 401 なら lib/api.ts が /login へ送る
 
-// P3〜P5 の全画面分を先に置く（まだ無い画面は 404 になる）
+// 全画面分のメニューを先に置く（まだ無い画面は 404 になる）
 const navItems = [
   { href: "/dashboard", label: "ダッシュボード" },
   { href: "/locations", label: "拠点" },

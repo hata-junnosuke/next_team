@@ -23,7 +23,7 @@ use Illuminate\Database\Seeder;
  *
  * BelongsToCompany が company_id を CurrentCompany::id() で埋めるので、企業ごとに runAs() の中で作る。
  * 状態はファクトリの state で直接作る（シードは「その状態のデータ」を置くだけ。アプリの操作では必ずサービスを通る）。
- * 雛形の WithoutModelEvents は付けない（creating が動かず company_id が埋まらなくなる。P1-02 の教訓）。
+ * 雛形の WithoutModelEvents は付けない（creating が動かず company_id が埋まらなくなる）。
  * 日付は実行した日からの相対で作るので、いつ make fresh してもダッシュボードに出る。
  * https://readouble.com/laravel/13.x/ja/seeding.html
  */

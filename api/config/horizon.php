@@ -197,7 +197,7 @@ return [
     |
     */
 
-    // docs/03 8 章。メール（mails）と出力・その他（default）を別のスーパーバイザにして、片方が詰まってももう片方は流れる。
+    // メール（mails）と出力・その他（default）を別のスーパーバイザにして、片方が詰まってももう片方は流れる。
     // tries はジョブ側の $tries / $maxExceptions / retryUntil() があればそちらが優先される（メールは $tries = 0 + $maxExceptions）。
     // timeout（60 秒）は config/queue.php の retry_after（90 秒）より短くする（長いと実行中のジョブが二重に取られる）。
     // https://readouble.com/laravel/13.x/ja/horizon.html#configuration

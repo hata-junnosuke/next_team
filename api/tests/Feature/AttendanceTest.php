@@ -17,7 +17,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
- * F-15 勤怠入力、F-16 報酬計算（docs/01 4.6、6.6）。
+ * F-15 勤怠入力、F-16 報酬計算（docs/01 の業務ルールの決定、勤怠・報酬の API）。
  * PUT /api/applications/{id}/attendance は作成でも更新でも 200。
  * 確定済みの応募は ApplicationFactory::confirmed() で作る（担当 B の承認処理には依存しない）。
  * 既定の募集は 9:00-17:00、時給 1,300 円、交通費 500 円。
@@ -73,7 +73,7 @@ class AttendanceTest extends TestCase
 
     public function test_確定時の時給と交通費で計算する(): void
     {
-        // 確定の後に募集の時給・交通費が変わっても、報酬は確定時にコピーした値で計算する（docs/01 4.6）
+        // 確定の後に募集の時給・交通費が変わっても、報酬は確定時にコピーした値で計算する（docs/01 の業務ルールの決定）
         $application = $this->confirmedApplication();
         $application->jobPosting->update(['hourly_wage' => 2000, 'transport_allowance' => 0]);
 
@@ -319,7 +319,7 @@ class AttendanceTest extends TestCase
         $this->assertDatabaseCount('attendances', 0);
     }
 
-    public function test_レスポンスの形がdocs01の6章6どおり(): void
+    public function test_レスポンスの形がdocs01の勤怠のapi契約どおり(): void
     {
         $application = $this->confirmedApplication();
 
@@ -456,7 +456,7 @@ class AttendanceTest extends TestCase
 
     public function test_0時0分同士の同時刻は翌日扱いにせず422(): void
     {
-        // 「退勤 ≤ 出勤なら翌日」のうち等号の場合は 24 時間勤務ではなくエラー（docs/01 4.6）
+        // 「退勤 ≤ 出勤なら翌日」のうち等号の場合は 24 時間勤務ではなくエラー（docs/01 の業務ルールの決定）
         $application = $this->confirmedApplication();
 
         $this->putAttendance($application, ['clock_in' => '00:00', 'clock_out' => '00:00', 'break_minutes' => 0])

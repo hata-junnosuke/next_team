@@ -23,7 +23,7 @@
         <env name="APP_KEY" value="base64:bmV4dF90ZWFtX3Rlc3Rpbmdfb25seV9kdW1teV9rZXk="/>
         <env name="APP_LOCALE" value="ja"/>
         <env name="APP_FALLBACK_LOCALE" value="en"/>
-        <!-- ja_JP の人名が assertDontSee などと衝突して確率的に赤になった（第2弾の教訓）ので en_US に固定 -->
+        <!-- ja_JP の人名が assertDontSee などと衝突して確率的に赤になるので en_US に固定 -->
         <env name="APP_FAKER_LOCALE" value="en_US"/>
         <env name="APP_TIMEZONE" value="Asia/Tokyo"/>
         <!-- CORS の許可オリジン。.env の値に左右されずに検証できるよう明示する -->

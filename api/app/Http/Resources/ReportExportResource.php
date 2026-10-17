@@ -9,7 +9,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\URL;
 
 /**
- * 集計出力の JSON（docs/01 6.9）: {id, month, status: {value, label}, progress, row_count, requested_at, completed_at, download_url}
+ * 集計出力の JSON（docs/01 の API 契約（非同期出力））: {id, month, status: {value, label}, progress, row_count, requested_at, completed_at, download_url}
  *
  * - progress: 0〜100。completed は 100、それ以外は job_batches の進捗（(全ジョブ - 残り) / 全ジョブ。Batch::progress() と同じ式）。
  *   バッチの列は ReportExportService::query() の left join で読んだ値（Resource でクエリを発行しない）。なければ 0
@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\URL;
  */
 class ReportExportResource extends JsonResource
 {
-    /** 署名付き URL の有効期限（分。docs/01 6.9） */
+    /** 署名付き URL の有効期限（分。docs/01 の API 契約（非同期出力）） */
     public const DOWNLOAD_URL_MINUTES = 30;
 
     /**

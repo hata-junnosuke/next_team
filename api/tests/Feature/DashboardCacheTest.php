@@ -18,8 +18,8 @@ use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /**
- * F-19 ダッシュボードのキャッシュ（P4-07。docs/01 8 章、docs/03 3.5、async-rules の「キャッシュ」）の補強。
- * DashboardTest の P4-07 の節で足りない分（全ての変更経路、ネストしたトランザクション、企業の分離、
+ * F-19 ダッシュボードのキャッシュ（docs/01 の非同期の契約、async-rules の「キャッシュ」）の補強。
+ * DashboardTest のキャッシュの節で足りない分（全ての変更経路、ネストしたトランザクション、企業の分離、
  * 設定 0 以下、日付の終わりの直前）をここに置く。
  *
  * 「キャッシュが作り直されたか」は generated_at（キャッシュした時刻）と Cache::has() で見る。
@@ -417,7 +417,7 @@ class DashboardCacheTest extends TestCase
 
     public function test_拠点の名前を変えるとダッシュボードの拠点名も更新される(): void
     {
-        // location_name は拠点のテーブルから読むので、拠点の変更でもキャッシュを破棄する（リードの決定。P4-07）
+        // location_name は拠点のテーブルから読むので、拠点の変更でもキャッシュを破棄する（リードの決定）
         $location = Location::factory()->create(['name' => '東京倉庫']);
         JobPosting::factory()->onDate('2026-10-05')->for($location)->create();
         $this->getDashboard()->assertJsonPath('data.upcoming_postings.0.location_name', '東京倉庫');

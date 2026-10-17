@@ -18,7 +18,7 @@ use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /**
- * F-19 ダッシュボード（docs/01 6.8）。
+ * F-19 ダッシュボード（docs/01 のダッシュボードの API）。
  * 今日以降の募集中・締切の募集（勤務日の昇順、最大 20 件）、充足率（整数の％、四捨五入）、応募中の件数、生成時刻。
  * 「今日」は app.timezone（Asia/Tokyo）。時刻は travelTo で 2026-10-01 10:00 に固定する。
  */
@@ -156,7 +156,7 @@ class DashboardTest extends TestCase
         $this->postingWithConfirmed(capacity: 3, confirmed: 1);
         $this->getDashboard()->assertOk();
 
-        // キャッシュに助けられないよう、測る前に毎回消す（P4-07 から 2 回目はキャッシュから返るため）
+        // キャッシュに助けられないよう、測る前に毎回消す（2 回目はキャッシュから返るため）
         Cache::flush();
         DB::enableQueryLog();
         $this->getDashboard()->assertOk();
@@ -172,7 +172,7 @@ class DashboardTest extends TestCase
         $this->assertSame($one, count(DB::getQueryLog()));
     }
 
-    // ---- ここから tester が補強（P2-06） ----
+    // ---- ここから tester が補強 ----
 
     public function test_データがなければ空の一覧と0件(): void
     {
@@ -277,7 +277,7 @@ class DashboardTest extends TestCase
 
     public function test_応募中の件数は締切や20件の外の募集の応募も数える(): void
     {
-        // 締切後も応募中の応募は承認できる（docs/01 4.6）ので未処理として数える
+        // 締切後も応募中の応募は承認できる（docs/01 の業務ルールの決定）ので未処理として数える
         $closed = JobPosting::factory()->onDate('2026-10-02')->closed()->create();
         Application::factory()->for($closed)->create();
         foreach (range(1, 21) as $day) {
@@ -325,7 +325,7 @@ class DashboardTest extends TestCase
             ->assertJsonPath('data.upcoming_postings.0.end_time', '17:00');
     }
 
-    // ---- P4-07 キャッシュ（docs/01 8 章、docs/03 3.5） ----
+    // ---- キャッシュ（docs/01 の非同期の契約） ----
 
     /**
      * ダッシュボードを集計するクエリ（募集・応募のテーブルを読むもの）だけを数える。認証やセッションのクエリは数えない

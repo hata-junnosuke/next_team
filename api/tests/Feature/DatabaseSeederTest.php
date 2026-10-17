@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Context;
 use Tests\TestCase;
 
 /**
- * 開発用シーダー（P1-02。make fresh）。管理者でログインでき、他社の拠点が自社の一覧に出ないこと。
+ * 開発用シーダー（make fresh）。管理者でログインでき、他社の拠点が自社の一覧に出ないこと。
  */
 class DatabaseSeederTest extends TestCase
 {

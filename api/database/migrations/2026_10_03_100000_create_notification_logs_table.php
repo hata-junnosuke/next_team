@@ -5,7 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * 通知の記録（F-20〜F-24。docs/01 3.2、docs/03 4 章）。1 通 1 行。
+ * 通知の記録（F-20〜F-24。docs/01 の非同期用のテーブル）。1 通 1 行。
  * - dedupe_key の UNIQUE が二重送信を防ぐ最後の砦（claim の検索をすり抜けた同時実行も DB が拒否する）
  * - recipient / subject はポリモーフィック（Rails の polymorphic: true）。*_type には morph map の短い名前
  *   （worker / user / application / job_posting / report_export）が入る。AppServiceProvider の enforceMorphMap

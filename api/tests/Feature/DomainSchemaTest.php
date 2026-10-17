@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 /**
- * P2-01 の業務テーブルの制約（docs/01 3.1・3.4）を DB に直接当てて確かめる。
+ * 業務テーブルの制約（docs/01 の業務テーブル・SQLite の設定）を DB に直接当てて確かめる。
  * アプリの検証（FormRequest・サービス）を通らない経路でも、最後の砦として DB が守ることの確認。
  * ここではクエリビルダ（DB::table。Rails の ActiveRecord を通さない connection.execute に近い）を使い、モデルのフックを通さない。
  * https://readouble.com/laravel/13.x/ja/migrations.html#foreign-key-constraints
@@ -131,7 +131,7 @@ class DomainSchemaTest extends TestCase
         ));
         $this->assertContains(['job_posting_id', 'worker_id'], $uniques('applications'));
         $this->assertContains(['application_id'], $uniques('attendances'));
-        // メールの一意制約は付けない（docs/01 3.1）
+        // メールの一意制約は付けない（docs/01 の業務テーブル）
         $this->assertNotContains(['email'], $uniques('workers'));
     }
 

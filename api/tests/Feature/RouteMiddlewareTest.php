@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
 /**
- * /api/* のルートを全部走査し、auth:sanctum と company の付け忘れを機械的に見つける（docs/01 6.1）。
+ * /api/* のルートを全部走査し、auth:sanctum と company の付け忘れを機械的に見つける（docs/01 の API の共通）。
  * 例外は署名付きURL のダウンロード（signed 付き）だけ。
  */
 class RouteMiddlewareTest extends TestCase
@@ -37,10 +37,10 @@ class RouteMiddlewareTest extends TestCase
     }
 
     /**
-     * docs/01 6.2〜6.8 の全パス。P2-01 で先に全部登録し、未実装のものは 501 を返す（10.1）。
+     * docs/01 の API 契約のうち拠点からダッシュボードまでの全パス。先に全部登録し、未実装のものは 501 を返す（docs/01 の基盤の担当）。
      * 並列担当（A / B / C）が routes/api.php を触らずに済むようにするための契約の固定。
      */
-    public function test_6章の全ルートが登録されている(): void
+    public function test_api契約の全ルートが登録されている(): void
     {
         $expected = [
             'GET api/locations', 'POST api/locations', 'GET api/locations/{location}',
@@ -69,14 +69,14 @@ class RouteMiddlewareTest extends TestCase
             $this->assertContains($route, $registered, "{$route} が登録されていない");
         }
 
-        // ワーカーは無効化、募集は中止で終える（要件 7 章。物理削除は使われていない拠点だけ）
+        // ワーカーは無効化、募集は中止で終える（要件の非機能要件。物理削除は使われていない拠点だけ）
         foreach (['DELETE api/workers/{worker}', 'DELETE api/job-postings/{job_posting}'] as $route) {
             $this->assertNotContains($route, $registered, "{$route} は登録してはいけない");
         }
     }
 
     /**
-     * 6 章のうち ID を URL に持つルート。{location} などは置き換え用の印（tester 追加）
+     * API 契約のうち ID を URL に持つルート。{location} などは置き換え用の印（tester 追加）
      *
      * @return list<array{string, string}>
      */
@@ -104,7 +104,7 @@ class RouteMiddlewareTest extends TestCase
 
     /**
      * 未実装（501）のルートも含め、他社の ID はルートモデルバインディング（グローバルスコープ）で 404 になる。
-     * 担当が中身を実装した後も、FormRequest の検証（422）より先に 404 になることをここで固定する（docs/01 4.2・6.1）
+     * 担当が中身を実装した後も、FormRequest の検証（422）より先に 404 になることをここで固定する（docs/01 のテナント分離・API の共通）
      */
     public function test_idを持つ全ルートで他社のidは404(): void
     {
@@ -140,7 +140,7 @@ class RouteMiddlewareTest extends TestCase
         }
     }
 
-    public function test_6章の全ルートは未ログインなら401(): void
+    public function test_api契約の全ルートは未ログインなら401(): void
     {
         $attendance = Attendance::factory()->create();
         $application = $attendance->application;

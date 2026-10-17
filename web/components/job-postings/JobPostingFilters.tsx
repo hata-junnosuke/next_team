@@ -17,7 +17,7 @@ export type JobPostingFilterValues = {
 
 type StatusValue = keyof (typeof statusTones)["jobPosting"];
 
-// 状態の選択肢。API に Enum の一覧を返す口がないため、docs/01 4.1 の JobPostingStatus の
+// 状態の選択肢。API に Enum の一覧を返す口がないため、docs/01 の Enum の JobPostingStatus の
 // value → label をここに置く（表のバッジは API の label をそのまま出す）
 const statusOptions: { value: StatusValue; label: string }[] = [
   { value: "open", label: "募集中" },

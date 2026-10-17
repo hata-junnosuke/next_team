@@ -1,11 +1,11 @@
 ---
 name: next-coding-standards
-description: myteam 第3弾の Next.js 16 実装規約。Server Component でのデータ取得、lib/api.ts 経由の Cookie 転送、zod スキーマ、Server Action と useActionState、422 の表示、共通部品、ログインの流れ。implementer-web と code-reviewer が従う
+description: next_team の Next.js 16 実装規約。Server Component でのデータ取得、lib/api.ts 経由の Cookie 転送、zod スキーマ、Server Action と useActionState、422 の表示、共通部品、ログインの流れ。implementer-web と code-reviewer が従う
 ---
 
-# Next.js 実装規約（myteam 第3弾）
+# Next.js 実装規約（next_team）
 
-契約（ディレクトリ・関数の形・画面と API の対応）は `docs/01_技術仕様_next.md` 7 章が正。ここは書き方。
+契約（ディレクトリ・関数の形・画面と API の対応）は `docs/01_技術仕様_next.md` のフロント契約が正。ここは書き方。
 
 **書く前に `web/node_modules/next/dist/docs/01-app/` を読む。** Next 16 は以前の版と違う。下のコードは形を示すもので、API の細部は同梱ドキュメントを正とする。
 
@@ -63,7 +63,7 @@ description: myteam 第3弾の Next.js 16 実装規約。Server Component での
    ```
    - **bind は Server 側で作る**: 一覧・編集の Server Component で `updateWorker.bind(null, worker.id)` を作り、Client のフォームには props で渡す（id は URL ではなく API が返した値）。Client 側で `bind` しない
    - 削除で 404（既に無い）は成功と同じ扱い（`revalidatePath` して `{ ok: true }`）
-   - 見本は P1-04 の `lib/actions/location.ts` と `app/(admin)/locations/*`
+   - 見本は `lib/actions/location.ts` と `app/(admin)/locations/*`
 4. **フォーム**（Client Component） `components/workers/WorkerForm.tsx`
    ```tsx
    "use client";
@@ -92,7 +92,7 @@ description: myteam 第3弾の Next.js 16 実装規約。Server Component での
 - 必須項目に HTML の `required` を付けない（ブラウザが止めると API の 422 が入力欄の下に出ることを確かめられない）
 - 数値の入力は `FormData` では文字列で届く。Laravel 側の検証（`integer`）が数値文字列を受け付けるので、web で変換しない
 
-## P3 で決まった型
+## 画面で使う型
 - **スキーマ**: 日付・時刻は `z.iso.date()` / `z.iso.time({ precision: -1 })`（`HH:MM:SS`）/ `z.iso.datetime({ offset: true })`（`+09:00` 付き）。整数は `z.number().int()`（id・金額・分・件数）。`z.string()` で受けて形を見逃さない
 - **`lib/actions/helpers.ts`**（`"use server"` にしない）: `isValidId(id)`（bind の id の形）、`text(formData, name)`（文字列でなければ null）、`toInPageFormState(e, formData)`（同じページに留まる操作の catch。404 は API の message を Alert に、422 は `toFormState`、それ以外は投げ直す）。Action ごとに同じ関数を書かない
 - **表の中の操作の 404**（別のタブで消えた・他社）は not-found 画面に飛ばさず、`toInPageFormState` で行の Alert に出す。画面全体を壊すのはページの `apiGet` の 404 だけ

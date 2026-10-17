@@ -12,8 +12,8 @@ use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 /**
- * F-01 拠点の登録・一覧・編集・削除（docs/01 6.2）。
- * job_postings_count は withCount('jobPostings') の実値、deletable は「募集が 0 件なら true」（P2-02）。
+ * F-01 拠点の登録・一覧・編集・削除（docs/01 の拠点の API）。
+ * job_postings_count は withCount('jobPostings') の実値、deletable は「募集が 0 件なら true」。
  */
 class LocationTest extends TestCase
 {
@@ -150,7 +150,7 @@ class LocationTest extends TestCase
 
     public function test_locationsとusersのcompany_idにindexがある(): void
     {
-        // SQLite は外部キーに索引を自動で張らない。企業で絞るクエリが全件走査にならないよう明示する（docs/01 3.1）
+        // SQLite は外部キーに索引を自動で張らない。企業で絞るクエリが全件走査にならないよう明示する（docs/01 の業務テーブル）
         foreach (['locations', 'users'] as $table) {
             $indexed = collect(Schema::getIndexes($table))
                 ->contains(fn (array $index) => $index['columns'] === ['company_id']);

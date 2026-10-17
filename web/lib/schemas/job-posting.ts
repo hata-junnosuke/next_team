@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { enumValueSchema, list, paginated, single } from "./common";
 
-// 募集（docs/01 6.4 の JobPostingResource）。型は z.infer からだけ作る
+// 募集（docs/01 の API 契約の JobPostingResource）。型は z.infer からだけ作る
 
 export const jobPostingSchema = z.object({
   id: z.number().int(),

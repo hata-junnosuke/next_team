@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # PreToolUse(Edit|Write|MultiEdit) フック: 秘密情報・生成物・確定済み基盤を編集させない
 # 入力: stdin JSON {"tool_input":{"file_path":"..."}}
-# 出力: 拒否なら permissionDecision=deny
+# 出力: 拒否なら permissionDecision=deny、人に確かめさせるなら ask
 set -u
 ROOT="${CLAUDE_PROJECT_DIR:-$PWD}"
 INPUT="$(cat)"
@@ -10,10 +10,13 @@ FILE="$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // ""')"
 
 # プロジェクトルート（next_team/）からの相対パスに正規化
 REL="${FILE#"$ROOT"/}"
-PHASE="$(cat "$ROOT/.claude/.phase" 2>/dev/null || echo 0)"
 
 deny() {
   jq -n --arg r "$1" '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
+  exit 0
+}
+ask() {
+  jq -n --arg r "$1" '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"ask",permissionDecisionReason:$r}}'
   exit 0
 }
 
@@ -29,10 +32,9 @@ case "$REL" in
   web/next-env.d.ts) deny "next-env.d.ts は Next.js が生成します。編集しないでください。" ;;
   api/storage/*) deny "api/storage/ は生成物（ログ・CSV 出力・キャッシュ）です。編集しないでください。" ;;
   api/database/database.sqlite*) deny "SQLite ファイルを直接編集しないでください。" ;;
+  # 検証に差し戻されている最中にフックを緩める、を人の目で止めるため、毎回承認を挟む（issue #8）
   .claude/hooks/*|.claude/settings.json)
-    [ "$PHASE" = "0" ] || deny "フックと settings.json はハーネス構築フェーズ（0）以外では変更禁止です。変更したい場合は人に .claude/.phase を 0 に戻してもらってください。" ;;
-  .claude/.phase)
-    deny ".claude/.phase は人が書き換えます（フェーズ移行は人の判断）。" ;;
+    ask "フックか settings.json を変更します。検証や守りを緩める変更でないか確かめて承認してください。" ;;
   api/database/migrations/*)
     if [ -f "$ROOT/.claude/.migrations-locked" ]; then
       deny "マイグレーションは基盤確定後ロックされています（.claude/.migrations-locked）。新しい列やテーブルは新しいマイグレーションファイルを足す形にし、既存ファイルの変更が必要なら人に相談してください。"

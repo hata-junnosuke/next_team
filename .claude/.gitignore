@@ -1,5 +1,6 @@
 .loop-count
 .subagent-loop-count
 .dirty-web
+.verify-green
 .running/
 .subagent-loop-count.*

@@ -17,7 +17,7 @@ return [
     |
     */
 
-    // 画面（Next.js）のオリジンだけをセッション認証の対象にする（docs/01 2 章）
+    // 画面（Next.js）のオリジンだけをセッション認証の対象にする（docs/01 の環境変数）
     'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', 'localhost:3002')),
 
     /*

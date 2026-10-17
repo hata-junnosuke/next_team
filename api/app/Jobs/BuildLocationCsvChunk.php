@@ -9,7 +9,7 @@ use Illuminate\Foundation\Queue\Queueable;
 use Throwable;
 
 /**
- * F-23 の拠点 1 つ分の CSV を作るジョブ（Bus::batch() の 1 本。docs/03 3.4）。
+ * F-23 の拠点 1 つ分の CSV を作るジョブ（Bus::batch() の 1 本）。
  * 中身は ReportExportService::buildChunk() を呼ぶだけ。キューは ReportExportService が batch に onQueue('default') で付ける。
  *
  * - コンストラクタは出力 ID と拠点 ID だけ（モデルを渡さない）

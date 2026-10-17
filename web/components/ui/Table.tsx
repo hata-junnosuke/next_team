@@ -1,6 +1,6 @@
 import { Children, type ReactNode } from "react";
 
-// 見出しと行の表。セルは折り返さない（第2弾の教訓: 折り返しで崩れた）
+// 見出しと行の表。セルは折り返さない（折り返すと表が崩れるため）
 
 type TableProps = {
   head: ReactNode[];

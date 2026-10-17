@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { single } from "./common";
 
-// 月次集計（docs/01 6.7 の GET /api/reports/monthly）。型は z.infer からだけ作る
+// 月次集計（docs/01 の API 契約の GET /api/reports/monthly）。型は z.infer からだけ作る
 
 /** 回数・労働時間（分）・報酬（円）。ワーカー別・拠点別・合計で共通 */
 const totalsShape = {

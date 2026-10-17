@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use Tests\TestCase;
 
 /**
- * config/cors.php（docs/01 5.1）。許可するのは FRONTEND_URL のオリジンだけで、Cookie つき（credentials）を通す。
+ * config/cors.php（docs/01 の認証のサーバ側）。許可するのは FRONTEND_URL のオリジンだけで、Cookie つき（credentials）を通す。
  * CORS は Rails の rack-cors に相当し、Laravel では HandleCors ミドルウェアが全体に掛かっている。
  * https://readouble.com/laravel/13.x/ja/routing.html#cors
  */

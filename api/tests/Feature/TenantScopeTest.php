@@ -15,7 +15,7 @@ use Tests\Support\TenantRecord;
 use Tests\TestCase;
 
 /**
- * テナント分離（docs/01 4.2、要件「企業IDで分ける」）。
+ * テナント分離（docs/01 のテナント分離、要件「企業IDで分ける」）。
  * BelongsToCompany（Rails の default_scope + before_create に相当）と SetCurrentCompany（別名 company）を検証する。
  * https://readouble.com/laravel/13.x/ja/eloquent.html#global-scopes
  */

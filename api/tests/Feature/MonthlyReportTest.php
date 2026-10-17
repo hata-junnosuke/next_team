@@ -18,7 +18,7 @@ use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /**
- * F-17 月次集計、F-18 CSV（docs/01 4.6・6.7）。
+ * F-17 月次集計、F-18 CSV（docs/01 の業務ルールの決定・月次集計の API）。
  * 対象は「募集の勤務日が対象月に入る」「応募が確定」の勤怠。範囲は半開区間（>= 月初 AND < 翌月初）。
  * 既定の募集（9:00-17:00、時給 1,300 円、交通費 500 円）と勤怠（休憩 60 分）なら 420 分・賃金 9,100 円・合計 9,600 円。
  */
@@ -348,7 +348,7 @@ class MonthlyReportTest extends TestCase
         }
     }
 
-    // ---- ここから tester が補強（P2-06） ----
+    // ---- ここから tester が補強 ----
 
     public function test_月初0時に始まる勤務は対象月に入る(): void
     {

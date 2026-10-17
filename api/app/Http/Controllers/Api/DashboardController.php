@@ -7,7 +7,7 @@ use App\Services\DashboardService;
 use Illuminate\Http\JsonResponse;
 
 /**
- * ダッシュボード（F-19、docs/01 6.8）。形は DashboardService::summary() が 6.8 のとおりに作る。
+ * ダッシュボード（F-19、docs/01 の API 契約（ダッシュボード））。形は DashboardService::summary() が契約のとおりに作る。
  */
 class DashboardController extends Controller
 {

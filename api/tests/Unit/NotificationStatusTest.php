@@ -11,7 +11,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
- * 通知の送信状態（notification_logs.status）の遷移表と、P4 の Enum の値・ラベル（docs/01 4.1）。
+ * 通知の送信状態（notification_logs.status）の遷移表と、Enum の値・ラベル（docs/01 の Enum）。
  * 遷移表は NotificationStatus::canTransitionTo() の 1 箇所。transitionTo() は DB を読み直すので Tests\TestCase を使う。
  */
 class NotificationStatusTest extends TestCase

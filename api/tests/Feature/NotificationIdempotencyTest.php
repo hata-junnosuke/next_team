@@ -32,9 +32,9 @@ use RuntimeException;
 use Tests\TestCase;
 
 /**
- * 同じ通知を二重に送らない（要件 7 章「4.7 を実装する弾のみ」、docs/03 4 章。docs/01 9.1 の必須テスト）。
+ * 同じ通知を二重に送らない（要件の非機能要件。docs/01 の必須テストファイル）。
  * ジョブの handle() を直接呼び、「実行したら何通送られたか」を Mail::fake() で数える。
- * 出力完了（P4-05）は FinalizeReportExport の handle() を直接呼び、Notification::fake() で数える。
+ * 出力完了は FinalizeReportExport の handle() を直接呼び、Notification::fake() で数える。
  */
 class NotificationIdempotencyTest extends TestCase
 {
@@ -98,7 +98,7 @@ class NotificationIdempotencyTest extends TestCase
         $this->assertSame(NotificationStatus::Sent, $log->fresh()->status);
     }
 
-    // ---- テスト補強（P4-02 tester） ----
+    // ---- テスト補強（tester） ----
 
     public function test_承認apiで積まれたジョブの後に同じジョブを手で積んでもメールは1通(): void
     {
@@ -147,7 +147,7 @@ class NotificationIdempotencyTest extends TestCase
         $this->assertSame(NotificationStatus::Sent, NotificationLog::query()->sole()->status);
     }
 
-    // ---- F-21 中止通知（P4-03） ----
+    // ---- F-21 中止通知 ----
 
     public function test_中止通知ジョブを2回実行してもメールは1通(): void
     {
@@ -195,7 +195,7 @@ class NotificationIdempotencyTest extends TestCase
         $this->assertSame(2, NotificationLog::query()->count());
     }
 
-    // ---- F-22 前日リマインド（P4-04） ----
+    // ---- F-22 前日リマインド ----
 
     public function test_コマンドを2回実行してもリマインドは1通(): void
     {
@@ -228,7 +228,7 @@ class NotificationIdempotencyTest extends TestCase
         $this->assertSame(NotificationStatus::Sent, NotificationLog::query()->sole()->status);
     }
 
-    // ---- F-23 出力完了（P4-05） ----
+    // ---- F-23 出力完了 ----
 
     public function test_出力完了通知は2回実行しても1通(): void
     {

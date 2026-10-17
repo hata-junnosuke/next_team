@@ -14,7 +14,7 @@ use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Throwable;
 
 /**
- * F-23 の仕上げ: チャンクを連結して completed にし、依頼した管理者に出力完了を知らせる（docs/03 3.4）。
+ * F-23 の仕上げ: チャンクを連結して completed にし、依頼した管理者に出力完了を知らせる。
  * バッチの then から積まれる。拠点が 0 件の月は ReportExportService::request() が直接積む。
  *
  * 通知は claim → 送信 → markSent（async-rules。export_ready:report_export:{出力ID} で 1 通だけ）。
@@ -54,7 +54,7 @@ class FinalizeReportExport implements ShouldQueue
      *
      * 重なった 2 本目は dontRelease() で戻さず捨てる（1 本目が仕上げる）。releaseAfter() で戻す案は採らない:
      * 戻した回も $tries に数えるので、1 本目が遅いと 2 本目が tries を使い切って failed() に入り、
-     * 出力は completed なのに通知の記録を failed にしてしまう（P4-02 の WithoutOverlapping と同じ理由）。
+     * 出力は completed なのに通知の記録を failed にしてしまう（SendApplicationConfirmedMail の WithoutOverlapping に dontRelease() を付けているのと同じ理由）。
      *
      * 捨てた 2 本目の代わりに、1 本目が落ちたときの再実行はキューの retry_after（Redis 90 秒）が担う。
      * ロックの期限は 60 秒にして retry_after より短くし、再実行の時点でロックが外れているようにする

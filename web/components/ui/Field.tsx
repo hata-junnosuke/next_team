@@ -8,7 +8,7 @@ type FieldProps = {
   name: string;
   /**
    * 入力欄の id（エラーの id は `${id}-error`）。既定は `field-${name}`。
-   * 同じ name の Field が 1 ページに複数並ぶとき（例: P3-03 の応募ごとの勤怠フォーム）は
+   * 同じ name の Field が 1 ページに複数並ぶとき（例: 応募ごとの勤怠フォーム）は
    * `field-attendance-${application.id}-clock_in` のように重ならない id を渡す
    */
   id?: string;

@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * 応募の JSON（docs/01 6.5）:
+ * 応募の JSON（docs/01 の API 契約（応募・確定））:
  * {id, worker: {id, name}, status: {value, label}, confirmed_at, confirmed_hourly_wage, confirmed_transport_allowance,
  *  cancel_reason: {value, label} | null, cancelled_at, attendance: AttendanceResource | null, can: {confirm, reject, cancel, attend}}
  *
@@ -38,7 +38,7 @@ class ApplicationResource extends JsonResource
             'cancelled_at' => $this->cancelled_at?->toIso8601String(),
             // 勤怠がまだなければ null（whenLoaded が null の関連を null のまま返す）
             'attendance' => $this->whenLoaded('attendance', fn () => $this->attendance === null ? null : new AttendanceResource($this->attendance)),
-            // 画面のボタンの出し分け。「状態として可能か」だけで、定員は見ない（定員超過は承認時の 422 で伝える。docs/01 6.5）
+            // 画面のボタンの出し分け。「状態として可能か」だけで、定員は見ない（定員超過は承認時の 422 で伝える。docs/01 の API 契約（応募・確定））
             'can' => [
                 'confirm' => $this->status->canTransitionTo(ApplicationStatus::Confirmed),
                 'reject' => $this->status->canTransitionTo(ApplicationStatus::Rejected),

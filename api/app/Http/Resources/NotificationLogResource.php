@@ -14,11 +14,11 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * 通知の記録の JSON（docs/01 6.10）:
+ * 通知の記録の JSON（docs/01 の API 契約（通知履歴））:
  * {id, kind: {value, label}, recipient: {type: {value, label}, name, email}, subject: {type: {value, label}, id, label}, status: {value, label}, sent_at, failed_at, error, created_at}
  *
  * - recipient.type / subject.type は {value, label}。value は morph map の短い名前（worker / user、application / job_posting / report_export）
- * - subject.label はそのまま画面に出す表示用の文字列。勤務日は画面の表示規約（docs/01 7.5）の 2026/10/10（土）の形
+ * - subject.label はそのまま画面に出す表示用の文字列。勤務日は画面の表示規約（docs/01 のフロント契約）の 2026/10/10（土）の形
  * - recipient.email は記録時のアドレス（recipient_email）。今のアドレスに変わっていても、実際に送った宛先を見せる
  * - 宛先・対象の行がもうない（morphs に外部キーはない）ときも落とさない。name は記録時のアドレス、label は「削除された◯◯」
  * - error は NotificationLogService が残した値（例外のクラス名と固定の文言。生のメッセージは入っていない）をそのまま返す
@@ -82,7 +82,7 @@ class NotificationLogResource extends JsonResource
     }
 
     /**
-     * 宛先・対象の種類を {value, label} で返す（docs/01 6.1。ラベルは API が返す）。value は morph map の短い名前
+     * 宛先・対象の種類を {value, label} で返す（docs/01 の API 契約の共通。ラベルは API が返す）。value は morph map の短い名前
      *
      * @return array{value: string, label: string}
      */

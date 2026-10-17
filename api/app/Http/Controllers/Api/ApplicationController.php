@@ -15,7 +15,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 /**
- * 応募・確定（F-09〜F-14、docs/01 6.5）と、応募できるワーカーの一覧（6.4 の applicable-workers）。
+ * 応募・確定（F-09〜F-14、docs/01 の API 契約（応募・確定））と、応募できるワーカーの一覧（API 契約（募集）の applicable-workers）。
  * Rails の resources :applications（job_postings の下にネスト）+ member ルート（confirm / reject / cancel）に相当。
  * 他社の ID はグローバルスコープでルートモデルバインディングが見つけられず 404 になる。
  */

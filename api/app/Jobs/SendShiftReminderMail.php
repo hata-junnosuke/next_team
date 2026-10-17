@@ -17,13 +17,13 @@ use Illuminate\Support\Facades\Mail;
 use Throwable;
 
 /**
- * F-22 前日リマインドを 1 通送るジョブ（docs/03 3.3、async-rules）。型は SendPostingCancelledMail と同じ。
+ * F-22 前日リマインドを 1 通送るジョブ（async-rules）。型は SendPostingCancelledMail と同じ。
  *
  * app:send-reminders コマンドが、対象日に勤務がある確定済みの応募 1 件ごとに 1 つ積む。
  * 「2 回送らない」の 3 段のうち、このジョブが受け持つのは 2 段目と 3 段目:
  * - ShouldBeUnique（uniqueId = 応募ID）: コマンドを 2 回実行しても、同じ応募のジョブを 2 つ積まない（積む前にキャッシュのロック）
  * - notification_logs.dedupe_key の UNIQUE（claim）: 送信済みの後に再実行・再投入されても 2 通目を送らない
- * - 同時に 2 本走ること自体は WithoutOverlapping で止める（UNIQUE が防ぐのは「送信済みの後」だけ。docs/03 3.3）
+ * - 同時に 2 本走ること自体は WithoutOverlapping で止める（UNIQUE が防ぐのは「送信済みの後」だけ）
  *
  * - コンストラクタは応募ID と対象日（"Y-m-d"）だけ。実行時に読み直し、まだ確定で勤務日が対象日のときだけ送る
  *   （積んだ後にキャンセルされた・募集の勤務日が変わった応募に「明日です」と送らない）
@@ -36,7 +36,7 @@ class SendShiftReminderMail implements ShouldBeUnique, ShouldQueue
 
     /**
      * 試行の回数では打ち切らない（0 = 無制限）。打ち切りは「例外 3 回」（$maxExceptions）か「積んでから一定時間」（retryUntil()）。
-     * 流量制限（RateLimited）でキューへ戻された回を失敗に数えないため（P4-03。async-rules）
+     * 流量制限（RateLimited）でキューへ戻された回を失敗に数えないため（async-rules）
      */
     public int $tries = 0;
 
@@ -93,7 +93,7 @@ class SendShiftReminderMail implements ShouldBeUnique, ShouldQueue
      * - WithoutOverlapping: 同じ通知のジョブを同時に 2 つ走らせない（dontRelease で 2 本目は捨てる、expireAfter で落ちたワーカーのロックを外す）。
      *   ShouldBeUnique があっても要るのは、それをすり抜けて同じ応募のジョブが 2 本になる経路があるため:
      *   queue:retry（failed_jobs から戻すときは積む前のロックを取らない）と、uniqueFor が切れた後の再投入。
-     *   notification_logs の UNIQUE は「送信済みの後」しか防がないので、同時に走る 2 本はここで止める（docs/03 3.3）
+     *   notification_logs の UNIQUE は「送信済みの後」しか防がないので、同時に走る 2 本はここで止める
      * https://readouble.com/laravel/13.x/ja/queues.html#job-middleware
      *
      * @return list<object>

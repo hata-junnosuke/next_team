@@ -9,7 +9,7 @@ use App\Services\MonthlyReportService;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * 月次集計（F-17、F-18、docs/01 6.7）。集計と CSV の行は MonthlyReportService が作る。
+ * 月次集計（F-17、F-18、docs/01 の API 契約（月次集計））。集計と CSV の行は MonthlyReportService が作る。
  */
 class MonthlyReportController extends Controller
 {

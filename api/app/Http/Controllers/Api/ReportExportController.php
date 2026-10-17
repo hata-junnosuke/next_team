@@ -12,12 +12,12 @@ use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * F-23 月次集計の非同期出力（docs/01 6.9）。受付・一覧・詳細は auth:sanctum + company の中、ダウンロードだけ署名付き URL。
+ * F-23 月次集計の非同期出力（docs/01 の API 契約（非同期出力））。受付・一覧・詳細は auth:sanctum + company の中、ダウンロードだけ署名付き URL。
  * https://readouble.com/laravel/13.x/ja/queues.html#job-batching
  */
 class ReportExportController extends Controller
 {
-    /** 一覧の件数（docs/01 6.9: 新しい順に最大 20 件） */
+    /** 一覧の件数（docs/01 の API 契約（非同期出力）: 新しい順に最大 20 件） */
     private const INDEX_LIMIT = 20;
 
     public function index(ReportExportService $service): AnonymousResourceCollection

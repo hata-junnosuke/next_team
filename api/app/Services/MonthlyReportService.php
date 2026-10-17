@@ -12,9 +12,9 @@ use Illuminate\Database\Query\JoinClause;
 use InvalidArgumentException;
 
 /**
- * 月次集計（F-17）と CSV の行（F-18。P4 の非同期出力 F-23 でも使う）。docs/01 4.5・4.6・6.7。
+ * 月次集計（F-17）と CSV の行（F-18。非同期出力 F-23 でも使う）。docs/01 のサービス契約・業務ルールの決定・月次集計の API。
  *
- * - 対象は「募集の勤務日（job_postings.work_date）が対象月に入る」かつ「応募が確定」の勤怠（6.6）
+ * - 対象は「募集の勤務日（job_postings.work_date）が対象月に入る」かつ「応募が確定」の勤怠（docs/01 の勤怠・報酬の API）
  * - 月の範囲は半開区間（>= 月初 AND < 翌月初）。work_date は "Y-m-d" の文字列で保存しているので文字列で比べる。
  *   whereBetween（月末日が漏れる）と whereDate（索引が効かない）は使わない
  * - 集計は SQL の join + GROUP BY + SUM。attendances に保存済みの金額・分を合計する
@@ -57,7 +57,7 @@ class MonthlyReportService
             ])
             ->all();
 
-        // 合計も SQL で集計する（PHP 側で足し合わせない。docs/01 4.6）
+        // 合計も SQL で集計する（PHP 側で足し合わせない。docs/01 の業務ルールの決定）
         $total = $this->baseQuery($month)
             ->selectRaw(self::AGGREGATES)
             ->first();
@@ -105,7 +105,7 @@ class MonthlyReportService
     }
 
     /**
-     * その月に集計対象の勤怠がある自社の拠点 ID（昇順）。P4 の非同期出力（F-23）で拠点ごとにジョブを分けるのに使う
+     * その月に集計対象の勤怠がある自社の拠点 ID（昇順）。非同期出力（F-23）で拠点ごとにジョブを分けるのに使う
      *
      * @return list<int>
      */
@@ -131,7 +131,7 @@ class MonthlyReportService
                 (string) $row->work_date,
                 (int) $row->worked_minutes,
                 (int) $row->wage_pay,
-                // 交通費 = 合計 - 賃金（保存時に「合計 = 賃金 + 交通費」で確定している。6.6）
+                // 交通費 = 合計 - 賃金（保存時に「合計 = 賃金 + 交通費」で確定している。docs/01 の勤怠・報酬の API）
                 (int) $row->total_pay - (int) $row->wage_pay,
                 (int) $row->total_pay,
             ];
@@ -139,7 +139,7 @@ class MonthlyReportService
     }
 
     /**
-     * 表計算ソフトで数式として解釈される先頭文字（= + - @ とタブ・CR）なら、先頭に ' を付けて文字列として扱わせる（docs/01 4.6、OWASP の CSV Injection）。
+     * 表計算ソフトで数式として解釈される先頭文字（= + - @ とタブ・CR）なら、先頭に ' を付けて文字列として扱わせる（docs/01 の業務ルールの決定、OWASP の CSV Injection）。
      * 全角の ＝ ＋ － ＠ は表計算ソフトが数式の開始として扱わないので対象にしない
      */
     public static function escapeCell(string $value): string
@@ -156,7 +156,7 @@ class MonthlyReportService
         $companyId = CurrentCompany::id();
 
         // 起点の attendances は Eloquent のグローバルスコープで company_id が付く（toBase() はスコープを適用した後の Query Builder を返す）。
-        // join 先にはスコープが効かないので、それぞれ company_id を明示する（docs/01 4.6）
+        // join 先にはスコープが効かないので、それぞれ company_id を明示する（docs/01 の業務ルールの決定）
         return Attendance::query()->toBase()
             ->join('applications', fn (JoinClause $join) => $join
                 ->on('applications.id', '=', 'attendances.application_id')

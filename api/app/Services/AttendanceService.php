@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 use LogicException;
 
 /**
- * 勤怠の保存（F-15、F-16、docs/01 4.5・4.6）。
+ * 勤怠の保存（F-15、F-16、docs/01 のサービス契約・業務ルールの決定）。
  * 深夜跨ぎ・同時刻・休憩の判定はここの 1 箇所だけに置く（FormRequest と web には書かない）。
  * 応募の状態は読むだけで変えない（状態を変えるのは担当 B の ApplicationService）。
  */

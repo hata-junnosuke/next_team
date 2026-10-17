@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * 勤怠の JSON（docs/01 6.6）:
+ * 勤怠の JSON（docs/01 の API 契約（勤怠・報酬））:
  * {clock_in, clock_out, is_overnight, break_minutes, worked_minutes, wage_pay, transport_allowance, total_pay}
  * clock_in / clock_out は ISO 8601（"2026-09-20T09:00:00+09:00"）。ApplicationResource の attendance にも入る。
  *

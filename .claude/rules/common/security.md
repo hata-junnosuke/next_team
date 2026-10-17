@@ -4,6 +4,7 @@
 - 企業の判定は `CurrentCompany::id()` だけを使う。サービスやジョブの中で `auth()->user()` を見ない（ジョブにはログインユーザーがいない）
 - `withoutGlobalScopes()` / `withoutGlobalScope('company')` を使う行には理由コメントを必ず書く
 - join するクエリは、グローバルスコープが効かない側のテーブルにも `company_id` 条件を明示する
+- ポリモーフィックな関連（例: `notification_logs` の宛先と対象）は「保存時に親が自社か」の検査が効かない。サービスの入口で、相手が自社のものかを確かめる
 - キャッシュのキーには企業ID を含める（`dashboard:{company_id}`）
 - `#[Fillable]` に `company_id` と `status` を入れない
 

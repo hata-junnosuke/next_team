@@ -7,7 +7,7 @@ import { isInProgressExportStatus } from "@/lib/status";
 
 // 月次集計の非同期出力の一覧（F-23）。GET /api/report-exports（新しい順・最大 20 件）をそのまま表示する。
 // 依頼は月次集計の画面の「CSV を生成（非同期）」から。成功すると ?requested={month} 付きでここへ来る。
-// 進み具合は開き直すと最新になる（自動で切り替えるのは F-25。docs/03）。
+// 進み具合は開き直すと最新になる（自動で切り替えるのは F-25）。
 // download_url は取得のたびに 30 分有効で作り直される
 
 type Props = {

@@ -66,7 +66,7 @@ export function ApplicationRow({
   confirmedCount,
 }: ApplicationRowProps) {
   const a = application.attendance;
-  // 勤怠の後にキャンセルされた応募は、勤怠の行が残るが月次集計に含めない（docs/01 6.6）。
+  // 勤怠の後にキャンセルされた応募は、勤怠の行が残るが月次集計に含めない（docs/01 の API 契約の勤怠・報酬）。
   // 判定は API の状態 value だけで行い、金額は API の値をそのまま出す
   const excluded = a !== null && application.status.value !== "confirmed";
   // サーバーの状態が変わったら（再検証で）フォームを作り直し、古い 422 の表示を消す

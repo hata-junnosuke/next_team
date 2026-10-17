@@ -3,7 +3,7 @@
 namespace App\Services;
 
 /**
- * 月次集計の結果（F-17、docs/01 4.5・6.7）。MonthlyReportService::build() が返す値オブジェクト。
+ * 月次集計の結果（F-17、docs/01 のサービス契約・月次集計の API）。MonthlyReportService::build() が返す値オブジェクト。
  * 金額・分はすべて attendances に保存済みの値の合計（集計時に計算し直さない）。
  */
 final readonly class MonthlyReport
