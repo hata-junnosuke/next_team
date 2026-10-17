@@ -12,7 +12,7 @@ argument-hint: <issue 番号>
 
 ## 前提
 - このスキルは **main の作業ツリー（司令塔）** で使う。main ではコードを書かない（`.claude/rules/common/git-workflow.md`）
-- 1 issue = 1 ブランチ `issue/<番号>` = 1 worktree。置き場所は `~/orca/workspaces/next_team/issue-<番号>`。名前は付けない（中身は issue のタイトルで分かる）（Orca から開ける。レビュー用の `レビュー用` と並ぶ）
+- 1 issue = 1 ブランチ `issue/<番号>` = 1 worktree。置き場所は人が指定したフォルダ。指定がなければ、すでにある worktree（`git worktree list` の 2 行目以降）と同じ親フォルダの `issue-<番号>`。どちらもなければ人に聞く。名前は付けない（中身は issue のタイトルで分かる）
 - `.env` / `.env.local` は Claude が読まない・書かない。コピーは `make worktree-env` に任せる（中身を出さない）
 - サーバーは起動しない（api 8002 / web 3002 はどの worktree も同じ番号。動かすのは一度に 1 つ）
 - `git reset --hard` / `git clean -f` は使わない（フックで禁止）
@@ -31,7 +31,7 @@ gh issue view <番号> --json number,title,state,labels,body
 | `requires-human` ラベルが付いている | 止めて、理由のコメントを人に見せる |
 
 ### 2. 場所を決める
-- `BRANCH=issue/<番号>`、`WT=~/orca/workspaces/next_team/issue-<番号>`
+- `BRANCH=issue/<番号>`、`WT=<置き場所>/issue-<番号>`（前提の「置き場所」）
 - すでにあるか調べる:
 ```bash
 git worktree list
@@ -77,7 +77,7 @@ make -C <WT> fresh
 - issue の番号・タイトル、`BRANCH`、`WT`、元にした main のコミット
 - 実行した準備（composer / npm / `.env` のコピー / fresh）と、人の作業が残っていればそれ（`DB_DATABASE` の修正など）
 - 次の一手（この順で人が行う）:
-  1. Orca で `WT` を開く（または `cd <WT> && claude`）。**worktree の直下で起動する**（フックが効く。SessionStart に今の issue 番号が出る）
+  1. `WT` を開いて Claude を起動する（`cd <WT> && claude`、またはエディタや worktree を扱う道具で `WT` を開く）。**worktree の直下で起動する**（フックが効く。SessionStart に今の issue 番号が出る）
   2. タスクが複数なら `/epic-flow <番号>`、1 件なら `/issue-flow <番号>`
 - このセッション（main の司令塔）は続けて使える
 

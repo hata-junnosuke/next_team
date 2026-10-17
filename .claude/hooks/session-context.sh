@@ -18,7 +18,7 @@ DIRTY="$(git status --short 2>/dev/null | wc -l | tr -d ' ')"
 
 echo "## next_team セッション開始情報"
 echo "- 起動場所: ${ROOT}（リポジトリの直下なら Stop フックが効きます。worktree の直下でもよい）"
-# worktree（~/orca/workspaces/next_team/<名前> など）でも効くよう、名前ではなく git の最上位と比べる
+# worktree（next_team/ 以外の名前のフォルダ）でも効くよう、名前ではなく git の最上位と比べる
 TOPLEVEL="$(git rev-parse --show-toplevel 2>/dev/null)"
 if [ "$TOPLEVEL" != "$ROOT" ] || [ ! -d api ] || [ ! -d web ]; then
   echo "- **警告**: 起動場所がリポジトリの直下（api/ と web/ がある場所）ではありません。フックの相対パスがずれます。直下に cd して claude で入り直してください"
