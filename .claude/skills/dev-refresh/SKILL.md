@@ -1,10 +1,10 @@
 ---
-name: dev-tidy
-description: 開発環境を整える。PR がマージされた issue の worktree（ブランチ issue/<番号>）を片付けて main を最新にし、残っている worktree が main より何コミット遅れているかと衝突の見込みを報告する（残っている worktree には触らない）。main（司令塔）で使う。引数なしならマージ済みのものを全部、番号を渡せばその 1 件を片付ける。「片付けて」「整えて」「worktree を消して」で使う。SessionStart に片付け候補が出たときにも使う
+name: dev-refresh
+description: 開発環境を最新化する。PR がマージされた issue の worktree（ブランチ issue/<番号>）を片付けて main を最新にし、残っている worktree が main より何コミット遅れているかと衝突の見込みを報告する（残っている worktree には触らない）。main（司令塔）で使う。引数なしならマージ済みのものを全部、番号を渡せばその 1 件を片付ける。「片付けて」「最新にして」「worktree を消して」で使う。SessionStart に片付け候補が出たときにも使う
 argument-hint: "[issue 番号]"
 ---
 
-# /dev-tidy — 開発環境を整える
+# /dev-refresh — 開発環境を最新化する
 
 対象: **$ARGUMENTS**（空ならマージ済みの `issue/*` の worktree を全部）
 

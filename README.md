@@ -78,7 +78,7 @@ make up        # redis / mailpit
 make verify    # api: Pint + テスト / web: 型 + ESLint が緑になること
 ```
 
-issue ごとの worktree は `/issue-start <番号>` が作ります（依存・`.env` のコピー・DB まで）。Orca を使用していれば、その worktree の画面（API `8100 + 番号` / web `3100 + 番号`）と Claude も開き、Claude には `/epic-flow` か `/issue-flow` を最初の指示として渡します。PR がマージされたら main で `/dev-tidy` が片付け、残っている worktree の遅れと衝突の見込みを出します（main で起動すると片付け候補が出ます）。main の取り込みは各 worktree の Claude が、タスクの始めと PR を作る前に行います。
+issue ごとの worktree は `/issue-start <番号>` が作ります（依存・`.env` のコピー・DB まで）。Orca を使用していれば、その worktree の画面（API `8100 + 番号` / web `3100 + 番号`）と Claude も開き、Claude には `/epic-flow` か `/issue-flow` を最初の指示として渡します。PR がマージされたら main で `/dev-refresh` が片付け、残っている worktree の遅れと衝突の見込みを出します（main で起動すると片付け候補が出ます）。main の取り込みは各 worktree の Claude が、タスクの始めと PR を作る前に行います。
 
 ### 毎回
 
@@ -126,7 +126,7 @@ make down                       # redis / mailpit を止める（データは残
 | 検証する | `/verify`（quick）/ `/verify pre-commit` / `/verify full` |
 | レビューだけする | `/code-review` |
 | PR を作って CI を確かめる | `/pr-create <issue 番号>`（`.github/pull_request_template.md` どおり） |
-| 開発環境を整える（マージ済みの worktree を片付ける） | `/dev-tidy [issue 番号]`（main で。未コミット・未マージは残し、遅れと衝突の見込みを出す） |
+| 開発環境を最新化する（マージ済みの worktree を片付ける） | `/dev-refresh [issue 番号]`（main で。未コミット・未マージは残し、遅れと衝突の見込みを出す） |
 
 応答を終えようとするたびに Stop フックが検証を回し、赤なら差し戻します（5 回で打ち切り。前回の緑から変更がなければ省略）。PR では CI が同じ `make verify` を回します（手元の速い合否が Stop フック、チームの関門が CI）。api のタスクの完了条件はテスト名、web のタスクは「型と ESLint が緑 ＋ issue に書いた画面の確認項目」です。差し戻しなどから分かった決まりは、`CLAUDE.md`・`.claude/rules/`・スキルに PR で直接書きます。
 

@@ -70,7 +70,7 @@ if command -v gh >/dev/null 2>&1; then
 fi
 
 # マージ済みの issue の worktree を片付け候補として出す（issue #15）。main（司令塔）で起動したときだけ。
-# ここでは消さない（別のセッションや Orca が開いているかもしれない）。片付けは人が /dev-tidy を打つ
+# ここでは消さない（別のセッションや Orca が開いているかもしれない）。片付けは人が /dev-refresh を打つ
 if [ "$BRANCH" = "main" ] && command -v gh >/dev/null 2>&1; then
   # porcelain の "worktree <場所>" と "branch refs/heads/issue/<番号>" の組を「ブランチ<TAB>場所」にする
   WTS="$(git worktree list --porcelain 2>/dev/null \
@@ -87,7 +87,7 @@ if [ "$BRANCH" = "main" ] && command -v gh >/dev/null 2>&1; then
       CANDIDATES="${CANDIDATES}    ${path##*/}（${br}、PR #${pr} マージ済み${note}）"$'\n'
     done <<< "$WTS"
     if [ -n "$CANDIDATES" ]; then
-      echo "- 片付け候補の worktree（PR がマージ済み）。/dev-tidy で片付けられます:"
+      echo "- 片付け候補の worktree（PR がマージ済み）。/dev-refresh で片付けられます:"
       printf '%s' "$CANDIDATES"
     fi
   fi

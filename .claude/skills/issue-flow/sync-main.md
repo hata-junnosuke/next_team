@@ -1,6 +1,6 @@
 # この worktree に main を取り込む
 
-`/issue-flow`（手順 0。タスクを始めるたび）と `/pr-create`（手順 1。PR を作る前）から使う手順。人に「main を取り込んで」と頼まれたときも使う。**この worktree の Claude（リード）が自分のブランチにだけ行う。** main のセッションは他の worktree に merge しない（`/dev-tidy` は遅れと衝突の見込みを報告するだけ）。
+`/issue-flow`（手順 0。タスクを始めるたび）と `/pr-create`（手順 1。PR を作る前）から使う手順。人に「main を取り込んで」と頼まれたときも使う。**この worktree の Claude（リード）が自分のブランチにだけ行う。** main のセッションは他の worktree に merge しない（`/dev-refresh` は遅れと衝突の見込みを報告するだけ）。
 
 取り込みは `git merge`。rebase は使わない（push 済みのブランチの rebase は force push が要り、フックで禁止）。
 
