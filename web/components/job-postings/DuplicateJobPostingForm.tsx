@@ -25,7 +25,7 @@ export function DuplicateJobPostingForm({
     .flatMap(([, messages]) => messages);
 
   return (
-    <form action={formAction} className="max-w-xl space-y-4">
+    <form action={formAction} className="space-y-4">
       <Alert state={state} />
       <Field
         label="新しい勤務日"
@@ -37,7 +37,7 @@ export function DuplicateJobPostingForm({
         defaultValue={state.values?.work_date}
       />
       {otherErrors.length > 0 && (
-        <ul role="alert" className="space-y-0.5 text-sm text-red-600">
+        <ul role="alert" className="text-danger space-y-0.5 text-sm">
           {otherErrors.map((message) => (
             <li key={message}>{message}</li>
           ))}

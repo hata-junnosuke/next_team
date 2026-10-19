@@ -15,10 +15,14 @@ type ActionButtonProps = {
   label: string;
   pendingLabel: string;
   variant?: "primary" | "secondary" | "danger";
+  /** 表の行内は "sm" */
+  size?: "sm" | "md";
   /** API の can.* が false のとき true */
   disabled: boolean;
   /** 指定すると送信前に確認ダイアログを出す（誤操作の防止だけ。可否の判定はしない） */
   confirmMessage?: string;
+  /** ボタンと 422 の理由をどちら側にそろえるか。画面の右端に置くときは "end"（理由を左へ伸ばし、はみ出さない） */
+  align?: "start" | "end";
 };
 
 export function ActionButton({
@@ -26,8 +30,10 @@ export function ActionButton({
   label,
   pendingLabel,
   variant = "secondary",
+  size = "md",
   disabled,
   confirmMessage,
+  align = "start",
 }: ActionButtonProps) {
   const [state, formAction, pending] = useActionState(action, {});
 
@@ -39,9 +45,18 @@ export function ActionButton({
   }
 
   return (
-    <form action={formAction} onSubmit={onSubmit} className="space-y-2">
+    <form
+      action={formAction}
+      onSubmit={onSubmit}
+      className={
+        align === "end"
+          ? "relative flex flex-col items-end"
+          : "flex flex-col items-start gap-2"
+      }
+    >
       <Button
         variant={variant}
+        size={size}
         pending={pending}
         pendingLabel={pendingLabel}
         disabled={disabled}
@@ -49,8 +64,11 @@ export function ActionButton({
         {label}
       </Button>
       {/* 表のセルは whitespace-nowrap なので、長い理由文はここで折り返す。
-          w-max でボタンの幅に押し込まれず、文の長さ（最大 max-w-xs）まで広がる */}
-      <div className="w-max max-w-xs whitespace-normal">
+          w-max でボタンの幅に押し込まれず、文の長さ（最大 max-w-xs）まで広がる。
+          "end"（見出しの右）では absolute でボタンの下に重ね、理由が出ても見出しの行の高さを変えない */}
+      <div
+        className={`w-max max-w-xs whitespace-normal ${align === "end" ? "absolute top-full right-0 z-10 mt-2" : ""}`}
+      >
         <Alert state={state} />
       </div>
     </form>

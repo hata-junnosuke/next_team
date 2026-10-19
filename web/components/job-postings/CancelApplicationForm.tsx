@@ -74,10 +74,11 @@ export function CancelApplicationForm({
             defaultValue={state.values?.reason}
           />
         </div>
-        {/* ラベルの高さぶん下げてボタンを入力欄の行にそろえる */}
-        <div className="pt-6">
+        {/* ラベルの高さ（text-xs の 16px + 間隔 4px）ぶん下げ、入力欄と同じ h-9 の中で小さいボタンを縦中央にそろえる */}
+        <div className="mt-5 flex h-9 items-center">
           <Button
             variant="danger"
+            size="sm"
             pending={pending}
             pendingLabel="キャンセル中…"
             disabled={!canCancel}

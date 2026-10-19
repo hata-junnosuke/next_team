@@ -65,8 +65,8 @@ export function AttendanceForm({
             defaultValue={state.values?.break_minutes ?? initial?.break_minutes}
           />
         </div>
-        {/* ラベルの高さぶん下げてボタンを入力欄の行にそろえる */}
-        <div className="pt-6">
+        {/* ラベルの高さ（text-xs の 16px + 間隔 4px）ぶん下げてボタンを入力欄の行にそろえる */}
+        <div className="pt-5">
           <Button pending={pending} pendingLabel="保存中…">
             {initial ? "勤怠を更新" : "勤怠を保存"}
           </Button>

@@ -1,6 +1,7 @@
 import Form from "next/form";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
 import { Field } from "@/components/ui/Field";
 import type { statusTones } from "@/lib/status";
 
@@ -38,53 +39,55 @@ export function JobPostingFilters({
   errors,
 }: JobPostingFiltersProps) {
   return (
-    // 条件が変わったら入力欄を作り直す（defaultValue は初回しか効かないため。「条件を消す」で空に戻す）
-    <Form
-      key={JSON.stringify(values)}
-      action="/job-postings"
-      className="grid grid-cols-2 items-end gap-4 rounded-md border border-gray-200 bg-white p-4 md:grid-cols-5"
-    >
-      <Field
-        label="勤務日（から）"
-        name="date_from"
-        type="date"
-        defaultValue={values.date_from}
-        errors={errors?.date_from}
-      />
-      <Field
-        label="勤務日（まで）"
-        name="date_to"
-        type="date"
-        defaultValue={values.date_to}
-        errors={errors?.date_to}
-      />
-      <Field
-        label="拠点"
-        name="location_id"
-        type="select"
-        options={locations}
-        emptyOption="すべて"
-        defaultValue={values.location_id}
-        errors={errors?.location_id}
-      />
-      <Field
-        label="状態"
-        name="status"
-        type="select"
-        options={statusOptions}
-        emptyOption="すべて"
-        defaultValue={values.status}
-        errors={errors?.status}
-      />
-      <div className="flex items-center gap-3">
-        <Button variant="secondary">絞り込む</Button>
-        <Link
-          href="/job-postings"
-          className="text-sm whitespace-nowrap text-gray-600 hover:text-gray-900"
-        >
-          条件を消す
-        </Link>
-      </div>
-    </Form>
+    <Card>
+      {/* 条件が変わったら入力欄を作り直す（defaultValue は初回しか効かないため。「条件を消す」で空に戻す） */}
+      <Form
+        key={JSON.stringify(values)}
+        action="/job-postings"
+        className="grid grid-cols-2 items-end gap-4 md:grid-cols-5"
+      >
+        <Field
+          label="勤務日（から）"
+          name="date_from"
+          type="date"
+          defaultValue={values.date_from}
+          errors={errors?.date_from}
+        />
+        <Field
+          label="勤務日（まで）"
+          name="date_to"
+          type="date"
+          defaultValue={values.date_to}
+          errors={errors?.date_to}
+        />
+        <Field
+          label="拠点"
+          name="location_id"
+          type="select"
+          options={locations}
+          emptyOption="すべて"
+          defaultValue={values.location_id}
+          errors={errors?.location_id}
+        />
+        <Field
+          label="状態"
+          name="status"
+          type="select"
+          options={statusOptions}
+          emptyOption="すべて"
+          defaultValue={values.status}
+          errors={errors?.status}
+        />
+        <div className="flex items-center gap-3">
+          <Button variant="secondary">絞り込む</Button>
+          <Link
+            href="/job-postings"
+            className="text-ink-muted hover:text-ink text-sm whitespace-nowrap underline-offset-2 hover:underline"
+          >
+            条件を消す
+          </Link>
+        </div>
+      </Form>
+    </Card>
   );
 }
