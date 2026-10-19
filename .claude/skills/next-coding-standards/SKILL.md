@@ -134,7 +134,7 @@ const res = await fetch(`${API}/login`, {
 | `PageHeader` | 一覧・詳細の見出し + 補足 + 右側の操作（`actions`）。`h1` を出すので画面に別の `h1` を置かない |
 | `Card` | `surface` の箱（`title?`）。絞り込み・フォーム・セクションを包む。`Table` は自前の枠を持つので `Card` で包まない |
 
-色は `app/globals.css` の `@theme` のトークン（`canvas` `surface` `ink` `accent` `sidebar` `tone-*` など）で書き、生の `blue-600` `gray-50` などは書かない。`accent`（琥珀色）は主ボタン・現在の画面の左の印・深夜跨ぎの文字の 3 か所だけ。フォーカスの印は `sidebar` 色
+色は `app/globals.css` の `@theme` のトークン（`canvas` `surface` `ink` `accent` `sidebar` `tone-*` など）で書き、生の `blue-600` `gray-50` などは書かない。`accent`（琥珀色）は主ボタン・現在の画面の印（`lg` 以上は左の縦線、`lg` 未満で上に畳んだときは下線）・深夜跨ぎの文字の 3 か所だけ。フォーカスの印は `sidebar` 色。ただし濃紺の面（サイドバー・ログイン画面の左）の上では見えないので、そこだけ `sidebar-ink` にする
 
 ## 表示（`lib/format.ts`）
 - `yen(9600)` → `9,600円` / `minutes(420)` → `7時間00分` / `date("2026-09-20")` → `2026/09/20（日）` / `dateTime(iso)` → `2026/10/01（木） 10:00` / `time(iso)` → `09:00`
