@@ -5,6 +5,6 @@
 - コミット前に `/verify pre-commit` を通す。赤のままコミットしない
 - `git push --force` `git reset --hard` `git clean -f` は禁止（PreToolUse フックが止める）
 - ブランチ: 1 issue = 1 ブランチ `issue/<番号>`（例: `issue/3`）。PR の本文に `Closes #<番号>`。`main` へのマージは人が行う
-- issue を並列に進めるときは issue ごとに worktree を分ける。main の作業ツリーは issue の作成・計画・マージの確認に使う。worktree は `/issue-start <番号>` で作り、PR がマージされたら main で `/worktree-clean` で片付ける（main で起動すると SessionStart フックが片付け候補を出す）
+- issue を並列に進めるときは issue ごとに worktree を分ける。main の作業ツリーは issue の作成・計画・マージの確認に使う。worktree は `/issue-start <番号>` で作り、PR がマージされたら main で `/dev-tidy` で片付ける（main で起動すると SessionStart フックが片付け候補を出す）。main の取り込み（`git merge origin/main`）は各 worktree の Claude が、タスクの始めと PR を作る前に行う（`.claude/skills/issue-flow/sync-main.md`）。main のセッションは他の worktree に merge しない
 - `.env` `composer.lock` `package-lock.json` `vendor/` `node_modules/` `storage/` `.next/` は編集しない（フックが止める）
 - コミットメッセージ末尾に、コミットするときに実際に動いているリードのモデル名で `Co-Authored-By: Claude <モデル名> <noreply@anthropic.com>` を付ける（例: `Claude Opus 5.5`、`Claude Fable 5.1`）。`/model` で切り替えたら、それ以降のコミットは新しいモデル名にする

@@ -14,6 +14,7 @@ PR の **形** は `.github/pull_request_template.md` が決め、このスキ�
 1. 前提を確かめる
    - ブランチが `issue/<番号>` であること。`main` なら止まる
    - `git status --short` が空であること（未コミットがあれば先にコミットする）
+   - **main を取り込む**（`.claude/skills/issue-flow/sync-main.md`。push はここではせず手順 5 で行う）。衝突したら PR を作らずに止まって報告する
    - `gh pr list --head issue/<番号>` で同じブランチの PR がないこと（あれば作らずに URL を返す。本文の更新は `gh pr edit`）
 2. 検証を集める: `make verify` を実行し、結果を記録する
    - api: Pint 緑/赤、PHPUnit の件数（assertions）と失敗名

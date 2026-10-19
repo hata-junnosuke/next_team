@@ -25,7 +25,7 @@
 - 起動時に SessionStart フックが open の issue と直近のコミットを要約して出す
 
 ## スキル（`/名前` で起動）
-`/issue-start` issue の worktree を作る（main で使う）/ `/worktree-clean` マージ済みの worktree を片付ける（main で使う）/ `/epic-flow` アウターループ（Orca では `/issue-start` が worktree の Claude に最初の指示として渡す。人が打ってもよい）/ `/issue-flow` インナーループ / `/plan` / `/verify [quick|pre-commit|full]` / `/code-review` / `/issue-create` issue をテンプレートどおりに作る / `/pr-create` PR を作って CI を確かめる。
+`/issue-start` issue の worktree を作る（main で使う）/ `/dev-tidy` マージ済みの worktree を片付けて main を最新にし、残りの遅れを報告する（main で使う）/ `/epic-flow` アウターループ（Orca では `/issue-start` が worktree の Claude に最初の指示として渡す。人が打ってもよい）/ `/issue-flow` インナーループ / `/plan` / `/verify [quick|pre-commit|full]` / `/code-review` / `/issue-create` issue をテンプレートどおりに作る / `/pr-create` PR を作って CI を確かめる。
 知識スキル: `tdd-workflow` `myteam-domain-rules` `laravel-api-standards` `next-coding-standards` `async-rules`
 
 ## エージェント（`.claude/agents/`）

@@ -8,7 +8,7 @@ argument-hint: <issue 番号>
 
 対象: **issue #$ARGUMENTS**（番号がなければ `gh issue list --state open` を見せて聞く）
 
-役目は**作業場所づくりと、そこで作業を始めさせるところまで**。このセッション（main）では実装・計画・片付けはしない（片付けは `/worktree-clean`）。Orca を使用していれば、作った worktree の画面と Claude を開き、その Claude に `/epic-flow` か `/issue-flow` を最初の指示として渡す。Orca の外なら、人が worktree で Claude を起動してそれを打つ。
+役目は**作業場所づくりと、そこで作業を始めさせるところまで**。このセッション（main）では実装・計画・片付けはしない（片付けは `/dev-tidy`）。Orca を使用していれば、作った worktree の画面と Claude を開き、その Claude に `/epic-flow` か `/issue-flow` を最初の指示として渡す。Orca の外なら、人が worktree で Claude を起動してそれを打つ。
 
 ## 前提
 - このスキルは **main の作業ツリー（司令塔）** で使う。main ではコードを書かない（`.claude/rules/common/git-workflow.md`）
