@@ -68,4 +68,28 @@ if command -v gh >/dev/null 2>&1; then
     echo "- open の issue を取得できませんでした（0 件、またはオフライン）。gh issue list で確認してください"
   fi
 fi
+
+# マージ済みの issue の worktree を片付け候補として出す（issue #15）。main（司令塔）で起動したときだけ。
+# ここでは消さない（別のセッションや Orca が開いているかもしれない）。片付けは人が /worktree-clean を打つ
+if [ "$BRANCH" = "main" ] && command -v gh >/dev/null 2>&1; then
+  # porcelain の "worktree <場所>" と "branch refs/heads/issue/<番号>" の組を「ブランチ<TAB>場所」にする
+  WTS="$(git worktree list --porcelain 2>/dev/null \
+    | awk '/^worktree /{p=substr($0,10)} /^branch refs\/heads\/issue\//{print substr($0,19) "\t" p}')"
+  if [ -n "$WTS" ]; then
+    MERGED="$(perl -e 'alarm shift; exec @ARGV' 5 gh pr list --state merged --limit 100 --json number,headRefName \
+      --jq '.[] | "\(.headRefName)\t\(.number)"' 2>/dev/null)"
+    CANDIDATES=""
+    while IFS=$'\t' read -r br path; do
+      pr="$(printf '%s\n' "$MERGED" | awk -F'\t' -v b="$br" '$1 == b {print $2; exit}')"
+      [ -n "$pr" ] || continue
+      note=""
+      [ -z "$(git -C "$path" status --short 2>/dev/null)" ] || note="・未コミットあり（片付けでは飛ばす）"
+      CANDIDATES="${CANDIDATES}    ${path##*/}（${br}、PR #${pr} マージ済み${note}）"$'\n'
+    done <<< "$WTS"
+    if [ -n "$CANDIDATES" ]; then
+      echo "- 片付け候補の worktree（PR がマージ済み）。/worktree-clean で片付けられます:"
+      printf '%s' "$CANDIDATES"
+    fi
+  fi
+fi
 exit 0

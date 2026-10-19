@@ -8,7 +8,7 @@ argument-hint: <issue 番号>
 
 対象: **issue #$ARGUMENTS**（番号がなければ `gh issue list --state open` を見せて聞く）
 
-役目は**作業場所づくりだけ**。実装・計画はしない。作った worktree で人が Claude を起動し直し、`/epic-flow` か `/issue-flow` を打つ。
+役目は**作業場所づくりだけ**。実装・計画・片付けはしない（片付けは `/worktree-clean`）。作った worktree で人が Claude を起動し直し、`/epic-flow` か `/issue-flow` を打つ。
 
 ## 前提
 - このスキルは **main の作業ツリー（司令塔）** で使う。main ではコードを書かない（`.claude/rules/common/git-workflow.md`）
@@ -80,12 +80,3 @@ make -C <WT> fresh
   1. `WT` を開いて Claude を起動する（`cd <WT> && claude`、またはエディタや worktree を扱う道具で `WT` を開く）。**worktree の直下で起動する**（フックが効く。SessionStart に今の issue 番号が出る）
   2. タスクが複数なら `/epic-flow <番号>`、1 件なら `/issue-flow <番号>`
 - このセッション（main の司令塔）は続けて使える
-
-## 片付け（PR がマージされた後、「片付けて」と言われたら）
-```bash
-gh pr list --state merged --head <BRANCH>     # マージ済みを確かめる。未マージなら止めて聞く
-git -C <WT> status --short                    # 空でなければ止めて人に聞く（勝手に捨てない）
-git worktree remove <WT>
-git branch -d <BRANCH>                        # -D は使わない。消せなければ未マージなので人に聞く
-git pull --ff-only                            # main（司令塔）を最新に
-```
