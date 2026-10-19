@@ -1,0 +1,70 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState, useTransition, type FormEvent } from "react";
+import { Alert } from "@/components/ui/Alert";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Field } from "@/components/ui/Field";
+import { login } from "@/lib/browser-api";
+import type { FormState } from "@/lib/form-state";
+
+// ログイン。Cookie を受け取る操作なのでブラウザから Laravel を直接叩く（docs/01 の認証・クライアント側の流れ）。
+// <form action> ではなく onSubmit にしているのは、React 19 が action 完了後にフォームを
+// リセットし、422 のときに入力したメールアドレスが消えるのを避けるため
+
+export function LoginForm() {
+  const router = useRouter();
+  const [state, setState] = useState<FormState>({});
+  const [pending, startTransition] = useTransition();
+
+  function onSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    startTransition(async () => {
+      const result = await login(
+        String(form.get("email") ?? ""),
+        String(form.get("password") ?? ""),
+      );
+      if (result.ok) {
+        router.replace("/dashboard");
+        router.refresh();
+        return;
+      }
+      // 422 は errors.email に、429 は message に日本語の理由が入る（どちらも API の文言）
+      setState(result);
+    });
+  }
+
+  return (
+    <Card className="w-full max-w-sm">
+      <div className="space-y-6">
+        <h1 className="text-xl font-semibold whitespace-nowrap">
+          myteam 管理画面にログイン
+        </h1>
+        <form onSubmit={onSubmit} className="space-y-4" noValidate>
+          <Alert state={state} />
+          <Field
+            label="メールアドレス"
+            name="email"
+            type="email"
+            autoComplete="username"
+            required
+            errors={state.errors?.email}
+          />
+          <Field
+            label="パスワード"
+            name="password"
+            type="password"
+            autoComplete="current-password"
+            required
+            errors={state.errors?.password}
+          />
+          <Button pending={pending} pendingLabel="ログイン中…">
+            ログイン
+          </Button>
+        </form>
+      </div>
+    </Card>
+  );
+}
