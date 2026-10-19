@@ -37,7 +37,7 @@ export const statusTones = {
 export type StatusKind = keyof typeof statusTones;
 
 // 文字色だけ（Badge の丸い点は currentColor で同じ色になる）。値は globals.css の tone-* トークン
-const toneClasses: Record<Tone, string> = {
+export const toneClasses: Record<Tone, string> = {
   gray: "text-tone-gray",
   blue: "text-tone-blue",
   green: "text-tone-green",

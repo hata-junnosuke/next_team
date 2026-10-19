@@ -34,6 +34,7 @@ export function DeleteLocationButton({
     <form action={formAction} onSubmit={onSubmit} className="space-y-2">
       <Button
         variant="danger"
+        size="sm"
         pending={pending}
         pendingLabel="削除中…"
         disabled={!deletable}

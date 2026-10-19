@@ -1,7 +1,10 @@
 import Link from "next/link";
+import { ActiveBadge } from "@/components/workers/ActiveBadge";
 import { ToggleWorkerActiveButton } from "@/components/workers/ToggleWorkerActiveButton";
 import { WorkerSearchForm } from "@/components/workers/WorkerSearchForm";
 import { Alert } from "@/components/ui/Alert";
+import { buttonClassName } from "@/components/ui/Button";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { emptyText, Pagination } from "@/components/ui/Pagination";
 import { Table, Td } from "@/components/ui/Table";
 import { setWorkerActive } from "@/lib/actions/worker";
@@ -18,8 +21,6 @@ type Props = {
     page?: string | string[];
   }>;
 };
-
-const linkClass = "whitespace-nowrap text-blue-700 hover:underline";
 
 /** ?q=a&q=b のように配列で来たら先頭を使う */
 function first(value: string | string[] | undefined): string {
@@ -53,16 +54,15 @@ export default async function WorkersPage({ searchParams }: Props) {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-xl font-semibold whitespace-nowrap">ワーカー</h1>
-        <Link
-          href="/workers/new"
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium whitespace-nowrap text-white hover:bg-blue-700"
-        >
-          ワーカーを登録
-        </Link>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="ワーカー"
+        actions={
+          <Link href="/workers/new" className={buttonClassName("primary")}>
+            ワーカーを登録
+          </Link>
+        }
+      />
 
       <WorkerSearchForm q={q} isActive={isActive} />
 
@@ -86,15 +86,16 @@ export default async function WorkersPage({ searchParams }: Props) {
                 <Td>{worker.email}</Td>
                 <Td>{worker.phone ?? "—"}</Td>
                 <Td>
-                  <span className="inline-block py-2">
-                    {worker.is_active ? "有効" : "無効"}
+                  {/* 行内ボタン（h-8）と高さをそろえる */}
+                  <span className="inline-flex h-8 items-center">
+                    <ActiveBadge isActive={worker.is_active} />
                   </span>
                 </Td>
                 <Td>
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-start gap-2">
                     <Link
                       href={`/workers/${worker.id}/edit`}
-                      className={`${linkClass} py-2`}
+                      className={buttonClassName("secondary", "sm")}
                     >
                       編集
                     </Link>

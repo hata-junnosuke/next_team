@@ -1,6 +1,7 @@
 import Form from "next/form";
 import Link from "next/link";
-import { Button } from "@/components/ui/Button";
+import { Button, buttonClassName } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
 import { Field } from "@/components/ui/Field";
 
 // 一覧の絞り込み（F-04）。GET で /workers?q=&is_active= に遷移するだけ（next/form）。
@@ -18,32 +19,36 @@ const activeOptions = [
 
 export function WorkerSearchForm({ q, isActive }: WorkerSearchFormProps) {
   return (
-    // key: 「条件を消す」などのリンクで URL が変わったとき、入力欄の defaultValue を読み直させる
-    <Form
-      key={`${q}\u0000${isActive}`}
-      action="/workers"
-      className="flex flex-wrap items-end gap-3 rounded-md border border-gray-200 bg-white p-4"
-    >
-      <div className="w-64">
-        <Field label="氏名" name="q" defaultValue={q} placeholder="部分一致" />
-      </div>
-      <div className="w-40">
-        <Field
-          label="状態"
-          name="is_active"
-          type="select"
-          emptyOption="全て"
-          options={activeOptions}
-          defaultValue={isActive}
-        />
-      </div>
-      <Button>検索</Button>
-      <Link
-        href="/workers"
-        className="py-2 text-sm whitespace-nowrap text-gray-600 hover:text-gray-900"
+    <Card>
+      {/* key: 「条件を消す」などのリンクで URL が変わったとき、入力欄の defaultValue を読み直させる */}
+      <Form
+        key={`${q}\u0000${isActive}`}
+        action="/workers"
+        className="flex flex-wrap items-end gap-3"
       >
-        条件を消す
-      </Link>
-    </Form>
+        <div className="w-64">
+          <Field
+            label="氏名"
+            name="q"
+            defaultValue={q}
+            placeholder="部分一致"
+          />
+        </div>
+        <div className="w-40">
+          <Field
+            label="状態"
+            name="is_active"
+            type="select"
+            emptyOption="全て"
+            options={activeOptions}
+            defaultValue={isActive}
+          />
+        </div>
+        <Button>検索</Button>
+        <Link href="/workers" className={buttonClassName("secondary")}>
+          条件を消す
+        </Link>
+      </Form>
+    </Card>
   );
 }
