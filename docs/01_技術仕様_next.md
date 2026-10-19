@@ -585,7 +585,7 @@ web/
 │   ├── page.tsx                  /dashboard へ redirect
 │   ├── (auth)/login/page.tsx     ログイン（Client Component）
 │   └── (admin)/
-│       ├── layout.tsx            GET /api/user → ヘッダ・ナビ。401 なら /login
+│       ├── layout.tsx            GET /api/user → サイドバー（企業名・メニュー・管理者名・ログアウト）。401 なら /login
 │       ├── dashboard/page.tsx
 │       ├── locations/            page.tsx / new/page.tsx / [id]/edit/page.tsx
 │       ├── workers/              page.tsx / new/page.tsx / [id]/edit/page.tsx
@@ -593,7 +593,7 @@ web/
 │       ├── reports/monthly/      page.tsx / csv/route.ts（F-18 の中継。Route Handler）
 │       ├── reports/exports/      page.tsx（P4）
 │       └── notifications/        page.tsx（P5・Could）
-├── components/ui/                Table / Field / Button / Alert / Badge / Pagination / LogoutButton（ログアウトだけは Client Component が要るため）
+├── components/ui/                Table / Field / Button / Alert / Badge / Pagination / LogoutButton（ログアウトだけは Client Component が要るため）/ NavLink（現在の画面に aria-current。Client）/ PageHeader / Card
 │                                 Pagination: 範囲外の page では 1 ページ目へのリンクだけを出す。itemCount（data.length）は必須。空の文言は emptyText() で差し替える
 ├── components/<機能>/            フォームなど機能ごとの Client Component
 └── lib/
@@ -663,6 +663,8 @@ export type FormState = { ok?: boolean; message?: string; errors?: Record<string
 - 金額は `9,600円`、労働時間は `7時間00分`、日付は `2026/09/20（日）`
 - 表のセル・バッジ・ボタンは `whitespace-nowrap`（第2弾の教訓: 折り返しで崩れた）
 - 状態の色は `lib/status.ts` の 1 箇所。ラベルは API の `label` をそのまま出す
+- 色は `app/globals.css` の `@theme` のトークン（`canvas` `surface` `ink` `accent` `sidebar` `tone-*` など）経由で書く。生の `blue-600` などと `dark:` は書かない（issue #3 で決定。ライト固定）
+- 例外（issue #3 で決定）: ワーカーの有効/無効は API が boolean で `{value, label}` を返さないので、ラベル（有効 / 無効）を web に置く。色は `lib/status.ts` の `toneClasses` を使う
 - 例外（P3-02 で決定）: 一覧の「状態で絞り込む」選択肢だけは、API に Enum の一覧を返す口がないので、ラベルを `lib/status.ts` の隣（絞り込み部品）に置く。値は docs/01 4.1 と同じ。表のバッジは API の label を出す
 - 例外（P3-02 で決定）: 入力欄のない項目の 422（例: 複製フォームの `errors.hourly_wage`）は、そのフォームの下にまとめて出す（Alert は項目エラーがあると出さないため）
 - 拠点の選択肢は `per_page=100` の 1 ページ分（101 件以上は想定しない）
