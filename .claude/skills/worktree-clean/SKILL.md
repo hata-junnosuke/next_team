@@ -40,6 +40,7 @@ gh pr list --state merged --limit 100 --json number,headRefName
   ```bash
   orca worktree rm --worktree path:<WT> --json    # --force は付けない
   ```
+  `ok: true` が返っても、削除はすぐには終わらない。少しのあいだフォルダと `git worktree list` の行が残る。`git worktree list` から `<WT>` が消えるまで待つ（2 秒おきに最大 20 秒）。消える前に `git branch -d` を打つと「checked out at」で失敗する。20 秒たっても残っていれば報告して人に聞く
   `orca` がエラーになったら、エラーを報告に書いて、下の「Orca の外」の手順で消す。そのときはターミナルが残るので、Orca でその worktree を閉じてもらう
 - **Orca の外**:
   ```bash
@@ -50,6 +51,7 @@ gh pr list --state merged --limit 100 --json number,headRefName
 ```bash
 git branch -d <BRANCH>        # 消せなければ未マージのコミットがある。-D にせず人に聞く
 ```
+`orca worktree rm` は、マージ済みのブランチも一緒に消すことがある。`git branch -d` が `branch '<BRANCH>' not found` になったら、もう消えているので成功として扱う
 最後に、画面のポート（`8100 + 番号` / `3100 + 番号`）が空いたか `lsof -tiTCP:<port> -sTCP:LISTEN` で確かめる。残っていれば kill せず、持ち主（`lsof -a -p <pid> -d cwd`）を報告する
 
 ### 3. main を最新にする（最後に 1 回）

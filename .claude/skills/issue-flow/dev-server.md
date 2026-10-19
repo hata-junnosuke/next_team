@@ -41,8 +41,9 @@ worktree（`issue/<番号>`）のコードを、開発（8002 / 3002。main の�
 ```bash
 pid=$(lsof -tiTCP:<port> -sTCP:LISTEN)
 lsof -a -p $pid -d cwd -Fn          # 場所が <WT> の中であることを確かめる。違えば止めずに報告
-kill $pid                            # web は親の npm も残っていれば kill（ps -o ppid= -p $pid で見る）
+kill $pid
 ```
+web で listen しているのは `next dev`（node）の子プロセス。これを kill すると、親の `next dev` と `npm run dev` も終わる。終わったかは `ps -o pid=,command= -p <親の pid>` で見る（親の pid は kill の前に `ps -o ppid= -p $pid` で控える）。残っていれば、cwd が `<WT>` の中であることを確かめてから kill する
 
 ## 注意
 - ログを見るときは `tail -f <WT>/api/storage/logs/dev-api.log`（web は `dev-web.log`）
