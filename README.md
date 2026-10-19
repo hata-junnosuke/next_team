@@ -99,7 +99,7 @@ make up        # redis / mailpit
 make verify    # api: Pint + テスト / web: 型 + ESLint が緑になること
 ```
 
-issue ごとの worktree は `/issue-start <番号>` が作ります（依存・`.env` のコピー・DB まで）。
+issue ごとの worktree は `/issue-start <番号>` が作ります（依存・`.env` のコピー・DB まで）。Orca を使用していれば、その worktree の画面（API `8100 + 番号` / web `3100 + 番号`）と Claude も開き、Claude には `/epic-flow` か `/issue-flow` を最初の指示として渡します。PR がマージされたら main で `/worktree-clean` が片付けます（main で起動すると片付け候補が出ます）。
 
 ### 毎回
 
@@ -141,12 +141,13 @@ make down                       # redis / mailpit を止める（データは残
 |---|---|
 | issue を作る | `/issue-create task <概要>` / `/issue-create bug <概要>`（`.github/ISSUE_TEMPLATE/` どおり） |
 | 実装の前に計画だけ立てる | `/plan <issue 番号>` |
-| issue の作業場所（worktree）を作る | `/issue-start <issue 番号>`（main で） |
-| タスクが複数ある issue をまとめて進める | `/epic-flow <issue 番号>`（人が起動。計画を承認してから実装が始まる） |
+| issue の作業場所（worktree）を作る | `/issue-start <issue 番号>`（main で。Orca なら画面と Claude も開く） |
+| タスクが複数ある issue をまとめて進める | `/epic-flow <issue 番号>`（Orca では `/issue-start` が worktree の Claude に渡す。人が打ってもよい。計画を承認してから実装が始まる） |
 | タスク 1 件を実装 → テスト → レビューまで回す | `/issue-flow <issue 番号> [タスクID]` |
 | 検証する | `/verify`（quick）/ `/verify pre-commit` / `/verify full` |
 | レビューだけする | `/code-review` |
 | PR を作って CI を確かめる | `/pr-create <issue 番号>`（`.github/pull_request_template.md` どおり） |
+| マージ済みの worktree を片付ける | `/worktree-clean [issue 番号]`（main で。未コミット・未マージは残す） |
 
 応答を終えようとするたびに Stop フックが検証を回し、赤なら差し戻します（5 回で打ち切り。前回の緑から変更がなければ省略）。PR では CI が同じ `make verify` を回します（手元の速い合否が Stop フック、チームの関門が CI）。api のタスクの完了条件はテスト名、web のタスクは「型と ESLint が緑 ＋ issue に書いた画面の確認項目」です。差し戻しなどから分かった決まりは、`CLAUDE.md`・`.claude/rules/`・スキルに PR で直接書きます。
 

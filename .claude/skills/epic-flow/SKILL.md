@@ -1,6 +1,6 @@
 ---
 name: epic-flow
-description: アウターループ。エピック（タスクが複数ある issue 1 つ。例: #3 デザイン見直し）を planner に分解させ、人の承認後にタスクごとに issue-flow を回し、全部終わったら verify full と PR を出して人に最終確認を求める。人が issue 単位で起動する
+description: アウターループ。エピック（タスクが複数ある issue 1 つ。例: #3 デザイン見直し）を planner に分解させ、人の承認後にタスクごとに issue-flow を回し、全部終わったら verify full と PR を出して人に最終確認を求める。issue 単位で起動する（Orca では /issue-start が worktree の Claude に最初の指示として渡す。人が打ってもよい）
 argument-hint: <issue 番号> [補足。例: #3]
 disable-model-invocation: true
 ---
@@ -23,7 +23,7 @@ disable-model-invocation: true
 - 承認後、issue 本文に「（日付 人が承認）」と書き、`git switch -c issue/<番号>`（すでにその worktree / ブランチにいればそのまま）
 
 ### 3. タスクの実行（issue-flow の繰り返し）
-- 最初のタスクの前に、**Orca を使用している場合**（`ORCA_WORKTREE_ID` が空でない）は、この worktree の画面を issue ごとのポートで起動して Orca のブラウザで開く（`.claude/skills/issue-flow/dev-server.md`）。人が実装の進みを画面で見ながら確かめられるようにする。Orca の外なら何もしない
+- 最初のタスクの前に、**Orca を使用している場合**（`ORCA_WORKTREE_ID` が空でない）は、この worktree の画面を issue ごとのポートで起動して Orca のブラウザで開く（`.claude/skills/issue-flow/dev-server.md`）。`/issue-start` が起動済みならタブを開き直すだけ、止まっていれば起動し直す。Orca の外なら何もしない
 - 依存関係の順に、タスクごとに `/issue-flow <番号> <タスクID>` を実行する。issue 本文でチェック済みのタスクは飛ばす（途中から再開できる）
 - 並列にしてよいのは、docs/01 の担当と所有ファイルにある並列担当（api の A / B / C）と web（WA / WB / WC）だけ。**同時に実装 3 体・レビュー 4 体まで**。レビューが 4 体を超えるときは担当ごとに順番に回す
 - 基盤と非同期（docs/01 の担当と所有ファイル）は直列
