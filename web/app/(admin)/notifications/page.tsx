@@ -4,6 +4,7 @@ import {
 } from "@/components/notifications/NotificationFilters";
 import { NotificationLogTable } from "@/components/notifications/NotificationLogTable";
 import { Alert } from "@/components/ui/Alert";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { emptyText, Pagination } from "@/components/ui/Pagination";
 import { ApiError, apiGet } from "@/lib/api";
 import { notificationLogListResponse } from "@/lib/schemas/notification-log";
@@ -65,8 +66,8 @@ export default async function NotificationsPage({ searchParams }: Props) {
   const filtered = filters.kind !== "" || filters.status !== "";
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold whitespace-nowrap">通知履歴</h1>
+    <div className="space-y-6">
+      <PageHeader title="通知履歴" />
 
       <NotificationFilters values={filters} errors={error?.errors} />
 

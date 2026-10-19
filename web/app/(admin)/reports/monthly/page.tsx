@@ -2,6 +2,8 @@ import { MonthPicker } from "@/components/reports/MonthPicker";
 import { RequestExportForm } from "@/components/reports/RequestExportForm";
 import { SummaryTable } from "@/components/reports/SummaryTable";
 import { Alert } from "@/components/ui/Alert";
+import { buttonClassName } from "@/components/ui/Button";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { ApiError, apiGet } from "@/lib/api";
 import { monthlyReportResponse } from "@/lib/schemas/report";
 
@@ -51,24 +53,24 @@ export default async function MonthlyReportPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <h1 className="text-xl font-semibold whitespace-nowrap">月次集計</h1>
-        <MonthPicker month={month} />
-      </div>
+      <PageHeader title="月次集計" actions={<MonthPicker month={month} />} />
 
       {error !== undefined && <Alert state={{ ok: false, message: error }} />}
 
       {report && (
         <>
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <p className="py-2 text-sm whitespace-nowrap text-gray-600">
-              対象月: {report.month}
+            <p className="text-ink-muted py-2 text-sm whitespace-nowrap">
+              対象月:{" "}
+              <span className="font-num text-ink text-base">
+                {report.month}
+              </span>
             </p>
             <div className="flex flex-wrap items-start gap-3">
               {/* ファイルの受け渡しなので Link ではなく a。Route Handler が text/csv を返す */}
               <a
                 href={`/reports/monthly/csv?month=${encodeURIComponent(report.month)}`}
-                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium whitespace-nowrap text-white hover:bg-blue-700"
+                className={buttonClassName("primary")}
               >
                 CSV をダウンロード
               </a>
@@ -77,8 +79,9 @@ export default async function MonthlyReportPage({ searchParams }: Props) {
             </div>
           </div>
 
-          <section className="space-y-2">
-            <h2 className="text-base font-semibold whitespace-nowrap">
+          {/* Table は自前の枠を持つので Card で包まず、見出しだけを外に置く */}
+          <section className="space-y-3">
+            <h2 className="text-ink text-base font-semibold whitespace-nowrap">
               ワーカー別
             </h2>
             <SummaryTable
@@ -89,8 +92,8 @@ export default async function MonthlyReportPage({ searchParams }: Props) {
             />
           </section>
 
-          <section className="space-y-2">
-            <h2 className="text-base font-semibold whitespace-nowrap">
+          <section className="space-y-3">
+            <h2 className="text-ink text-base font-semibold whitespace-nowrap">
               拠点別
             </h2>
             <SummaryTable

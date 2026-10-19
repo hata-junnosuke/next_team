@@ -17,7 +17,7 @@ export function MonthPicker({ month }: MonthPickerProps) {
       <div className="space-y-1">
         <label
           htmlFor="field-month"
-          className="block text-sm font-medium whitespace-nowrap text-gray-700"
+          className="text-ink block text-xs font-medium whitespace-nowrap"
         >
           対象月
         </label>
@@ -26,7 +26,7 @@ export function MonthPicker({ month }: MonthPickerProps) {
           type="month"
           name="month"
           defaultValue={month}
-          className="block rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs focus:ring-2 focus:ring-blue-200 focus:outline-none"
+          className="bg-surface text-ink ring-line focus:ring-sidebar block h-9 rounded-md px-3 text-sm ring-1 transition-shadow ring-inset focus:ring-2 focus:outline-none"
         />
       </div>
       <Button variant="secondary">表示する</Button>

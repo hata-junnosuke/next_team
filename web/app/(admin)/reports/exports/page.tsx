@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { ExportTable } from "@/components/reports/ExportTable";
 import { Alert } from "@/components/ui/Alert";
+import { buttonClassName } from "@/components/ui/Button";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { apiGet } from "@/lib/api";
 import { reportExportListResponse } from "@/lib/schemas/report-export";
 import { isInProgressExportStatus } from "@/lib/status";
@@ -33,15 +35,17 @@ export default async function ReportExportsPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <h1 className="text-xl font-semibold whitespace-nowrap">非同期出力</h1>
-        <Link
-          href="/reports/monthly"
-          className="text-sm font-medium whitespace-nowrap text-blue-600 hover:underline"
-        >
-          月次集計へ
-        </Link>
-      </div>
+      <PageHeader
+        title="非同期出力"
+        actions={
+          <Link
+            href="/reports/monthly"
+            className={buttonClassName("secondary")}
+          >
+            月次集計へ
+          </Link>
+        }
+      />
 
       {month !== null && (
         <Alert
@@ -56,18 +60,18 @@ export default async function ReportExportsPage({ searchParams }: Props) {
         {/* 同じページを開き直して Server Component を取り直す（受付の表示は消える） */}
         <Link
           href="/reports/exports"
-          className="text-sm font-medium whitespace-nowrap text-blue-600 hover:underline"
+          className={buttonClassName("secondary", "sm")}
         >
           最新の状態に更新
         </Link>
         {hasInProgress && (
-          <p className="text-sm text-gray-600">
+          <p className="text-ink-muted text-sm">
             生成中の出力があります。進み具合は更新すると最新になります。
           </p>
         )}
       </div>
 
-      <p className="text-sm text-gray-600">
+      <p className="text-ink-muted text-sm">
         新しい順に最大 20 件を表示します。ダウンロードのリンクは表示してから 30
         分有効です。期限が切れたら更新してください。
       </p>

@@ -29,16 +29,39 @@ export function SummaryTable({
             ...rows.map((row) => (
               <tr key={row.key}>
                 <Td>{row.name}</Td>
-                <Td align="right">{row.shifts}回</Td>
-                <Td align="right">{minutes(row.worked_minutes)}</Td>
-                <Td align="right">{yen(row.total_pay)}</Td>
+                <Td align="right">
+                  <span className="font-num text-base">{row.shifts}回</span>
+                </Td>
+                <Td align="right">
+                  <span className="font-num text-base">
+                    {minutes(row.worked_minutes)}
+                  </span>
+                </Td>
+                <Td align="right">
+                  <span className="font-num text-base">
+                    {yen(row.total_pay)}
+                  </span>
+                </Td>
               </tr>
             )),
-            <tr key="total" className="bg-gray-50 font-medium">
+            <tr
+              key="total"
+              className="bg-surface-muted border-line border-t-2 font-semibold"
+            >
               <Td>合計</Td>
-              <Td align="right">{total.shifts}回</Td>
-              <Td align="right">{minutes(total.worked_minutes)}</Td>
-              <Td align="right">{yen(total.total_pay)}</Td>
+              <Td align="right">
+                <span className="font-num text-base">{total.shifts}回</span>
+              </Td>
+              <Td align="right">
+                <span className="font-num text-base">
+                  {minutes(total.worked_minutes)}
+                </span>
+              </Td>
+              <Td align="right">
+                <span className="font-num text-base">
+                  {yen(total.total_pay)}
+                </span>
+              </Td>
             </tr>,
           ]}
     </Table>
