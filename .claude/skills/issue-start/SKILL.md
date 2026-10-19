@@ -14,7 +14,7 @@ argument-hint: <issue 番号>
 - このスキルは **main の作業ツリー（司令塔）** で使う。main ではコードを書かない（`.claude/rules/common/git-workflow.md`）
 - 1 issue = 1 ブランチ `issue/<番号>` = 1 worktree。置き場所は人が指定したフォルダ。指定がなければ、すでにある worktree（`git worktree list` の 2 行目以降）と同じ親フォルダの `issue-<番号>`。どちらもなければ人に聞く。名前は付けない（中身は issue のタイトルで分かる）
 - `.env` / `.env.local` は Claude が読まない・書かない。コピーは `make worktree-env` に任せる（中身を出さない）
-- サーバーは起動しない（api 8002 / web 3002 はどの worktree も同じ番号。動かすのは一度に 1 つ）
+- サーバーは起動しない。起動は作った worktree の Claude が `/epic-flow` `/issue-flow` の始めに、issue ごとのポート（API `8100 + 番号` / web `3100 + 番号`）で行い、Orca のブラウザで開く（`.claude/skills/issue-flow/dev-server.md`。Orca を使用している場合だけ）。main の 8002 / 3002 とはぶつからない
 - `git reset --hard` / `git clean -f` は使わない（フックで禁止）
 - 別の作業ツリーの中で操作するときは `cd` しない。`git -C <場所>`、`composer -d <場所>/api`、`npm --prefix <場所>/web`、`make -C <場所>` を使う
 
@@ -79,12 +79,14 @@ make -C <WT> fresh
 - 次の一手（この順で人が行う）:
   1. `WT` を開いて Claude を起動する（`cd <WT> && claude`、またはエディタや worktree を扱う道具で `WT` を開く）。**worktree の直下で起動する**（フックが効く。SessionStart に今の issue 番号が出る）
   2. タスクが複数なら `/epic-flow <番号>`、1 件なら `/issue-flow <番号>`
+     （Orca で開いていれば、始めにこの issue の画面 `http://localhost:<3100 + 番号>` が Orca のブラウザに開く）
 - このセッション（main の司令塔）は続けて使える
 
 ## 片付け（PR がマージされた後、「片付けて」と言われたら）
 ```bash
 gh pr list --state merged --head <BRANCH>     # マージ済みを確かめる。未マージなら止めて聞く
 git -C <WT> status --short                    # 空でなければ止めて人に聞く（勝手に捨てない）
+lsof -tiTCP:<8100+番号> -sTCP:LISTEN; lsof -tiTCP:<3100+番号> -sTCP:LISTEN   # 動いていれば cwd が <WT> か確かめてから止める
 git worktree remove <WT>
 git branch -d <BRANCH>                        # -D は使わない。消せなければ未マージなので人に聞く
 git pull --ff-only                            # main（司令塔）を最新に
