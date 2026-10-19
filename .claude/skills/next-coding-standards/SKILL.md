@@ -124,11 +124,17 @@ const res = await fetch(`${API}/login`, {
 | 部品 | 役割 |
 |---|---|
 | `Table` | 見出しと行。セルは `whitespace-nowrap` |
-| `Field` | ラベル + 入力 + その項目のエラー。`type` は text / email / number / date / time / select |
-| `Button` | `pending` で無効化と文言の切り替え。`variant`: primary / secondary / danger |
+| `Field` | ラベル + 入力 + その項目のエラー。`type` は text / email / password / number / date / time / select / textarea |
+| `Button` | `pending` で無効化と文言の切り替え。`variant`: primary / secondary / danger、`size`: md（既定・`h-9`）/ sm（表の行内）。`Link` や `a` をボタンの見た目にするときは `buttonClassName(variant, size)` を使い、クラスを手で書かない |
 | `Alert` | `FormState` の `message` を表示（成功 / エラー）。`errors` に項目があるときは出さない（項目エラーは `Field`、業務ルール違反は `Alert`） |
-| `Badge` | 状態の表示。色は `lib/status.ts` |
+| `Badge` | 状態の表示（丸い点 + 文字色）。色は `lib/status.ts` |
 | `Pagination` | `meta` を受けて前後のリンク。範囲外の page（`meta.total > 0` なのに 0 件）では 1 ページ目へのリンクだけを出す。`itemCount`（`data.length`）は必須。表の空の文言は `emptyText(meta, data.length, "…まだ…")` で差し替える（範囲外なら「このページには表示する項目がありません。」） |
+| `LogoutButton` | ログアウト（`lib/browser-api.ts` の `logout()`） |
+| `NavLink` | サイドバーのメニュー（Client）。現在の画面に `aria-current="page"` を付けるだけで、見た目は呼び出し側の `aria-[current=page]:` で書く |
+| `PageHeader` | 一覧・詳細の見出し + 補足 + 右側の操作（`actions`）。`h1` を出すので画面に別の `h1` を置かない |
+| `Card` | `surface` の箱（`title?`）。絞り込み・フォーム・セクションを包む。`Table` は自前の枠を持つので `Card` で包まない |
+
+色は `app/globals.css` の `@theme` のトークン（`canvas` `surface` `ink` `accent` `sidebar` `tone-*` など）で書き、生の `blue-600` `gray-50` などは書かない。`accent`（琥珀色）は主ボタン・現在の画面の左の印・深夜跨ぎの文字の 3 か所だけ。フォーカスの印は `sidebar` 色
 
 ## 表示（`lib/format.ts`）
 - `yen(9600)` → `9,600円` / `minutes(420)` → `7時間00分` / `date("2026-09-20")` → `2026/09/20（日）` / `dateTime(iso)` → `2026/10/01（木） 10:00` / `time(iso)` → `09:00`
