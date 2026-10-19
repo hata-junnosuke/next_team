@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { buttonClassName } from "@/components/ui/Button";
 import type { PaginationMeta } from "@/lib/schemas/common";
 
 // 一覧の meta を受けて前後のリンクを出す。検索条件（query）は引き継ぐ
@@ -48,10 +49,13 @@ function href(
   return `${basePath}?${params.toString()}`;
 }
 
-const linkClass =
-  "rounded-md border border-gray-300 bg-white px-3 py-1.5 whitespace-nowrap text-gray-700 hover:bg-gray-50";
-const disabledClass =
-  "rounded-md border border-gray-200 px-3 py-1.5 whitespace-nowrap text-gray-300";
+// 前へ・次へは 1 つのセグメント（外枠を共有し、間を罫線で区切る）
+const segmentClass =
+  "inline-flex divide-x divide-line overflow-hidden rounded-md bg-surface ring-1 ring-line";
+const segmentItemClass =
+  "inline-flex h-9 items-center px-3 whitespace-nowrap transition-colors";
+const linkClass = `${segmentItemClass} text-ink hover:bg-surface-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sidebar`;
+const disabledClass = `${segmentItemClass} cursor-not-allowed text-ink-muted opacity-50`;
 
 export function Pagination({
   meta,
@@ -67,8 +71,11 @@ export function Pagination({
         aria-label="ページ送り"
         className="flex items-center justify-between gap-4 text-sm"
       >
-        <p className="whitespace-nowrap text-gray-600">全 {total} 件</p>
-        <Link href={href(basePath, 1, query)} className={linkClass}>
+        <p className="text-ink-muted whitespace-nowrap">全 {total} 件</p>
+        <Link
+          href={href(basePath, 1, query)}
+          className={buttonClassName("secondary")}
+        >
           1 ページ目へ
         </Link>
       </nav>
@@ -79,23 +86,27 @@ export function Pagination({
       aria-label="ページ送り"
       className="flex items-center justify-between gap-4 text-sm"
     >
-      <p className="whitespace-nowrap text-gray-600">
+      <p className="text-ink-muted whitespace-nowrap">
         全 {total} 件（{current} / {Math.max(last, 1)} ページ）
       </p>
-      <div className="flex gap-2">
+      <div className={segmentClass}>
         {current > 1 ? (
           <Link href={href(basePath, current - 1, query)} className={linkClass}>
             前へ
           </Link>
         ) : (
-          <span className={disabledClass}>前へ</span>
+          <span aria-disabled="true" className={disabledClass}>
+            前へ
+          </span>
         )}
         {current < last ? (
           <Link href={href(basePath, current + 1, query)} className={linkClass}>
             次へ
           </Link>
         ) : (
-          <span className={disabledClass}>次へ</span>
+          <span aria-disabled="true" className={disabledClass}>
+            次へ
+          </span>
         )}
       </div>
     </nav>

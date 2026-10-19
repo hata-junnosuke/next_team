@@ -13,13 +13,14 @@ export function Alert({ state }: AlertProps) {
   if (!state.message || hasFieldErrors) {
     return null;
   }
+  // 左のアクセント線と文字色でトーンを出す（地は surface）
   const className = state.ok
-    ? "border-green-300 bg-green-50 text-green-800"
-    : "border-red-300 bg-red-50 text-red-800";
+    ? "border-success text-success"
+    : "border-danger text-danger";
   return (
     <div
       role={state.ok ? "status" : "alert"}
-      className={`rounded-md border px-4 py-3 text-sm ${className}`}
+      className={`bg-surface ring-line rounded-md border-l-4 px-4 py-3 text-sm font-medium ring-1 ${className}`}
     >
       {state.message}
     </div>

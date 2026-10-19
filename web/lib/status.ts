@@ -36,13 +36,14 @@ export const statusTones = {
 
 export type StatusKind = keyof typeof statusTones;
 
+// 文字色だけ（Badge の丸い点は currentColor で同じ色になる）。値は globals.css の tone-* トークン
 const toneClasses: Record<Tone, string> = {
-  gray: "bg-gray-100 text-gray-700 ring-gray-300",
-  blue: "bg-blue-50 text-blue-700 ring-blue-300",
-  green: "bg-green-50 text-green-700 ring-green-300",
-  amber: "bg-amber-50 text-amber-800 ring-amber-300",
-  red: "bg-red-50 text-red-700 ring-red-300",
-  purple: "bg-purple-50 text-purple-700 ring-purple-300",
+  gray: "text-tone-gray",
+  blue: "text-tone-blue",
+  green: "text-tone-green",
+  amber: "text-tone-amber",
+  red: "text-tone-red",
+  purple: "text-tone-purple",
 };
 
 /** 未知の value（API に Enum が増えた）は灰色で出す。ラベルは API が返すので表示は崩れない */
