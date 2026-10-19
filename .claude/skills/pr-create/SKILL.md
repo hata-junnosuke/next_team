@@ -29,7 +29,10 @@ PR の **形** は `.github/pull_request_template.md` が決め、このスキ�
 4. タイトル: issue のタイトルに合わせる（`feat(api): ...` / `chore: issue #<番号> ...` など。日本語）
 5. push して作る: `git push -u origin issue/<番号>` → `gh pr create --base main --title "<タイトル>" --body-file <一時ファイル>`
 6. **CI の結果を確かめる**: `gh pr checks <PR 番号> --watch`（`.github/workflows/ci.yml` の `verify` ジョブ）
-   - 緑: PR の URL と CI の結果を報告して止まる。**マージは人が行う**
+   - 緑: Orca のブラウザで開いてから、PR の URL と CI の結果を報告して止まる。**マージは人が行う**
+     - `orca tab create --url <PR の URL> --json`（今の worktree のタブに開く）
+     - `web/` に変更があれば、`orca tab create --url http://localhost:3002 --json` も開く（人が画面の確認項目を見るため。3002 が別の場所のプロセスなら `make ports` の結果を報告に添える）
+     - `orca` が動かない・Orca が起動していないときは、エラーをそのまま報告に書いて先に進む（PR の作成は止めない）
    - 赤: `gh run view <run id> --log-failed` で失敗を読み、手元の `make verify` との差（PHP / Node の版、依存、環境変数、Redis の有無）を調べて直し、push し直して 6 を繰り返す。「再実行したら緑」は合格にしない。2 回直しても赤なら issue に `requires-human` ラベルを付けて理由をコメントし、人に報告する
 
 ## 禁止
