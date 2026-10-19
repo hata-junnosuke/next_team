@@ -14,7 +14,7 @@ argument-hint: <issue 番号>
 - このスキルは **main の作業ツリー（司令塔）** で使う。main ではコードを書かない（`.claude/rules/common/git-workflow.md`）
 - 1 issue = 1 ブランチ `issue/<番号>` = 1 worktree。置き場所は人が指定したフォルダ。指定がなければ、すでにある worktree（`git worktree list` の 2 行目以降）と同じ親フォルダの `issue-<番号>`。どちらもなければ人に聞く。名前は付けない（中身は issue のタイトルで分かる）
 - `.env` / `.env.local` は Claude が読まない・書かない。コピーは `make worktree-env` に任せる（中身を出さない）
-- 画面のサーバーは、Orca を使用している場合だけ、作った worktree の Orca のターミナルで issue ごとのポート（API `8100 + 番号` / web `3100 + 番号`）に起動する（`.claude/skills/issue-flow/dev-server.md`）。main の 8002 / 3002 と `/pr-env` の 8012 / 3012 には触らない
+- 画面のサーバーは、Orca を使用している場合だけ、作った worktree の画面として、issue ごとのポート（API `8100 + 番号` / web `3100 + 番号`）に `nohup` で起動する（ターミナルのタブは作らない。`.claude/skills/issue-flow/dev-server.md`）。main の 8002 / 3002 と `/pr-env` の 8012 / 3012 には触らない
 - Orca を使用しているかは、環境変数 `ORCA_WORKTREE_ID` が空でないかで判定する。CLI は `ORCA_CLI_COMMAND` があればその値、なければ `orca`
 - `git reset --hard` / `git clean -f` は使わない（フックで禁止）
 - 別の作業ツリーの中で操作するときは `cd` しない。`git -C <場所>`、`composer -d <場所>/api`、`npm --prefix <場所>/web`、`make -C <場所>` を使う
@@ -91,7 +91,7 @@ make -C <WT> fresh
 ### 8. 報告
 - issue の番号・タイトル、`BRANCH`、`WT`、元にした main のコミット
 - 実行した準備（composer / npm / `.env` のコピー / fresh）と、人の作業が残っていればそれ（`DB_DATABASE` の修正など）
-- **Orca を使用している場合**: 画面の URL（`http://localhost:<3100 + 番号>`、admin@example.com / password）、API・web のターミナル、起動した Claude と渡した指示。計画の承認やマージなど人の判断が要るところでは、その Claude が止まって聞く
+- **Orca を使用している場合**: 画面の URL（`http://localhost:<3100 + 番号>`、admin@example.com / password）、サーバーのログの場所（`<WT>/api/storage/logs/dev-*.log`）、起動した Claude と渡した指示。計画の承認やマージなど人の判断が要るところでは、その Claude が止まって聞く
 - **Orca の外の場合**: 次の一手（この順で人が行う）
   1. `WT` を開いて Claude を起動する（`cd <WT> && claude`、またはエディタや worktree を扱う道具で `WT` を開く）。**worktree の直下で起動する**（フックが効く。SessionStart に今の issue 番号が出る）
   2. タスクが複数なら `/epic-flow <番号>`、1 件なら `/issue-flow <番号>`

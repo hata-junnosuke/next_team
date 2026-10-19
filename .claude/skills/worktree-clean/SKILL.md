@@ -34,9 +34,9 @@ gh pr list --state merged --limit 100 --json number,headRefName
 | `git -C <WT> status --short` が空 | 飛ばして「未コミットあり」と変更の一覧を報告（勝手に捨てない） |
 | `git -C <WT> log origin/main..HEAD --oneline` が空（マージ後に足したコミットがない） | 飛ばして、そのコミットを報告して人に聞く |
 
-すべて満たしたら、worktree を消す。
+すべて満たしたら、まず画面のサーバー（API `8100 + 番号` / web `3100 + 番号`）が動いていれば止める（`.claude/skills/issue-flow/dev-server.md` の「止める」。場所が `<WT>` の中のものだけ）。次に worktree を消す。
 
-- **Orca を使用している場合**（環境変数 `ORCA_WORKTREE_ID` が空でない）: Orca から消す。その worktree のターミナル（画面のサーバー API `8100 + 番号` / web `3100 + 番号`、起動した Claude）も閉じる（`.claude/skills/issue-flow/dev-server.md`）。CLI は `ORCA_CLI_COMMAND` があればその値、なければ `orca`
+- **Orca を使用している場合**（環境変数 `ORCA_WORKTREE_ID` が空でない）: Orca から消す。その worktree のターミナル（起動した Claude）も閉じる。CLI は `ORCA_CLI_COMMAND` があればその値、なければ `orca`
   ```bash
   orca worktree rm --worktree path:<WT> --json    # --force は付けない
   ```
