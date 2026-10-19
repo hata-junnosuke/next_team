@@ -35,11 +35,10 @@ class SendApplicationConfirmedMail implements ShouldQueue
     /**
      * 試行の回数では打ち切らない（0 = 無制限）。打ち切りは「例外 3 回」（$maxExceptions）か「積んでから一定時間」（retryUntil()）。
      *
-     * $tries = 3 だと、キューへ戻された回（流量制限の RateLimited など）も試行に数えられ、戻される回が続くと
-     * 1 通も送ろうとしないまま failed になる。しかも claim の前なので notification_logs に行が残らず、
-     * 「届いていない」が画面から見えない（要件の非機能要件に反する。中止通知で tester が再現）。
-     * メールのジョブは tries=0 + maxExceptions + retryUntil にそろえる（async-rules）。
-     * https://readouble.com/laravel/13.x/ja/queues.html#max-exceptions
+     * 試行回数はキューから取り出すたびに増え、流量制限（RateLimited）でキューへ戻された回も数える。回数で打ち切ると、
+     * 戻されるだけで 1 通も送ろうとしないまま failed になる。retryUntil() があれば Laravel は $tries を見ずに期限だけで判定するので、
+     * それを防いでいるのは retryUntil()。$tries = 0 は retryUntil() を外したときに回数で打ち切らないための保険（async-rules）。
+     * https://readouble.com/laravel/13.x/ja/queues.html#max-job-attempts-and-timeout
      */
     public int $tries = 0;
 

@@ -240,7 +240,7 @@ class FailedJobTest extends TestCase
             $this->travel(70)->seconds();
         }
 
-        // 5 回戻されても失敗にしない（tries=3 だと 4 回目の取り出しで failed_jobs に移り、記録が何も残らなかった）
+        // 5 回戻されても失敗にしない（retryUntil() がなく tries=3 だと 4 回目の取り出しで failed_jobs に移り、記録が何も残らなかった。retryUntil() があれば tries は見られない）
         Mail::assertSent(ApplicationConfirmedMail::class, 5);
         Mail::assertNotSent(PostingCancelledMail::class);
         $this->assertSame(0, DB::table('failed_jobs')->count());
