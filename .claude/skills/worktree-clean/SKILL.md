@@ -34,11 +34,23 @@ gh pr list --state merged --limit 100 --json number,headRefName
 | `git -C <WT> status --short` が空 | 飛ばして「未コミットあり」と変更の一覧を報告（勝手に捨てない） |
 | `git -C <WT> log origin/main..HEAD --oneline` が空（マージ後に足したコミットがない） | 飛ばして、そのコミットを報告して人に聞く |
 
-すべて満たしたら:
+すべて満たしたら、worktree を消す。
+
+- **Orca を使用している場合**（環境変数 `ORCA_WORKTREE_ID` が空でない）: Orca から消す。その worktree のターミナル（画面のサーバー API `8100 + 番号` / web `3100 + 番号`、起動した Claude）も閉じる（`.claude/skills/issue-flow/dev-server.md`）。CLI は `ORCA_CLI_COMMAND` があればその値、なければ `orca`
+  ```bash
+  orca worktree rm --worktree path:<WT> --json    # --force は付けない
+  ```
+  `orca` がエラーになったら、エラーを報告に書いて、下の「Orca の外」の手順で消す。そのときはターミナルが残るので、Orca でその worktree を閉じてもらう
+- **Orca の外**:
+  ```bash
+  git worktree remove <WT>
+  ```
+
+どちらの後も、ブランチを消す。
 ```bash
-git worktree remove <WT>
 git branch -d <BRANCH>        # 消せなければ未マージのコミットがある。-D にせず人に聞く
 ```
+最後に、画面のポート（`8100 + 番号` / `3100 + 番号`）が空いたか `lsof -tiTCP:<port> -sTCP:LISTEN` で確かめる。残っていれば kill せず、持ち主（`lsof -a -p <pid> -d cwd`）を報告する
 
 ### 3. main を最新にする（最後に 1 回）
 ```bash
@@ -51,4 +63,4 @@ git pull --ff-only
 - 片付けたもの: worktree の場所・ブランチ・PR 番号
 - 残したもの: 場所と理由（未マージ / 未コミットあり / マージ後のコミットあり / `-d` で消せない）
 - `main` の今のコミット（`git log -1 --oneline`）
-- Orca などのツールの画面に消した worktree が残っていれば、そちらで閉じてもらう
+- Orca の外の手順で消した worktree が Orca の画面に残っていれば、そちらで閉じてもらう
