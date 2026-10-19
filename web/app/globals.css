@@ -1,26 +1,50 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+ * 色・角丸・フォントのトークン（ライト固定。ダークは別 issue）。
+ * 画面ではこの名前（bg-canvas / text-ink / ring-line / font-num など）で書き、生の blue-600 などは書かない。
+ * accent は「主ボタン・現在の画面の左の印・深夜跨ぎの文字」の 3 か所だけに使う。
+ */
+@theme {
+  /* サイドバーと表の見出し行 */
+  --color-sidebar: #0f1d33;
+  --color-sidebar-raised: #172a47;
+  --color-sidebar-ink: #e7edf6;
+  --color-sidebar-muted: #8fa1bb;
+
+  /* 本文 */
+  --color-canvas: #eef1f5;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f5f7fa;
+  --color-ink: #142033;
+  --color-ink-muted: #5d6b80;
+  --color-line: #dde3eb;
+
+  /* アクセントと状態 */
+  --color-accent: #ffb020;
+  --color-accent-hover: #f09a00;
+  --color-accent-ink: #3b2600;
+  --color-danger: #d33a2c;
+  --color-success: #1e7f45;
+  --color-warning: #9a5b00;
+
+  /* バッジの文字色（白い背景の上で 4.5:1 以上） */
+  --color-tone-gray: #4b5563;
+  --color-tone-blue: #1d4ed8;
+  --color-tone-green: #15803d;
+  --color-tone-amber: #b45309;
+  --color-tone-red: #b91c1c;
+  --color-tone-purple: #7e22ce;
+
+  /* 角丸: 部品 6px / 表・カード 10px */
+  --radius-md: 6px;
+  --radius-lg: 10px;
 }
 
+/* next/font が <html> に置く CSS 変数を参照するので inline にする */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  --font-sans:
+    var(--font-sans-jp), "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI",
+    sans-serif;
+  --font-num: var(--font-num-condensed), var(--font-sans-jp), sans-serif;
 }
