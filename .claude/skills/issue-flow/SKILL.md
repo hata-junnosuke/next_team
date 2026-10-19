@@ -17,6 +17,7 @@ argument-hint: <issue 番号> [タスクID。例: 3 D-2]
 - 担当が api か web かを確定する。両方にまたがるタスクは 2 つに分ける
 - **工程ごとの状態は書かない**（進行中・レビュー中を issue に書き込まない。いま何をしているかはリードの会話とブランチで分かる）
 - ブランチが `issue/<番号>` でなければ作る（epic-flow の中ならすでにある）
+- **Orca を使用している場合**（`ORCA_WORKTREE_ID` が空でない）、この worktree の画面を issue ごとのポートで開く（`.claude/skills/issue-flow/dev-server.md`）。`/issue-start` か epic-flow で起動済みならタブを開き直すだけ、止まっていれば起動し直す。Orca の外なら何もしない
 
 ### 1. 実装（implementer-api または implementer-web）
 - タスク行・所有ファイル・完了条件・`docs/01` の該当章を渡す

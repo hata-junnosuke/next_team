@@ -1,6 +1,6 @@
 ---
 name: issue-start
-description: 計画が承認された issue の作業場所を作る。main（司令塔）から issue 用の worktree（ブランチ issue/<番号>）を切り、依存・.env の確認・DB まで整えて、そこで Claude を起動すれば /epic-flow か /issue-flow に入れる状態にする。「issue #◯ を始めて」「#◯ の worktree を作って」で使う
+description: 計画が承認された issue の作業場所を作る。main（司令塔）から issue 用の worktree（ブランチ issue/<番号>）を切り、依存・.env の確認・DB まで整える。Orca を使用していれば、その worktree の画面（issue ごとのポート）と Claude（最初の指示 /epic-flow か /issue-flow つき）も開く。「issue #◯ を始めて」「#◯ の worktree を作って」で使う
 argument-hint: <issue 番号>
 ---
 
@@ -8,13 +8,14 @@ argument-hint: <issue 番号>
 
 対象: **issue #$ARGUMENTS**（番号がなければ `gh issue list --state open` を見せて聞く）
 
-役目は**作業場所づくりだけ**。実装・計画・片付けはしない（片付けは `/worktree-clean`）。作った worktree で人が Claude を起動し直し、`/epic-flow` か `/issue-flow` を打つ。
+役目は**作業場所づくりと、そこで作業を始めさせるところまで**。このセッション（main）では実装・計画・片付けはしない（片付けは `/worktree-clean`）。Orca を使用していれば、作った worktree の画面と Claude を開き、その Claude に `/epic-flow` か `/issue-flow` を最初の指示として渡す。Orca の外なら、人が worktree で Claude を起動してそれを打つ。
 
 ## 前提
 - このスキルは **main の作業ツリー（司令塔）** で使う。main ではコードを書かない（`.claude/rules/common/git-workflow.md`）
 - 1 issue = 1 ブランチ `issue/<番号>` = 1 worktree。置き場所は人が指定したフォルダ。指定がなければ、すでにある worktree（`git worktree list` の 2 行目以降）と同じ親フォルダの `issue-<番号>`。どちらもなければ人に聞く。名前は付けない（中身は issue のタイトルで分かる）
 - `.env` / `.env.local` は Claude が読まない・書かない。コピーは `make worktree-env` に任せる（中身を出さない）
-- サーバーは起動しない（api 8002 / web 3002 はどの worktree も同じ番号。動かすのは一度に 1 つ）
+- 画面のサーバーは、Orca を使用している場合だけ、作った worktree の画面として、issue ごとのポート（API `8100 + 番号` / web `3100 + 番号`）に `nohup` で起動する（ターミナルのタブは作らない。`.claude/skills/issue-flow/dev-server.md`）。main の 8002 / 3002 と `/pr-env` の 8012 / 3012 には触らない
+- Orca を使用しているかは、環境変数 `ORCA_WORKTREE_ID` が空でないかで判定する。CLI は `ORCA_CLI_COMMAND` があればその値、なければ `orca`
 - `git reset --hard` / `git clean -f` は使わない（フックで禁止）
 - 別の作業ツリーの中で操作するときは `cd` しない。`git -C <場所>`、`composer -d <場所>/api`、`npm --prefix <場所>/web`、`make -C <場所>` を使う
 
@@ -73,10 +74,25 @@ make -C <WT> fresh
 ```
 （シードの管理者は `admin@example.com / password`）
 
-### 7. 報告
+### 7. Orca で画面と Claude を開く（Orca を使用している場合だけ）
+`ORCA_WORKTREE_ID` が空なら飛ばして 8 へ。`orca` がエラーになったら、エラーを報告に書いて先に進む（`runtime_access_denied` ならサンドボックスの外で再実行する。`orca open` や Orca の再起動はしない）。
+
+1. Orca が worktree を認識しているか確かめる: `orca worktree list --json` に `<WT>` があること（`git worktree add` で作ったものも自動で載る。なければ数秒おいてもう一度。それでもなければ 7 を飛ばして 8 の「Orca の外」の案内にする）
+2. 画面を起動して、その worktree のブラウザに開く: `.claude/skills/issue-flow/dev-server.md` の手順を `<WT>` と issue 番号で行う
+3. 最初の指示を決める: 1 で見た issue 本文の未チェックのタスク（`- [ ] **`）が 2 件以上なら `/epic-flow <番号>`、それ以外（1 件、またはチェックリストのない小さな issue）なら `/issue-flow <番号>`
+4. その worktree で Claude を起動する（リードのモデルは `fable`。CLAUDE.md）
+   ```bash
+   orca agent launch --agent claude --worktree path:<WT> --model claude-fable-5-1 --prompt "<3 の指示>" --focus --json
+   ```
+   - モデルの指定でエラーになったら、`--model` を外してもう一度（起動した Claude で人が `/model` を切り替える）
+   - 結果の `outcome.kind`（chat / terminal）と `receipt.detail` を報告に書く
+   - Claude は worktree の直下で起動するので、その worktree のフックが効く（SessionStart に issue 番号が出る）
+
+### 8. 報告
 - issue の番号・タイトル、`BRANCH`、`WT`、元にした main のコミット
 - 実行した準備（composer / npm / `.env` のコピー / fresh）と、人の作業が残っていればそれ（`DB_DATABASE` の修正など）
-- 次の一手（この順で人が行う）:
+- **Orca を使用している場合**: 画面の URL（`http://localhost:<3100 + 番号>`、admin@example.com / password）、サーバーのログの場所（`<WT>/api/storage/logs/dev-*.log`）、起動した Claude と渡した指示。計画の承認やマージなど人の判断が要るところでは、その Claude が止まって聞く
+- **Orca の外の場合**: 次の一手（この順で人が行う）
   1. `WT` を開いて Claude を起動する（`cd <WT> && claude`、またはエディタや worktree を扱う道具で `WT` を開く）。**worktree の直下で起動する**（フックが効く。SessionStart に今の issue 番号が出る）
   2. タスクが複数なら `/epic-flow <番号>`、1 件なら `/issue-flow <番号>`
 - このセッション（main の司令塔）は続けて使える
