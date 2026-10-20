@@ -16,7 +16,7 @@ argument-hint: <issue 番号> [タスクID。例: 3 D-2]
 - `gh issue view <番号>` で対象タスク（担当・所有ファイル・完了条件）を読む。完了条件がなければ着手せず `/plan <番号>` に戻す
 - 担当が api か web かを確定する。両方にまたがるタスクは 2 つに分ける
 - **工程ごとの状態は書かない**（進行中・レビュー中を issue に書き込まない。いま何をしているかはリードの会話とブランチで分かる）
-- ブランチが `issue/<番号>` でなければ作る（epic-flow の中ならすでにある）
+- issue の worktree（ブランチ `issue/<番号>`）で動く（main の作業ツリーでは UserPromptSubmit フック `guard-prompt.sh` が止める。epic-flow から Skill ツールで呼ばれたときは通るので、ここでも確かめる）。`git rev-parse --path-format=absolute --git-dir --git-common-dir` の 2 行が同じなら main の作業ツリー。そうなら、またはブランチが `issue/<番号>` でなければ、ブランチを作らずに止まって報告する（入口は main の `/issue-start <番号>`）
 - **main を取り込む**（`.claude/skills/issue-flow/sync-main.md`）。タスクを始めるたびに行う。遅れがなければ何もしない。衝突したら止まって報告する
 - **Orca を使用している場合**（`ORCA_WORKTREE_ID` が空でない）、この worktree の画面を issue ごとのポートで開く（`.claude/skills/issue-flow/dev-server.md`）。`/issue-start` か epic-flow で起動済みならタブを開き直すだけ、止まっていれば起動し直す。Orca の外なら何もしない
 

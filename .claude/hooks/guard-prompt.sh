@@ -7,21 +7,23 @@
 # （issue #25 では main の作業ツリーが issue/25 に切り替わっていたので、ブランチ名では捕まらない）
 set -u
 INPUT="$(cat)"
-PROMPT="$(printf '%s' "$INPUT" | jq -r '.prompt // ""' 2>/dev/null | head -n 1)"
+# 空行でない最初の行だけを見る（先頭の空行で判定をすり抜けない）
+PROMPT="$(printf '%s' "$INPUT" | jq -r '.prompt // ""' 2>/dev/null | grep -m 1 -v '^[[:space:]]*$')"
 
-# 1 行目の先頭が対象のコマンドのときだけ見る（文中で /epic-flow に触れた質問や計画は止めない）
+# その行の先頭が対象のコマンドのときだけ見る（文中で /epic-flow に触れた質問や計画は止めない）
 CMD_RE='^[[:space:]]*/(epic-flow|issue-flow|pr-create)([[:space:]]|$)'
 printf '%s' "$PROMPT" | grep -Eq "$CMD_RE" || exit 0
 
 ROOT="${CLAUDE_PROJECT_DIR:-$PWD}"
 DIRS="$(git -C "$ROOT" rev-parse --path-format=absolute --git-dir --git-common-dir 2>/dev/null)" || exit 0
-GIT_DIR="$(printf '%s\n' "$DIRS" | sed -n 1p)"
-COMMON_DIR="$(printf '%s\n' "$DIRS" | sed -n 2p)"
+# 変数名は git の環境変数 GIT_DIR と重ねない
+WT_GIT_DIR="$(printf '%s\n' "$DIRS" | sed -n 1p)"
+WT_COMMON_DIR="$(printf '%s\n' "$DIRS" | sed -n 2p)"
 # 取れなかったとき・linked worktree（issue の worktree、レビュー用）のときは通す
-[ -n "$GIT_DIR" ] && [ "$GIT_DIR" = "$COMMON_DIR" ] || exit 0
+[ -n "$WT_GIT_DIR" ] && [ "$WT_GIT_DIR" = "$WT_COMMON_DIR" ] || exit 0
 
 COMMAND="$(printf '%s' "$PROMPT" | sed -nE 's#^[[:space:]]*/([a-z-]+).*#\1#p')"
-NUMBER="$(printf '%s' "$PROMPT" | sed -nE 's#^[[:space:]]*/[a-z-]+[[:space:]]+([0-9]+).*#\1#p')"
+NUMBER="$(printf '%s' "$PROMPT" | sed -nE 's#^[[:space:]]*/[a-z-]+[[:space:]]+\#?([0-9]+).*#\1#p')"
 NUMBER="${NUMBER:-<番号>}"
 
 jq -n --arg c "$COMMAND" --arg n "$NUMBER" '{

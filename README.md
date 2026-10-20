@@ -121,11 +121,11 @@ make down                       # redis / mailpit を止める（データは残
 | issue を作る | `/issue-create task <概要>` / `/issue-create bug <概要>`（`.github/ISSUE_TEMPLATE/` どおり） |
 | 実装の前に計画だけ立てる | `/plan <issue 番号>` |
 | issue の作業場所（worktree）を作る | `/issue-start <issue 番号>`（main で。Orca なら画面と Claude も開く） |
-| タスクが複数ある issue をまとめて進める | `/epic-flow <issue 番号>`（Orca では `/issue-start` が worktree の Claude に渡す。人が打ってもよい。計画を承認してから実装が始まる） |
-| タスク 1 件を実装 → テスト → レビューまで回す | `/issue-flow <issue 番号> [タスクID]` |
+| タスクが複数ある issue をまとめて進める | `/epic-flow <issue 番号>`（Orca では `/issue-start` が worktree の Claude に渡す。issue の worktree の中なら人が打ってもよい。main の作業ツリーではフックが止める） |
+| タスク 1 件を実装 → テスト → レビューまで回す | `/issue-flow <issue 番号> [タスクID]`（issue の worktree で。main の作業ツリーではフックが止める） |
 | 検証する | `/verify`（quick）/ `/verify pre-commit` / `/verify full` |
 | レビューだけする | `/code-review` |
-| PR を作って CI を確かめる | `/pr-create <issue 番号>`（`.github/pull_request_template.md` どおり） |
+| PR を作って CI を確かめる | `/pr-create <issue 番号>`（issue の worktree で。`.github/pull_request_template.md` どおり） |
 | 開発環境を最新化する（マージ済みの worktree を片付ける） | `/dev-refresh [issue 番号]`（main で。未コミット・未マージは残し、遅れと衝突の見込みを出す） |
 
 応答を終えようとするたびに Stop フックが検証を回し、赤なら差し戻します（5 回で打ち切り。前回の緑から変更がなければ省略）。PR では CI が同じ `make verify` を回します（手元の速い合否が Stop フック、チームの関門が CI）。api のタスクの完了条件はテスト名、web のタスクは「型と ESLint が緑 ＋ issue に書いた画面の確認項目」です。差し戻しなどから分かった決まりは、`CLAUDE.md`・`.claude/rules/`・スキルに PR で直接書きます。
