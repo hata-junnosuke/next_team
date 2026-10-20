@@ -17,7 +17,7 @@ export const notificationLogSchema = z.object({
     email: z.string(),
   }),
   subject: z.object({
-    /** value は morph の短い名前、label は「応募」「募集」「集計出力」 */
+    /** value は morph の短い名前、label は「応募」「集計出力」 */
     type: enumValueSchema,
     id: z.number().int(),
     /** 表示用の文字列（例: 「倉庫内作業 2026/10/10（土） / 山田 太郎」「削除された応募」） */

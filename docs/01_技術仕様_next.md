@@ -334,7 +334,7 @@ final class CurrentCompany
 | `ReportExportService`（P4） | `request(User $u, string $month): ReportExport` | 受け付けた行（読み直した後の状態。Redis では `processing`、拠点 0 件は `queued`、積むのに失敗したら `failed`、sync のテストでは `completed` のこともある。P4-05 で決定） | 同じ月の出力が生成中です。 |
 | `NotificationLogService`（P4） | `claim(NotificationKind $k, Model $recipient, Model $subject): ?NotificationLog`（宛先のアドレスは $recipient->email から決める。宛先・対象が未保存・company_id なし・他社なら LogicException。P4-01 で決定） | 送ってよいなら行、送信済みなら `null` | |
 | | `markSent(NotificationLog $l): void` / `markFailed(NotificationLog $l, ?Throwable $e): void`（送信済みなら何もしない） | | |
-| | `markFailedByKey(string $dedupeKey, ?Throwable $e): void`（ジョブの `failed()` 用。行がない・送信済みなら何もしない）/ `static dedupeKey(NotificationKind, Model $subject): string` | | |
+| | `markFailedByKey(string $dedupeKey, ?Throwable $e): bool`（ジョブの `failed()` 用。行があれば failed にして `true`（送信済みなら変えないが `true`）、行がなければ何もせず `false`。`false` なら呼び出し側がまだ送るべき対象かを確かめて `recordFailure()`）/ `static dedupeKey(NotificationKind, Model $subject): string` | | |
 
 ### 4.6 業務ルールの決定（要件の解釈）
 
