@@ -193,7 +193,7 @@ INDEX: `(company_id, clock_in)`（勤怠の日時での参照用。月次集計�
 | company_id | FK | NOT NULL |
 | kind | string | NOT NULL（`application_confirmed` / `posting_cancelled` / `shift_reminder` / `export_ready`） |
 | recipient_type / recipient_id | morphs | NOT NULL（`worker` または `user`） |
-| subject_type / subject_id | morphs | NOT NULL（`application` / `job_posting` / `report_export`） |
+| subject_type / subject_id | morphs | NOT NULL（`application` または `report_export`。募集は対象にしない（中止通知も対象は応募）。issue #25 で `job_posting` を外した） |
 | recipient_email | string | NOT NULL（送信時点の宛先を残す） |
 | dedupe_key | string | NOT NULL、**UNIQUE**（例: `shift_reminder:application:15`） |
 | status | string | NOT NULL、default `pending`（`pending` / `sent` / `failed`） |
@@ -304,7 +304,7 @@ final class CurrentCompany
 - `Application` の `$attributes = ['status' => 'applied']`、`JobPosting` の `$attributes = ['status' => 'open']`（`create()` 直後のメモリ上の値を DB の既定値と揃える。第2弾の教訓）
 - cast は `casts()` メソッド。日付は `immutable_date` / `immutable_datetime`
 - morph map を `AppServiceProvider::boot()` で強制する（P4）:
-  `Relation::enforceMorphMap(['worker' => Worker::class, 'user' => User::class, 'application' => Application::class, 'job_posting' => JobPosting::class, 'report_export' => ReportExport::class])`
+  `Relation::enforceMorphMap(['worker' => Worker::class, 'user' => User::class, 'application' => Application::class, 'report_export' => ReportExport::class])`
 
 ### 4.4 例外（`app/Exceptions/DomainException.php`）
 
@@ -565,9 +565,9 @@ sequenceDiagram
 
 `GET /api/notification-logs?kind=&status=&page=&per_page=`（per_page は 6.1 の共通どおり最大 100）
 
-`NotificationLogResource`: `{id, kind: {value, label}, recipient: {type: {value, label}, name, email}, subject: {type: {value, label}, id, label}, status: {value, label}, sent_at, failed_at, error, created_at}`（type の value は morph の短い名前、label は「ワーカー」「管理者」「応募」「募集」「集計出力」。null になりうるのは sent_at（送信済みのときだけ入る）と failed_at・error（失敗のときだけ入る）の 3 つ。subject.label の勤務日は表示用の `2026/10/10（土）` の形。P5-01 で決定）
+`NotificationLogResource`: `{id, kind: {value, label}, recipient: {type: {value, label}, name, email}, subject: {type: {value, label}, id, label}, status: {value, label}, sent_at, failed_at, error, created_at}`（type の value は morph の短い名前、label は「ワーカー」「管理者」「応募」「集計出力」。null になりうるのは sent_at（送信済みのときだけ入る）と failed_at・error（失敗のときだけ入る）の 3 つ。subject.label の勤務日は表示用の `2026/10/10（土）` の形。P5-01 で決定）
 
-（P5-01 で決定）新しい順（created_at → id の降順）でページング。`kind` / `status` は Enum で検証（不正は 422、空は絞り込まない）。`recipient.email` は記録時の `recipient_email`（実際に送った先）、`recipient.name` と label の名前は今の値（名前を直したら新しい名前で出る）。`subject.label` は応募が「{職種} {勤務日} / {ワーカー名}」、募集が「{職種} {勤務日}」、集計出力が「{月} の月次集計」。宛先・対象の行が消えていたら `name` は記録時のアドレス、`label` は「削除された応募」などを返す。
+（P5-01 で決定）新しい順（created_at → id の降順）でページング。`kind` / `status` は Enum で検証（不正は 422、空は絞り込まない）。`recipient.email` は記録時の `recipient_email`（実際に送った先）、`recipient.name` と label の名前は今の値（名前を直したら新しい名前で出る）。`subject.label` は応募が「{職種} {勤務日} / {ワーカー名}」、集計出力が「{月} の月次集計」。宛先・対象の行が消えていたら `name` は記録時のアドレス、`label` は「削除された応募」などを返す。
 
 ---
 
