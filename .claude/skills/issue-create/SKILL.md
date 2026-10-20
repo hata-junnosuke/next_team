@@ -1,6 +1,6 @@
 ---
 name: issue-create
-description: GitHub issue を .github/ISSUE_TEMPLATE/ のテンプレート（task / bug）どおりに作る。見出しを変えずに埋めて gh issue create する。/plan・/epic-flow で issue がないときと、不具合を見つけたときに使う
+description: GitHub issue を .github/ISSUE_TEMPLATE/ のテンプレート（task / bug）どおりに作る。見出しを変えずに埋めて gh issue create する。/plan で issue がないときと、不具合を見つけたときに使う
 argument-hint: <task|bug> <タイトルまたは概要>
 ---
 

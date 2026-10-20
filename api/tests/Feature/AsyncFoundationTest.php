@@ -144,14 +144,13 @@ class AsyncFoundationTest extends TestCase
 
     // --- morph map ----------------------------------------------------------
 
-    public function test_morph_mapはdocs01の4_3の5モデルで強制されている(): void
+    public function test_morph_mapはdocs01の4_3の4モデルで強制されている(): void
     {
         $this->assertTrue(Relation::requiresMorphMap());
         $this->assertEqualsCanonicalizing([
             'worker' => Worker::class,
             'user' => User::class,
             'application' => Application::class,
-            'job_posting' => JobPosting::class,
             'report_export' => ReportExport::class,
         ], Relation::morphMap());
     }
@@ -162,7 +161,6 @@ class AsyncFoundationTest extends TestCase
             'worker' => new Worker,
             'user' => new User,
             'application' => new Application,
-            'job_posting' => new JobPosting,
             'report_export' => new ReportExport,
         ];
         foreach ($expected as $alias => $model) {
@@ -172,7 +170,7 @@ class AsyncFoundationTest extends TestCase
 
     public function test_morph_mapにないモデルをポリモーフィックに使うと例外(): void
     {
-        foreach ([new Location, new Attendance, new Company, new NotificationLog] as $model) {
+        foreach ([new Location, new Attendance, new Company, new NotificationLog, new JobPosting] as $model) {
             try {
                 $model->getMorphClass();
                 $this->fail(class_basename($model).' がクラス名のまま使えてしまった');

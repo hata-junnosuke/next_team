@@ -9,6 +9,7 @@
 - `tests/TestCase.php` の `RefreshDatabase`、`$this->company` / `$this->admin`、`$this->actingAsAdmin()` を使う。HTTP は `getJson` / `postJson` など JSON 系
 - テストを通すためにテストを消す・スキップする・条件で逃げることを禁止
 - 他社データの分離は機能ごとに 1 本（404 になること）
+- JSON の応答に日本語が「出ないこと」を `assertDontSee('他社の職種')` で確かめない。JSON は日本語を `\uXXXX` にエスケープするので、本文に日本語がそのまま現れず常に通る（issue #25 で 2 本見つかった）。`assertJsonPath` の完全一致か、`assertStringNotContainsString('…', json_encode($response->json(), JSON_UNESCAPED_UNICODE))` を使う
 - 非同期は「積まれたか」を fake（`Queue::fake()` `Bus::fake()` `Mail::fake()`）で、「実行したらどうなるか」をジョブの `handle()` を直接呼んで検証する。両方を 1 本のテストに混ぜない
 - 「再実行したら緑になった」は合格ではない。原因を調べる（例: Faker のロケールや乱数で確率的に赤になる）
 - 期待値に関わる列には、ファクトリの `fake()->optional()` の値を使わない。テストの中で列を明示して作る（乱数で 2 回に 1 回だけ赤になる）

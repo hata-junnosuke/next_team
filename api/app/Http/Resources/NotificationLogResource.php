@@ -17,7 +17,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * 通知の記録の JSON（docs/01 の API 契約（通知履歴））:
  * {id, kind: {value, label}, recipient: {type: {value, label}, name, email}, subject: {type: {value, label}, id, label}, status: {value, label}, sent_at, failed_at, error, created_at}
  *
- * - recipient.type / subject.type は {value, label}。value は morph map の短い名前（worker / user、application / job_posting / report_export）
+ * - recipient.type / subject.type は {value, label}。value は morph map の短い名前（worker / user、application / report_export）
  * - subject.label はそのまま画面に出す表示用の文字列。勤務日は画面の表示規約（docs/01 のフロント契約）の 2026/10/10（土）の形
  * - recipient.email は記録時のアドレス（recipient_email）。今のアドレスに変わっていても、実際に送った宛先を見せる
  * - 宛先・対象の行がもうない（morphs に外部キーはない）ときも落とさない。name は記録時のアドレス、label は「削除された◯◯」
@@ -60,7 +60,6 @@ class NotificationLogResource extends JsonResource
     /**
      * 対象を人が読める文言にする
      * - 応募: 「{募集の職種} {勤務日（2026/10/10（土））} / {ワーカー名}」
-     * - 募集: 「{職種} {勤務日}」
      * - 集計出力: 「{月} の月次集計」
      */
     private static function subjectLabel(Model $subject): string
@@ -68,7 +67,6 @@ class NotificationLogResource extends JsonResource
         return match (true) {
             $subject instanceof Application => self::postingLabel($subject->jobPosting)
                 .' / '.($subject->worker->name ?? '削除されたワーカー'),
-            $subject instanceof JobPosting => self::postingLabel($subject),
             $subject instanceof ReportExport => "{$subject->month} の月次集計",
             default => self::morphLabel($subject->getMorphClass()),
         };
@@ -76,6 +74,7 @@ class NotificationLogResource extends JsonResource
 
     private static function postingLabel(?JobPosting $posting): string
     {
+        // job_posting_id は restrictOnDelete なので募集は消えない。null は募集が今の企業のスコープで読めないとき（応募の付け替えなど）の防御
         return $posting !== null
             ? "{$posting->job_title} {$posting->work_date->isoFormat('YYYY/MM/DD（ddd）')}"
             : '削除された募集';
@@ -98,7 +97,6 @@ class NotificationLogResource extends JsonResource
             Worker::class => 'ワーカー',
             User::class => '管理者',
             Application::class => '応募',
-            JobPosting::class => '募集',
             ReportExport::class => '集計出力',
             default => '不明',
         };
