@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Schema;
  * 通知の記録（F-20〜F-24。docs/01 の非同期用のテーブル）。1 通 1 行。
  * - dedupe_key の UNIQUE が二重送信を防ぐ最後の砦（claim の検索をすり抜けた同時実行も DB が拒否する）
  * - recipient / subject はポリモーフィック（Rails の polymorphic: true）。*_type には morph map の短い名前
- *   （worker / user / application / job_posting / report_export）が入る。AppServiceProvider の enforceMorphMap
+ *   （worker / user / application / report_export）が入る。AppServiceProvider の enforceMorphMap
  * - recipient_email は送信時点の宛先を残す（あとでワーカーのメールが変わっても、誰に送ったかが分かる）
  * INDEX: (company_id, created_at)（F-24 の通知履歴を新しい順に）。morphs() は (type, id) の索引を自分で張る。
  * https://readouble.com/laravel/13.x/ja/migrations.html
