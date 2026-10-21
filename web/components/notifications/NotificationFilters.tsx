@@ -1,6 +1,7 @@
 import Form from "next/form";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
 import { Field } from "@/components/ui/Field";
 import type { statusTones } from "@/lib/status";
 
@@ -51,50 +52,52 @@ export function NotificationFilters({
     .flatMap(([, messages]) => messages);
 
   return (
-    // 条件が変わったら入力欄を作り直す（defaultValue は初回しか効かないため。「条件を消す」で空に戻す）
-    <Form
-      key={JSON.stringify(values)}
-      action="/notifications"
-      className="flex flex-wrap items-end gap-4 rounded-md border border-gray-200 bg-white p-4"
-    >
-      <div className="w-48">
-        <Field
-          label="種別"
-          name="kind"
-          type="select"
-          options={kindOptions}
-          emptyOption="すべて"
-          defaultValue={values.kind}
-          errors={errors?.kind}
-        />
-      </div>
-      <div className="w-40">
-        <Field
-          label="状態"
-          name="status"
-          type="select"
-          options={statusOptions}
-          emptyOption="すべて"
-          defaultValue={values.status}
-          errors={errors?.status}
-        />
-      </div>
-      <div className="flex items-center gap-3">
-        <Button variant="secondary">絞り込む</Button>
-        <Link
-          href="/notifications"
-          className="text-sm whitespace-nowrap text-gray-600 hover:text-gray-900"
-        >
-          条件を消す
-        </Link>
-      </div>
-      {otherErrors.length > 0 && (
-        <ul role="alert" className="w-full space-y-0.5 text-sm text-red-600">
-          {otherErrors.map((message) => (
-            <li key={message}>{message}</li>
-          ))}
-        </ul>
-      )}
-    </Form>
+    <Card>
+      {/* 条件が変わったら入力欄を作り直す（defaultValue は初回しか効かないため。「条件を消す」で空に戻す） */}
+      <Form
+        key={JSON.stringify(values)}
+        action="/notifications"
+        className="flex flex-wrap items-end gap-4"
+      >
+        <div className="w-48">
+          <Field
+            label="種別"
+            name="kind"
+            type="select"
+            options={kindOptions}
+            emptyOption="すべて"
+            defaultValue={values.kind}
+            errors={errors?.kind}
+          />
+        </div>
+        <div className="w-40">
+          <Field
+            label="状態"
+            name="status"
+            type="select"
+            options={statusOptions}
+            emptyOption="すべて"
+            defaultValue={values.status}
+            errors={errors?.status}
+          />
+        </div>
+        <div className="flex items-center gap-3">
+          <Button variant="secondary">絞り込む</Button>
+          <Link
+            href="/notifications"
+            className="text-ink-muted hover:text-ink text-sm whitespace-nowrap transition-colors"
+          >
+            条件を消す
+          </Link>
+        </div>
+        {otherErrors.length > 0 && (
+          <ul role="alert" className="text-danger w-full space-y-0.5 text-sm">
+            {otherErrors.map((message) => (
+              <li key={message}>{message}</li>
+            ))}
+          </ul>
+        )}
+      </Form>
+    </Card>
   );
 }

@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { buttonClassName } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Table, Td } from "@/components/ui/Table";
 import { apiGet } from "@/lib/api";
 import { date, dateTime } from "@/lib/format";
@@ -8,33 +11,37 @@ import { dashboardResponse } from "@/lib/schemas/dashboard";
 // 充足率・確定数・未処理の応募数は API が数える（web で計算しない）。
 // API 側でキャッシュされるので、generated_at で「いつの値か」を出す
 
-const linkClass = "whitespace-nowrap text-blue-700 hover:underline";
-
 export default async function DashboardPage() {
   const { data } = await apiGet("/api/dashboard", dashboardResponse);
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <h1 className="text-xl font-semibold whitespace-nowrap">
-          ダッシュボード
-        </h1>
-        <p className="text-sm whitespace-nowrap text-gray-600">
-          集計時刻: {dateTime(data.generated_at)}
-        </p>
+      <PageHeader
+        title="ダッシュボード"
+        description={
+          <span className="whitespace-nowrap">
+            集計時刻: {dateTime(data.generated_at)}
+          </span>
+        }
+      />
+
+      {/* Card の className は幅の追加だけに使うので、並べ方は外側の div で決める */}
+      <div className="inline-block">
+        <Card className="min-w-56">
+          <p className="text-ink-muted text-xs font-medium whitespace-nowrap">
+            未処理の応募（応募中）
+          </p>
+          <p className="text-ink mt-1 whitespace-nowrap">
+            <span className="font-num text-4xl leading-none font-semibold">
+              {data.pending_applications_count}
+            </span>
+            <span className="ml-1 text-sm">件</span>
+          </p>
+        </Card>
       </div>
 
-      <section className="inline-block rounded-md border border-gray-200 bg-white px-6 py-4">
-        <p className="text-sm whitespace-nowrap text-gray-600">
-          未処理の応募（応募中）
-        </p>
-        <p className="text-2xl font-semibold whitespace-nowrap tabular-nums">
-          {data.pending_applications_count}件
-        </p>
-      </section>
-
-      <section className="space-y-2">
-        <h2 className="text-base font-semibold whitespace-nowrap">
+      <section className="space-y-3">
+        <h2 className="text-ink text-base font-semibold whitespace-nowrap">
           今日以降の募集
         </h2>
         <Table
@@ -43,20 +50,47 @@ export default async function DashboardPage() {
         >
           {data.upcoming_postings.map((posting) => (
             <tr key={posting.id}>
-              <Td>{date(posting.work_date)}</Td>
               <Td>
-                {posting.start_time}〜{posting.end_time}
+                <span className="font-num text-base">
+                  {date(posting.work_date)}
+                </span>
+              </Td>
+              <Td>
+                <span className="font-num text-base">
+                  {posting.start_time}〜{posting.end_time}
+                </span>
               </Td>
               <Td>{posting.job_title}</Td>
               <Td>{posting.location_name}</Td>
               <Td align="right">
-                {posting.confirmed_count} / {posting.capacity}
+                <span className="font-num text-base">
+                  {posting.confirmed_count} / {posting.capacity}
+                </span>
               </Td>
-              <Td align="right">{posting.fill_rate}%</Td>
+              <Td>
+                <div className="flex items-center gap-3">
+                  {/* 幅は API の fill_rate（整数の％）を使う。値の計算はしない。
+                      想定外の値でバーがはみ出さないよう幅だけ 0〜100 に収める（数字は API の値のまま出す） */}
+                  <div
+                    aria-hidden="true"
+                    className="bg-surface-muted ring-line h-1.5 w-24 overflow-hidden rounded-full ring-1"
+                  >
+                    <div
+                      className="bg-sidebar h-full rounded-full"
+                      style={{
+                        width: `${Math.min(100, Math.max(0, posting.fill_rate))}%`,
+                      }}
+                    />
+                  </div>
+                  <span className="font-num w-10 text-right text-base">
+                    {posting.fill_rate}%
+                  </span>
+                </div>
+              </Td>
               <Td>
                 <Link
                   href={`/job-postings/${posting.id}`}
-                  className={linkClass}
+                  className={buttonClassName("secondary", "sm")}
                 >
                   詳細
                 </Link>

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { fontVariables } from "./fonts";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -8,11 +9,9 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="ja" className="h-full antialiased">
-      <body className="flex min-h-full flex-col">
-        <div className="flex min-h-full flex-1 flex-col bg-gray-50 text-gray-900">
-          {children}
-        </div>
+    <html lang="ja" className={`${fontVariables} h-full antialiased`}>
+      <body className="bg-canvas text-ink flex min-h-full flex-col font-sans tabular-nums">
+        {children}
       </body>
     </html>
   );

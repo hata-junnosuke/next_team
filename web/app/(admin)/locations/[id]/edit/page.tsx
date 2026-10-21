@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { LocationForm } from "@/components/locations/LocationForm";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { updateLocation } from "@/lib/actions/location";
 import { apiGet } from "@/lib/api";
 import { locationResponse } from "@/lib/schemas/location";
@@ -23,8 +24,8 @@ export default async function EditLocationPage({ params }: Props) {
   );
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold whitespace-nowrap">拠点を編集</h1>
+    <div className="space-y-6">
+      <PageHeader title="拠点を編集" />
       <LocationForm
         // id は URL ではなく API が返した値を使う
         action={updateLocation.bind(null, location.id)}

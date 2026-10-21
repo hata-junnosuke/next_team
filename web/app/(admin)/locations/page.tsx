@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { DeleteLocationButton } from "@/components/locations/DeleteLocationButton";
+import { buttonClassName } from "@/components/ui/Button";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { emptyText, Pagination } from "@/components/ui/Pagination";
 import { Table, Td } from "@/components/ui/Table";
 import { deleteLocation } from "@/lib/actions/location";
@@ -12,8 +14,6 @@ type Props = {
   searchParams: Promise<{ page?: string | string[] }>;
 };
 
-const linkClass = "whitespace-nowrap text-blue-700 hover:underline";
-
 export default async function LocationsPage({ searchParams }: Props) {
   const { page } = await searchParams;
   // ?page=1&page=2 のように配列で来たら先頭を使う。値の妥当性は Laravel に任せる
@@ -24,16 +24,15 @@ export default async function LocationsPage({ searchParams }: Props) {
   );
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-xl font-semibold whitespace-nowrap">拠点</h1>
-        <Link
-          href="/locations/new"
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium whitespace-nowrap text-white hover:bg-blue-700"
-        >
-          拠点を登録
-        </Link>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="拠点"
+        actions={
+          <Link href="/locations/new" className={buttonClassName("primary")}>
+            拠点を登録
+          </Link>
+        }
+      />
 
       <Table
         head={["名称", "住所", "募集数", ""]}
@@ -49,10 +48,10 @@ export default async function LocationsPage({ searchParams }: Props) {
             <Td>{location.address ?? "—"}</Td>
             <Td align="right">{location.job_postings_count}</Td>
             <Td>
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-2">
                 <Link
                   href={`/locations/${location.id}/edit`}
-                  className={`${linkClass} py-2`}
+                  className={buttonClassName("secondary", "sm")}
                 >
                   編集
                 </Link>

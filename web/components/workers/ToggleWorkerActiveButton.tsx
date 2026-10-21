@@ -23,7 +23,12 @@ export function ToggleWorkerActiveButton({
 
   return (
     <form action={formAction} className="space-y-2">
-      <Button variant="secondary" pending={pending} pendingLabel="切替中…">
+      <Button
+        variant="secondary"
+        size="sm"
+        pending={pending}
+        pendingLabel="切替中…"
+      >
         {isActive ? "無効にする" : "有効にする"}
       </Button>
       {/* 表のセルは whitespace-nowrap なので、長い理由文はここで折り返す */}

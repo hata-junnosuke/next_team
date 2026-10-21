@@ -3,6 +3,9 @@ import { DuplicateJobPostingForm } from "@/components/job-postings/DuplicateJobP
 import { fetchLocationOptions } from "@/components/job-postings/location-options";
 import { JobPostingForm } from "@/components/job-postings/JobPostingForm";
 import { Badge } from "@/components/ui/Badge";
+import { buttonClassName } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { PageHeader } from "@/components/ui/PageHeader";
 import {
   duplicateJobPosting,
   updateJobPosting,
@@ -32,54 +35,57 @@ export default async function EditJobPostingPage({ params }: Props) {
   ]);
 
   return (
-    <div className="space-y-8">
-      <section className="space-y-4">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-semibold whitespace-nowrap">
+    <div className="space-y-6">
+      <PageHeader
+        title={
+          <span className="inline-flex items-center gap-3">
             募集を編集
-          </h1>
-          <Badge kind="jobPosting" status={posting.status} />
+            {/* 読み上げで見出しと状態の間に区切りを入れる */}
+            <span className="sr-only">、</span>
+            <Badge kind="jobPosting" status={posting.status} />
+          </span>
+        }
+        actions={
           <Link
             href={`/job-postings/${posting.id}`}
-            className="text-sm whitespace-nowrap text-blue-700 hover:underline"
+            className={buttonClassName("secondary")}
           >
             詳細へ
           </Link>
-        </div>
-        {!posting.can.edit && (
-          <p
-            role="status"
-            className="max-w-xl rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800"
-          >
-            この募集は「{posting.status.label}
-            」のため編集できません。下の複製から別の日の募集を作れます。
-          </p>
-        )}
-        <JobPostingForm
-          // id は URL ではなく API が返した値を使う
-          action={updateJobPosting.bind(null, posting.id)}
-          locations={locations}
-          posting={posting}
-          submitLabel="保存する"
-          editable={posting.can.edit}
-        />
-      </section>
+        }
+      />
+      {!posting.can.edit && (
+        // Alert と同じ見た目（左のアクセント線 + 文字色）。業務上の注意なので warning
+        <p
+          role="status"
+          className="bg-surface ring-line border-warning text-warning max-w-xl rounded-md border-l-4 px-4 py-3 text-sm font-medium ring-1"
+        >
+          この募集は「{posting.status.label}
+          」のため編集できません。下の複製から別の日の募集を作れます。
+        </p>
+      )}
+      <JobPostingForm
+        // id は URL ではなく API が返した値を使う
+        action={updateJobPosting.bind(null, posting.id)}
+        locations={locations}
+        posting={posting}
+        submitLabel="保存する"
+        editable={posting.can.edit}
+      />
 
-      <section
-        id="duplicate"
-        className="space-y-4 border-t border-gray-200 pt-6"
-      >
-        <div className="space-y-1">
-          <h2 className="text-lg font-semibold whitespace-nowrap">複製</h2>
-          <p className="text-sm text-gray-600">
-            {date(posting.work_date)}の「{posting.job_title}
-            」と同じ内容（拠点・時間・募集人数・時給・交通費）で、別の勤務日の募集を作ります。応募は引き継ぎません。
-          </p>
-        </div>
-        <DuplicateJobPostingForm
-          action={duplicateJobPosting.bind(null, posting.id)}
-        />
-      </section>
+      <div id="duplicate">
+        <Card title="複製" className="max-w-xl">
+          <div className="space-y-4">
+            <p className="text-ink-muted text-sm">
+              {date(posting.work_date)}の「{posting.job_title}
+              」と同じ内容（拠点・時間・募集人数・時給・交通費）で、別の勤務日の募集を作ります。応募は引き継ぎません。
+            </p>
+            <DuplicateJobPostingForm
+              action={duplicateJobPosting.bind(null, posting.id)}
+            />
+          </div>
+        </Card>
+      </div>
     </div>
   );
 }

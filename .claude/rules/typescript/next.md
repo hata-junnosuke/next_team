@@ -15,7 +15,8 @@ paths:
 - 更新は Server Action（`lib/actions/*.ts`、先頭に `"use server"`）。フォームは `useActionState`
 - 検証は Laravel を正とする。422 の `errors` を `FormState` にして `Field` に流す。同じ検証を web に二重に書かない
 - 状態管理ライブラリ・データ取得ライブラリ・UI ライブラリを入れない
-- 共通部品は `components/ui/` の 7 つ（`Table` `Field` `Button` `Alert` `Badge` `Pagination` `LogoutButton`）。足したくなったらリードに報告する
+- 共通部品は `components/ui/` の 10 個（`Table` `Field` `Button` `Alert` `Badge` `Pagination` `LogoutButton` `NavLink` `PageHeader` `Card`）。足したくなったらリードに報告する
+- 色は `app/globals.css` の `@theme` のトークンで書く。生の `blue-600` `gray-50` などと `dark:` は書かない。`Link` をボタンの見た目にするときは `buttonClassName()`
 - 状態のラベルは API の `label` をそのまま出す。色は `lib/status.ts` の対応表だけ
 - 表のセル・バッジ・ボタンには `whitespace-nowrap`
 - `api/` のコードを読まない。契約は `docs/01_技術仕様_next.md` の API 契約と実際のレスポンス

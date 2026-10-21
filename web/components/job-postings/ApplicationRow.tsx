@@ -13,6 +13,7 @@ import { saveAttendance } from "@/lib/actions/attendance";
 import { dateTime, minutes, time, yen } from "@/lib/format";
 import type { Application } from "@/lib/schemas/application";
 import type { Attendance } from "@/lib/schemas/attendance";
+import { toneClasses } from "@/lib/status";
 
 // 募集詳細の応募一覧の 1 行（Server Component）。応募の行と、勤怠を入力できる応募（can.attend）なら勤怠フォームの行。
 // bind はここ（Server 側）で作る。ボタンを押せるかは API の can.* だけで決める（定員・遷移の判定は API の 422）
@@ -107,7 +108,13 @@ export function ApplicationRow({
             <span className="inline-flex items-center gap-2">
               {workedRange(a)}
               {a.is_overnight && (
-                <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs whitespace-nowrap text-gray-700">
+                // Badge と同じ形（丸い点 + 文字）。accent の文字は白地では読みにくいので、
+                // デザイン節の「深夜跨ぎの印の地」の sidebar 色の上に置く
+                <span className="bg-sidebar text-accent inline-flex items-center gap-1.5 rounded-sm px-1.5 py-0.5 text-xs font-medium whitespace-nowrap">
+                  <span
+                    aria-hidden="true"
+                    className="size-2 shrink-0 rounded-full bg-current"
+                  />
                   深夜跨ぎ
                 </span>
               )}
@@ -124,13 +131,20 @@ export function ApplicationRow({
           {a ? (
             <span className="inline-flex items-center gap-2">
               {excluded && (
-                <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-normal whitespace-nowrap text-gray-600">
+                // Badge と同じ形（丸い点 + 文字色）。灰色のトーン
+                <span
+                  className={`inline-flex items-center gap-1.5 text-xs font-medium whitespace-nowrap ${toneClasses.gray}`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="size-2 shrink-0 rounded-full bg-current"
+                  />
                   集計対象外
                 </span>
               )}
               <span
                 className={
-                  excluded ? "text-gray-400 line-through" : "font-semibold"
+                  excluded ? "text-ink-muted line-through" : "font-semibold"
                 }
               >
                 {yen(a.total_pay)}
@@ -148,6 +162,7 @@ export function ApplicationRow({
               label="承認"
               pendingLabel="承認中…"
               variant="primary"
+              size="sm"
               disabled={!application.can.confirm}
             />
             <ActionButton
@@ -155,6 +170,7 @@ export function ApplicationRow({
               action={rejectApplication.bind(null, application.id, postingId)}
               label="却下"
               pendingLabel="却下中…"
+              size="sm"
               disabled={!application.can.reject}
               confirmMessage={`${name}さんの応募を却下します。よろしいですか？`}
             />
@@ -169,9 +185,13 @@ export function ApplicationRow({
         </Td>
       </tr>
       {application.can.attend && (
-        <tr className="bg-gray-50">
-          <td colSpan={APPLICATION_HEAD.length} className="px-4 py-3">
-            <p className="mb-2 text-sm font-medium whitespace-nowrap text-gray-700">
+        // 勤怠の入力行。応募の行と区別するため、surface-muted の地と左の線（sidebar 色）を付ける
+        <tr className="bg-surface-muted">
+          <td
+            colSpan={APPLICATION_HEAD.length}
+            className="border-sidebar border-l-4 px-4 py-3"
+          >
+            <p className="text-ink mb-2 text-xs font-semibold whitespace-nowrap">
               勤怠の入力（{name}）
             </p>
             <AttendanceForm

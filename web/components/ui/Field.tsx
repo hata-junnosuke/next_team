@@ -32,8 +32,9 @@ type FieldProps = {
   emptyOption?: string;
 };
 
+// 枠線は ring で描く（border と違って太さを変えても寸法が動かない）。フォーカスは sidebar 色、エラーは danger
 const inputClass =
-  "block w-full rounded-md border px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-2";
+  "block w-full rounded-md bg-surface px-3 py-2 text-sm text-ink ring-1 ring-inset transition-shadow placeholder:text-ink-muted focus:ring-2 focus:outline-none";
 
 export function Field({
   label,
@@ -51,8 +52,8 @@ export function Field({
   const id = idProp ?? `field-${name}`;
   const hasError = (errors?.length ?? 0) > 0;
   const stateClass = hasError
-    ? "border-red-400 focus:ring-red-200"
-    : "border-gray-300 focus:ring-blue-200";
+    ? "ring-danger focus:ring-danger"
+    : "ring-line focus:ring-sidebar";
   const common = {
     id,
     name,
@@ -67,10 +68,10 @@ export function Field({
     <div className="space-y-1">
       <label
         htmlFor={id}
-        className="block text-sm font-medium whitespace-nowrap text-gray-700"
+        className="text-ink block text-xs font-medium whitespace-nowrap"
       >
         {label}
-        {required && <span className="ml-1 text-red-600">*</span>}
+        {required && <span className="text-danger ml-1">*</span>}
       </label>
       {type === "select" ? (
         <select {...common}>
@@ -92,7 +93,7 @@ export function Field({
         />
       )}
       {hasError && (
-        <ul id={`${id}-error`} className="space-y-0.5 text-sm text-red-600">
+        <ul id={`${id}-error`} className="text-danger space-y-0.5 text-xs">
           {errors?.map((e) => (
             <li key={e}>{e}</li>
           ))}

@@ -32,7 +32,7 @@ export function RequestExportForm({ month }: RequestExportFormProps) {
       <div className="max-w-md whitespace-normal">
         <Alert state={state} />
         {fieldErrors.length > 0 && (
-          <ul role="alert" className="space-y-0.5 text-sm text-red-600">
+          <ul role="alert" className="text-danger space-y-0.5 text-sm">
             {fieldErrors.map((message, i) => (
               <li key={`${i}-${message}`}>{message}</li>
             ))}

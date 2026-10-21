@@ -26,11 +26,12 @@ export function LogoutButton() {
   return (
     <div className="flex items-center gap-2">
       {error && (
-        <span className="text-sm whitespace-nowrap text-red-600">{error}</span>
+        <span className="text-danger text-sm whitespace-nowrap">{error}</span>
       )}
       <Button
         type="button"
         variant="secondary"
+        size="sm"
         pending={pending}
         onClick={onClick}
       >

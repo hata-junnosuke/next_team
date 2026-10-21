@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useActionState } from "react";
 import { Alert } from "@/components/ui/Alert";
-import { Button } from "@/components/ui/Button";
+import { Button, buttonClassName } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
 import { Field } from "@/components/ui/Field";
 import type { FormState } from "@/lib/form-state";
 import type { JobPosting } from "@/lib/schemas/job-posting";
@@ -38,84 +39,83 @@ export function JobPostingForm({
     state.values?.[name] ?? original;
 
   return (
-    <form action={formAction} className="max-w-xl space-y-4">
-      <Alert state={state} />
-      <Field
-        label="拠点"
-        name="location_id"
-        type="select"
-        options={locations}
-        emptyOption="選択してください"
-        errors={state.errors?.location_id}
-        defaultValue={value("location_id", posting?.location.id)}
-      />
-      <Field
-        label="職種名"
-        name="job_title"
-        errors={state.errors?.job_title}
-        defaultValue={value("job_title", posting?.job_title)}
-      />
-      <Field
-        label="勤務日"
-        name="work_date"
-        type="date"
-        errors={state.errors?.work_date}
-        defaultValue={value("work_date", posting?.work_date)}
-      />
-      <div className="grid grid-cols-2 gap-4">
+    <Card className="max-w-xl">
+      <form action={formAction} className="space-y-4">
+        <Alert state={state} />
         <Field
-          label="開始時刻"
-          name="start_time"
-          type="time"
-          errors={state.errors?.start_time}
-          defaultValue={value("start_time", posting?.start_time)}
+          label="拠点"
+          name="location_id"
+          type="select"
+          options={locations}
+          emptyOption="選択してください"
+          errors={state.errors?.location_id}
+          defaultValue={value("location_id", posting?.location.id)}
         />
         <Field
-          label="終了時刻"
-          name="end_time"
-          type="time"
-          errors={state.errors?.end_time}
-          defaultValue={value("end_time", posting?.end_time)}
+          label="職種名"
+          name="job_title"
+          errors={state.errors?.job_title}
+          defaultValue={value("job_title", posting?.job_title)}
         />
-      </div>
-      <Field
-        label="募集人数（名）"
-        name="capacity"
-        type="number"
-        errors={state.errors?.capacity}
-        defaultValue={value("capacity", posting?.capacity)}
-      />
-      <div className="grid grid-cols-2 gap-4">
         <Field
-          label="時給（円）"
-          name="hourly_wage"
+          label="勤務日"
+          name="work_date"
+          type="date"
+          errors={state.errors?.work_date}
+          defaultValue={value("work_date", posting?.work_date)}
+        />
+        <div className="grid grid-cols-2 gap-4">
+          <Field
+            label="開始時刻"
+            name="start_time"
+            type="time"
+            errors={state.errors?.start_time}
+            defaultValue={value("start_time", posting?.start_time)}
+          />
+          <Field
+            label="終了時刻"
+            name="end_time"
+            type="time"
+            errors={state.errors?.end_time}
+            defaultValue={value("end_time", posting?.end_time)}
+          />
+        </div>
+        <Field
+          label="募集人数（名）"
+          name="capacity"
           type="number"
-          errors={state.errors?.hourly_wage}
-          defaultValue={value("hourly_wage", posting?.hourly_wage)}
+          errors={state.errors?.capacity}
+          defaultValue={value("capacity", posting?.capacity)}
         />
-        <Field
-          label="交通費（円）"
-          name="transport_allowance"
-          type="number"
-          placeholder="空欄なら 0円"
-          errors={state.errors?.transport_allowance}
-          defaultValue={value(
-            "transport_allowance",
-            posting?.transport_allowance,
-          )}
-        />
-      </div>
-      <div className="flex items-center gap-3">
-        <Button pending={pending} pendingLabel="保存中…" disabled={!editable}>
-          {submitLabel}
-        </Button>
-        <Link
-          href="/job-postings"
-          className="text-sm whitespace-nowrap text-gray-600 hover:text-gray-900"
-        >
-          一覧に戻る
-        </Link>
-      </div>
-    </form>
+        <div className="grid grid-cols-2 gap-4">
+          <Field
+            label="時給（円）"
+            name="hourly_wage"
+            type="number"
+            errors={state.errors?.hourly_wage}
+            defaultValue={value("hourly_wage", posting?.hourly_wage)}
+          />
+          <Field
+            label="交通費（円）"
+            name="transport_allowance"
+            type="number"
+            placeholder="空欄なら 0円"
+            errors={state.errors?.transport_allowance}
+            defaultValue={value(
+              "transport_allowance",
+              posting?.transport_allowance,
+            )}
+          />
+        </div>
+        <div className="flex items-center gap-3">
+          <Button pending={pending} pendingLabel="保存中…" disabled={!editable}>
+            {submitLabel}
+          </Button>
+          <Link href="/job-postings" className={buttonClassName("secondary")}>
+            一覧に戻る
+          </Link>
+        </div>
+      </form>
+    </Card>
   );
 }

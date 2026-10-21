@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { WorkerForm } from "@/components/workers/WorkerForm";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { updateWorker } from "@/lib/actions/worker";
 import { apiGet } from "@/lib/api";
 import { workerResponse } from "@/lib/schemas/worker";
@@ -23,10 +24,8 @@ export default async function EditWorkerPage({ params }: Props) {
   );
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold whitespace-nowrap">
-        ワーカーを編集
-      </h1>
+    <div className="space-y-6">
+      <PageHeader title="ワーカーを編集" />
       <WorkerForm
         // id は URL ではなく API が返した値を使う
         action={updateWorker.bind(null, worker.id)}
