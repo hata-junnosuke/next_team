@@ -1,6 +1,6 @@
 ---
 name: epic-flow
-description: アウターループ。エピック（タスクが複数ある issue 1 つ。例: #3 デザイン見直し）を planner に分解させ、人の承認後にタスクごとに issue-flow を回し、全部終わったら verify full と PR を出して人に最終確認を求める。issue 単位で起動する（Orca では /issue-start が worktree の Claude に最初の指示として渡す。人が打ってもよい）
+description: アウターループ。エピック（タスクが複数ある issue 1 つ。例: #3 デザイン見直し）を planner に分解させ、人の承認後にタスクごとに issue-flow を回し、全部終わったら verify full と PR を出して人に最終確認を求める。issue の worktree で起動する（Orca では /issue-start が worktree の Claude に最初の指示として渡す。worktree の中なら人が打ってもよい。main の作業ツリーではフックが止める）
 argument-hint: <issue 番号> [補足。例: #3]
 disable-model-invocation: true
 ---
@@ -13,14 +13,18 @@ disable-model-invocation: true
 
 ## 手順
 
+### 0. 場所を確かめる
+- このスキルは `/issue-start` が作った issue の worktree（ブランチ `issue/<番号>`）で動く。main の作業ツリーでは UserPromptSubmit フック `guard-prompt.sh` が止めるが、Skill ツールから呼ばれたときは通るので、ここでも確かめる
+- `git rev-parse --path-format=absolute --git-dir --git-common-dir` の 2 行が同じなら main の作業ツリー。そうなら、またはブランチが `issue/<番号>` でなければ、ブランチを作らずに止まって `/issue-start <番号>`（main で打つ）を案内する
+
 ### 1. 計画（planner）
-- issue 本文にすでに承認済みのタスク表（チェックリスト）があれば、1・2 を飛ばして 3 へ
+- 通常は main の `/plan <番号>` で計画と承認が済んでから `/issue-start` している（`/issue-start` は承認済みのタスク表がなければ止まる）。issue 本文にすでに承認済みのタスク表（チェックリスト）があれば、1・2 を飛ばして 3 へ
 1. `/plan <番号>` と同じ手順で planner に分解させ、リードが issue 本文に書く
 2. planner が質問を返したら、**分解を進めずに人へ質問する**
 
 ### 2. 人の承認（チェックポイント 1）
 - タスク表を要約して人に見せ、承認を待つ。**承認前に実装を始めない。リードが代行しない**
-- 承認後、issue 本文に「（日付 人が承認）」と書き、`git switch -c issue/<番号>`（すでにその worktree / ブランチにいればそのまま）
+- 承認後、issue 本文に「（日付 人が承認）」と書く
 
 ### 3. タスクの実行（issue-flow の繰り返し）
 - 最初のタスクの前に、**Orca を使用している場合**（`ORCA_WORKTREE_ID` が空でない）は、この worktree の画面を issue ごとのポートで起動して Orca のブラウザで開く（`.claude/skills/issue-flow/dev-server.md`）。`/issue-start` が起動済みならタブを開き直すだけ、止まっていれば起動し直す。Orca の外なら何もしない

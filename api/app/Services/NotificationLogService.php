@@ -180,7 +180,7 @@ class NotificationLogService
      * - 未保存（exists が false か主キーが null）→ 行を指せない
      * - company_id が null（select で列を省いて読んだなど）→ どの企業の行か分からない
      * - company_id が他社 → 企業を取り違えたジョブ
-     * どれも呼び出し側のバグなので LogicException。morph map の 5 モデルはすべて company_id を持つ。
+     * どれも呼び出し側のバグなので LogicException。morph map の 4 モデルはすべて company_id を持つ。
      */
     private static function assertSameCompany(Model $model, string $role): void
     {

@@ -9,7 +9,7 @@ worktree（`issue/<番号>`）のコードを、開発（8002 / 3002。main の�
 | API | `8100 + N` | 8103 |
 | web | `3100 + N` | 3103 |
 
-サーバーは **`nohup` でシェルから切り離して**動かす。Orca のターミナルのタブは作らない（ログのタブは要らない。人が選択）。Claude の `run_in_background` も使わない（セッションが終わると止まる）。ログは worktree の `api/storage/logs/dev-api.log` と `dev-web.log`（git の管理外）に出す。止めるのは `/worktree-clean` か、人に言われたとき（下の「止める」）。
+サーバーは **`nohup` でシェルから切り離して**動かす。Orca のターミナルのタブは作らない（ログのタブは要らない。人が選択）。Claude の `run_in_background` も使わない（セッションが終わると止まる）。ログは worktree の `api/storage/logs/dev-api.log` と `dev-web.log`（git の管理外）に出す。止めるのは `/dev-refresh` か、人に言われたとき（下の「止める」）。
 
 ポート・Redis の prefix・Cookie 名は `.env` を書き換えず、起動時の環境変数で上書きする（`/pr-env` と同じ方法。`php artisan serve` は子プロセスに環境変数を渡さないので `php -S` を使う）。Mailpit（8025）と Redis は共有。
 
@@ -37,12 +37,13 @@ worktree（`issue/<番号>`）のコードを、開発（8002 / 3002。main の�
 6. 人に伝える: 「画面: http://localhost:<WEB>（`issue/<番号>` の worktree。admin@example.com / password）」。キュー・メール・キャッシュを見るなら `make up`（Redis / Mailpit）が要る。Horizon は人に聞いてから、同じ prefix で起動する（`make horizon` は使わない）
 
 ## 止める
-`/worktree-clean`（worktree を消す前）と、人に言われたときだけ。2 つのポートそれぞれで:
+`/dev-refresh`（worktree を消す前）と、人に言われたときだけ。2 つのポートそれぞれで:
 ```bash
 pid=$(lsof -tiTCP:<port> -sTCP:LISTEN)
 lsof -a -p $pid -d cwd -Fn          # 場所が <WT> の中であることを確かめる。違えば止めずに報告
-kill $pid                            # web は親の npm も残っていれば kill（ps -o ppid= -p $pid で見る）
+kill $pid
 ```
+web で listen しているのは `next dev`（node）の子プロセス。これを kill すると、親の `next dev` と `npm run dev` も終わる。終わったかは `ps -o pid=,command= -p <親の pid>` で見る（親の pid は kill の前に `ps -o ppid= -p $pid` で控える）。残っていれば、cwd が `<WT>` の中であることを確かめてから kill する
 
 ## 注意
 - ログを見るときは `tail -f <WT>/api/storage/logs/dev-api.log`（web は `dev-web.log`）

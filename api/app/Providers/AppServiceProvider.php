@@ -45,7 +45,6 @@ class AppServiceProvider extends ServiceProvider
             'worker' => Worker::class,
             'user' => User::class,
             'application' => Application::class,
-            'job_posting' => JobPosting::class,
             'report_export' => ReportExport::class,
         ]);
 

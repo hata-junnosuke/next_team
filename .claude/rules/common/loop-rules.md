@@ -6,6 +6,7 @@
 4. **ハードストップ**: 検証ループは 5 回、レビュー差し戻しは 2 周、planner の質問往復は 2 回まで。超えたら issue に `requires-human` ラベルを付けて理由をコメントし、止まって人に報告する。無限に粘らない
 
 ## 3 層のループ
+- 入口は main の `/issue-start <番号>`（worktree・依存・`.env` のコピー・DB、Orca なら画面と worktree の Claude まで用意する）。アウターループとインナーループは issue の worktree で回す（main の作業ツリーでは `guard-prompt.sh` が止める）
 - アウターループ `/epic-flow`: エピック（issue）→ タスク分解（issue 本文のチェックリスト）→ 人の承認 → タスクごとに issue-flow → 統合 → PR → 人の最終確認とマージ
 - インナーループ `/issue-flow`: implementer → tester → 3 レビュアー並列 → 差し戻し（2 周）→ 完了。**各工程は直列**
 - 最内ループ Stop フック `verify-loop.sh`: api（Pint → PHPUnit）→ web（変更があれば tsc → ESLint）→ 受け入れ条件 → 赤なら block（5 回）

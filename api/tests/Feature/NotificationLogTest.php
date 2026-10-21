@@ -165,11 +165,12 @@ class NotificationLogTest extends TestCase
         $theirAdmin = User::factory()->for($other)->create(['name' => '他社 管理者']);
         NotificationLog::query()->update(['recipient_id' => $theirAdmin->id]);
 
-        $this->actingAsAdmin()
+        $response = $this->actingAsAdmin()
             ->getJson('/api/notification-logs')
             ->assertOk()
-            ->assertJsonPath('data.0.recipient', ['type' => ['value' => 'user', 'label' => '管理者'], 'name' => $this->admin->email, 'email' => $this->admin->email])
-            ->assertDontSee('他社 管理者');
+            ->assertJsonPath('data.0.recipient', ['type' => ['value' => 'user', 'label' => '管理者'], 'name' => $this->admin->email, 'email' => $this->admin->email]);
+        // assertDontSee は JSON の \uXXXX エスケープ後の本文を見るので日本語には効かない。エスケープせずに比べる
+        $this->assertStringNotContainsString('他社 管理者', json_encode($response->json(), JSON_UNESCAPED_UNICODE));
     }
 
     public function test_kindとstatusで絞り込める(): void
@@ -303,25 +304,6 @@ class NotificationLogTest extends TestCase
         }
     }
 
-    public function test_対象が募集のときは職種と勤務日のラベルで返る(): void
-    {
-        // 本番のジョブは募集を対象にしないが、docs/01 の通知履歴の API の契約にあるので形を固定する
-        $posting = JobPosting::factory()->create(['job_title' => '仕分け', 'work_date' => '2026-11-03']);
-        $worker = Worker::factory()->create();
-        $log = NotificationLog::factory()->state([
-            'kind' => NotificationKind::PostingCancelled,
-            'subject_type' => $posting->getMorphClass(),
-            'subject_id' => $posting->id,
-            'recipient_id' => $worker->id,
-            'recipient_email' => $worker->email,
-        ])->create();
-
-        $this->actingAsAdmin()
-            ->getJson('/api/notification-logs')
-            ->assertOk()
-            ->assertJsonPath('data.0.subject', ['type' => ['value' => 'job_posting', 'label' => '募集'], 'id' => $log->subject_id, 'label' => '仕分け 2026/11/03（火）']);
-    }
-
     public function test_宛先がワーカーと管理者の両方とも名前と記録時のアドレスで返る(): void
     {
         $logs = $this->claimAllKinds();
@@ -349,15 +331,65 @@ class NotificationLogTest extends TestCase
             ->assertJsonPath('data.0.subject', ['type' => ['value' => 'report_export', 'label' => '集計出力'], 'id' => 999999, 'label' => '削除された集計出力']);
     }
 
-    public function test_対象の募集の行が消えていたら削除された募集で返る(): void
+    public function test_対象の種類は応募と集計出力の2つだけが返る(): void
     {
-        $log = $this->confirmedLog();
-        NotificationLog::query()->whereKey($log->id)->update(['subject_type' => 'job_posting', 'subject_id' => 999999]);
+        // 通知 4 種の対象は応募か集計出力だけ（docs/01 の 3.2）。募集は morph map にないので対象にできない
+        // 募集を対象にできないことは AsyncFoundationTest の morph map のテストで固定している
+        $this->claimAllKinds();
 
-        $this->actingAsAdmin()
+        $response = $this->actingAsAdmin()->getJson('/api/notification-logs')->assertOk()->assertJsonCount(4, 'data');
+
+        $this->assertEqualsCanonicalizing(
+            ['application', 'report_export'],
+            collect($response->json('data'))->pluck('subject.type.value')->unique()->values()->all(),
+        );
+    }
+
+    public function test_宛先と対象の種類のラベルに不明や募集が出ない(): void
+    {
+        // docs/01 の NotificationLogResource: type の label は「ワーカー」「管理者」「応募」「集計出力」の 4 つだけ（issue #25 で「募集」を外した）
+        $this->claimAllKinds();
+        // 行が消えた記録も混ぜる（ラベルは *_type から決まるので、行がなくても 4 つのどれかになる）
+        NotificationLog::query()->update(['recipient_id' => 999999, 'subject_id' => 999999]);
+
+        $rows = collect($this->actingAsAdmin()->getJson('/api/notification-logs')->assertOk()->assertJsonCount(4, 'data')->json('data'));
+
+        $this->assertEqualsCanonicalizing(['ワーカー', '管理者'], $rows->pluck('recipient.type.label')->unique()->values()->all());
+        $this->assertEqualsCanonicalizing(['応募', '集計出力'], $rows->pluck('subject.type.label')->unique()->values()->all());
+        // type の label は上で確定しているので、残りは subject.label に「不明」が出ないことだけ
+        foreach ($rows as $row) {
+            $this->assertStringNotContainsString('不明', $row['subject']['label']);
+        }
+    }
+
+    public function test_応募の募集が読めないときは削除された募集とワーカー名のラベルで返る(): void
+    {
+        // job_posting_id は restrictOnDelete なので募集は消せない。読めない状態は「他社の募集を指す」で作る（グローバルスコープで読まれない）
+        $log = $this->confirmedLog('検品', '2026-10-10', '山田 太郎');
+        $other = Company::factory()->create();
+        $theirPosting = CurrentCompany::runAs($other->id, fn () => JobPosting::factory()->create(['job_title' => '他社の職種']));
+        Application::query()->whereKey($log->subject_id)->update(['job_posting_id' => $theirPosting->id]);
+
+        $response = $this->actingAsAdmin()
             ->getJson('/api/notification-logs')
             ->assertOk()
-            ->assertJsonPath('data.0.subject', ['type' => ['value' => 'job_posting', 'label' => '募集'], 'id' => 999999, 'label' => '削除された募集']);
+            ->assertJsonPath('data.0.subject', ['type' => ['value' => 'application', 'label' => '応募'], 'id' => $log->subject_id, 'label' => '削除された募集 / 山田 太郎']);
+        $this->assertStringNotContainsString('他社の職種', json_encode($response->json(), JSON_UNESCAPED_UNICODE));
+    }
+
+    public function test_応募のワーカーが読めないときは削除されたワーカーのラベルで他社のワーカー名が出ない(): void
+    {
+        // 読めない状態は「他社のワーカーを指す」で作る（グローバルスコープで読まれない）
+        $log = $this->confirmedLog('検品', '2026-10-10', '山田 太郎');
+        $other = Company::factory()->create();
+        $theirWorker = CurrentCompany::runAs($other->id, fn () => Worker::factory()->create(['name' => '他社 ワーカー']));
+        Application::query()->whereKey($log->subject_id)->update(['worker_id' => $theirWorker->id]);
+
+        $response = $this->actingAsAdmin()
+            ->getJson('/api/notification-logs')
+            ->assertOk()
+            ->assertJsonPath('data.0.subject', ['type' => ['value' => 'application', 'label' => '応募'], 'id' => $log->subject_id, 'label' => '検品 2026/10/10（土） / 削除されたワーカー']);
+        $this->assertStringNotContainsString('他社 ワーカー', json_encode($response->json(), JSON_UNESCAPED_UNICODE));
     }
 
     public function test_宛先のアドレスが後から変わってもemailは記録時のアドレスで名前は今の名前(): void

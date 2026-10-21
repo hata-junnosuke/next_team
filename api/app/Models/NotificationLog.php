@@ -16,7 +16,7 @@ use LogicException;
 /**
  * 通知の記録（F-20〜F-24）。作る・状態を変えるのは NotificationLogService だけ（ジョブから直接触らない）。
  * status は #[Fillable] に入れず、transitionTo() だけが変える。
- * recipient（宛先: Worker / User）と subject（対象: Application / JobPosting / ReportExport）はポリモーフィック
+ * recipient（宛先: Worker / User）と subject（対象: Application / ReportExport）はポリモーフィック
  * （Rails の belongs_to :recipient, polymorphic: true）。*_type には morph map の短い名前が入る。
  * https://readouble.com/laravel/13.x/ja/eloquent-relationships.html#polymorphic-relationships
  *
