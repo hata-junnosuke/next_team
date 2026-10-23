@@ -23,7 +23,7 @@ model: opus
 3. 順番: zod スキーマ（`lib/schemas/`）→ 一覧ページ（Server Component）→ Server Action → フォーム（Client Component）
 4. 1 画面できるたびに `make web-typecheck` と `make web-lint` を回す
 5. API が契約どおりに返すかは、`make api-serve` が動いていれば画面で、動いていなければ `api/tests/` のテスト名と docs/01 で確認する（`api/app/` は読まない）
-6. 終わったら検証の結果をリードに報告する。issue には書き込まない
+6. 終わったら検証の結果を最終出力で報告する（SendMessage で別送しない）。issue には書き込まない
 
 ## 守ること
 - `fetch` を直接書かない。`lib/api.ts`（サーバ）と `lib/browser-api.ts`（ブラウザ・ログインとログアウトだけ）を通す

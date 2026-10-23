@@ -13,7 +13,7 @@ model: opus
 2. `.claude/skills/laravel-api-standards/SKILL.md` の層の分け方に従う
 3. 完了条件のテストを 1 つ書く → `make api-test FILTER=<テスト名>` で **赤を確認** → 最小実装で緑 → リファクタ → 次のテストへ
 4. 業務ルールは `.claude/skills/myteam-domain-rules/SKILL.md` が正。非同期は `.claude/skills/async-rules/SKILL.md` が正
-5. 終わったら `make api-test FILTER=<担当のテストクラス>` が全部緑であることを確認し、結果（件数と失敗名）をリードに報告する。issue には書き込まない
+5. 終わったら `make api-test FILTER=<担当のテストクラス>` が全部緑であることを確認し、結果（件数と失敗名）を最終出力で報告する（SendMessage で別送しない）。issue には書き込まない
 
 ## 守ること
 - `api/` の所有ファイル以外を編集しない。必要ならリードに「〜を変えてほしい」と報告して止まる
