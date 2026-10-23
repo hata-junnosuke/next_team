@@ -109,7 +109,7 @@ make fresh         # 初回とデータを作り直したいときだけ。DB �
 make api-serve     # ターミナル 1: http://localhost:8002
 make web-dev       # ターミナル 2: http://localhost:3002
 make horizon       # ターミナル 3: キューワーカー（Horizon）
-make schedule      # ターミナル 4: スケジューラ（F-22 の前日リマインド。毎日 18:00）
+make schedule      # ターミナル 4: スケジューラ（F-22 の前日リマインド 毎日 18:00 と、Horizon の Metrics 用 horizon:snapshot 5 分ごと）
 ```
 
 - ログインは http://localhost:3002/login で **`admin@example.com` / `password`**（`make fresh` のシード。企業「株式会社サンプル」の管理者）
@@ -119,6 +119,7 @@ make schedule      # ターミナル 4: スケジューラ（F-22 の前日リ�
 - Horizon と Telescope の画面は、管理画面にログインした同じブラウザで開きます（ローカル環境かつログイン済み管理者だけ。未ログインは 403）。Telescope の記録テーブル `telescope_entries` は `make fresh` で作られます
 - メールは Mailpit（http://localhost:8025）で見ます
 - `make schedule` の代わりに、リマインドは `cd api && php artisan app:send-reminders --date=2026-10-03` で手動実行できます（`php artisan schedule:list` に `0 18 * * *` で出ます）
+- Horizon の Metrics（Jobs / Queues のグラフ）は `make schedule` が 5 分ごとに回す `horizon:snapshot` で溜まります（`schedule:list` に `*/5 * * * *` で出ます）。急ぐときは `cd api && php artisan horizon:snapshot` を数分おきに手で叩きます（docs/03 8 章）
 - 同じブラウザで、別のプロジェクトの Laravel（`localhost:8001` など）を開いていると `XSRF-TOKEN` の Cookie が上書きし合います。閉じるか、別のプロファイルで確かめます
 
 ### よく使うコマンド

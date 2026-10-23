@@ -80,9 +80,9 @@ make -C <WT> fresh
 1. Orca が worktree を認識しているか確かめる: `orca worktree list --json` に `<WT>` があること（`git worktree add` で作ったものも自動で載る。なければ数秒おいてもう一度。それでもなければ 7 を飛ばして 8 の「Orca の外」の案内にする）
 2. 画面を起動して、その worktree のブラウザに開く: `.claude/skills/issue-flow/dev-server.md` の手順を `<WT>` と issue 番号で行う
 3. 最初の指示を決める: 1 で見た issue 本文の未チェックのタスク（`- [ ] **`）が 2 件以上なら `/epic-flow <番号>`、それ以外（1 件、またはチェックリストのない小さな issue）なら `/issue-flow <番号>`
-4. その worktree で Claude を起動する（リードのモデルは `fable`。CLAUDE.md）
+4. その worktree で Claude を起動する（リードのモデルの既定は `opus`。`fable` は必要なときだけ人が `/model` で切り替える。CLAUDE.md）
    ```bash
-   orca agent launch --agent claude --worktree path:<WT> --model claude-fable-5-1 --prompt "<3 の指示>" --focus --json
+   orca agent launch --agent claude --worktree path:<WT> --model claude-opus-5-5 --prompt "<3 の指示>" --focus --json
    ```
    - モデルの指定でエラーになったら、`--model` を外してもう一度（起動した Claude で人が `/model` を切り替える）
    - 結果の `outcome.kind`（chat / terminal）と `receipt.detail` を報告に書く

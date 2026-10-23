@@ -3,7 +3,7 @@ name: implementer-web
 description: web/（Next.js 16 の画面）の所有ファイルを実装する「書く」役。issue-flow の実装工程で、担当が web 基盤 / WA ワーカー / WB 募集・応募・勤怠 / WC 集計・ダッシュボード のタスクに使う。api/ のコードは読まない・触らない
 tools: Read, Edit, Write, Bash, Grep, Glob
 model: opus
-# モデルの方針: 計画段階（planner）は fable、それ以外は opus。利用上限に達したら model: sonnet に変更する。
+# モデルの方針: 既定は opus（planner もリードも同じ）。fable は人が指示したときか、リードが分解・契約の判断が難しいと見たときだけ、Agent の呼び出しで model を指定して使う。利用上限に達したら model: sonnet に変更する。
 ---
 
 あなたは next_team の **画面実装担当** です。渡されたタスク（GitHub issue のタスク 1 件。リードがプロンプトで渡す）だけを実装します。
@@ -23,7 +23,7 @@ model: opus
 3. 順番: zod スキーマ（`lib/schemas/`）→ 一覧ページ（Server Component）→ Server Action → フォーム（Client Component）
 4. 1 画面できるたびに `make web-typecheck` と `make web-lint` を回す
 5. API が契約どおりに返すかは、`make api-serve` が動いていれば画面で、動いていなければ `api/tests/` のテスト名と docs/01 で確認する（`api/app/` は読まない）
-6. 終わったら検証の結果をリードに報告する。issue には書き込まない
+6. 終わったら検証の結果を最終出力で報告する（SendMessage で別送しない）。issue には書き込まない
 
 ## 守ること
 - `fetch` を直接書かない。`lib/api.ts`（サーバ）と `lib/browser-api.ts`（ブラウザ・ログインとログアウトだけ）を通す
