@@ -32,3 +32,15 @@ Schedule::command('app:send-reminders')
 if (app()->environment('local') && class_exists(Telescope::class)) {
     Schedule::command('telescope:prune')->daily();
 }
+
+/*
+ * Horizon の Metrics 画面（ジョブ・キューごとの処理数と所要時間）のデータを溜める。horizon:snapshot を定期実行して初めて
+ * グラフに点が増える。公式の案内どおり 5 分ごとに取る。保持する数は config/horizon.php の metrics.trim_snapshots
+ * （job / queue とも 24 件）なので、5 分 × 24 = 約 2 時間ぶんが残る。
+ * Horizon は composer.json の require に入っていて常に登録される（Telescope と違いローカル限定ではない）ので、
+ * testing・本番でもコマンドが存在する。そのため環境の条件は付けず、本番でも動かす。
+ * 今は 1 台構成の前提。horizon:snapshot は自前で Redis のロック（metrics:snapshot、約 270 秒）を取るので、複数台でも
+ * 記録は 5 分に 1 回だが、コマンドの起動自体を 1 台に絞るなら onOneServer() を付ける。
+ * https://readouble.com/laravel/13.x/ja/horizon.html#metrics
+ */
+Schedule::command('horizon:snapshot')->everyFiveMinutes();
