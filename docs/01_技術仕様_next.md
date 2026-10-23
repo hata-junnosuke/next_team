@@ -734,7 +734,7 @@ export type FormState = { ok?: boolean; message?: string; errors?: Record<string
 
 ### 10.1 P1・P2 基盤（直列。`implementer-api` 1 体）
 
-`api/database/migrations/*`、`api/app/Models/*`、`api/app/Enums/*`、`api/app/Support/*`、`api/app/Exceptions/*`、`api/app/Http/Middleware/*`、`api/app/Providers/*`、`api/bootstrap/app.php`、`api/config/*`、`api/routes/api.php`（**全ルートを先に登録**し、未実装のコントローラは 501 を返す）、`api/database/factories/*`、`api/database/seeders/*`、`api/tests/TestCase.php`、`api/lang/*`
+`api/database/migrations/*`、`api/app/Models/*`、`api/app/Enums/*`、`api/app/Support/*`、`api/app/Exceptions/*`、`api/app/Http/Middleware/*`、`api/app/Providers/*`、`api/bootstrap/app.php`、`api/config/*`、`api/routes/api.php`（**全ルートを先に登録**し、未実装のコントローラは 501 を返す）、`api/routes/console.php`（スケジューラ。`app:send-reminders`・`telescope:prune`・`horizon:snapshot`。P4 以降は該当タスクの `implementer-api` が編集し、テストは `api/tests/Feature/ScheduleTest.php` に置く）、`api/database/factories/*`、`api/database/seeders/*`、`api/tests/TestCase.php`、`api/lang/*`
 
 基盤が `database-reviewer` のレビューを通ったら、人が `.claude/.migrations-locked` を置きます。以後、既存のマイグレーションは編集できません（新しいファイルを足すのは可）。
 
