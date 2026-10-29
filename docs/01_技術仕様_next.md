@@ -21,7 +21,8 @@
 | DB | SQLite（`api/database/database.sqlite`。テストは in-memory） |
 | キュー・キャッシュ | Redis（Docker。非同期の実装時に導入） |
 | メール | Mailpit（Docker。非同期の実装時に導入） |
-| 認証 | Sanctum SPA 認証（Cookie + CSRF）＋ Fortify ヘッドレス |
+| 認証 | Sanctum SPA 認証（Cookie + CSRF）＋ Fortify ヘッドレス。ワーカーは Sanctum の API トークン（5.3） |
+| `mobile/` | ワーカーアプリ。Flutter（安定版。導入したバージョンを `mobile/README.md` に書く）/ Dart。**iOS を先に作り、Android は後で動作確認だけ**（docs/00 の決定 56）。`flutter create --org io.github.hatajunnosuke --project-name worker_app --platforms ios,android mobile`（Bundle ID は `io.github.hatajunnosuke.workerApp`。決定 67）。接続先は `--dart-define=API_BASE_URL=http://localhost:8002` で渡す（7A.2）。計画は [`05_ワーカーアプリ学習計画.md`](05_ワーカーアプリ学習計画.md) |
 
 ### ポート
 
@@ -47,8 +48,16 @@
 | web | `zod` | P1 | API レスポンスの検証と型の導出 |
 | web | `prettier` `prettier-plugin-tailwindcss`（dev） | 導入済み | 整形 |
 | web | `laravel-echo` `pusher-js` | P6（Could） | WebSocket クライアント |
+| mobile | `flutter_lints`（dev） | Step 3 | 静的解析のルール集（`flutter create` の雛形に最初から入っている） |
+| mobile | `go_router` | Step 3 | 画面遷移と下タブ（`StatefulShellRoute`） |
+| mobile | `flutter_riverpod` `riverpod_annotation`、dev: `riverpod_generator` `build_runner` | Step 4 | 状態管理（docs/00 の決定 58）とコード生成 |
+| mobile | `dio` | Step 6 | API の呼び出し（インターセプタでトークンを付け、401 を扱う） |
+| mobile | `flutter_secure_storage` | Step 6 | トークンの保存（iOS では Keychain） |
+| mobile | `freezed_annotation` `json_annotation`、dev: `freezed` `json_serializable` | Step 7 | レスポンスの型と `fromJson` の生成 |
+| mobile | `firebase_core` `firebase_messaging` | Step 10 | プッシュ通知（要件の外の学習。docs/00 の決定 59） |
+| api | `laravel-notification-channels/fcm` | Step 10 | プッシュ通知の送信（同上） |
 
-UI コンポーネントライブラリ、状態管理ライブラリ、データ取得ライブラリ（SWR / TanStack Query）は入れません（決定8）。
+UI コンポーネントライブラリ、状態管理ライブラリ、データ取得ライブラリ（SWR / TanStack Query）は `web/` に入れません（決定8）。`mobile/` の行は「いつ」の Step より前に入れません。バージョンは入れるときの安定版に固定し、`mobile/pubspec.lock` をコミットします（`composer.lock` や `package-lock.json` と同じ扱い）。
 
 ---
 
@@ -800,6 +809,74 @@ export type FormState = { ok?: boolean; message?: string; errors?: Record<string
 
 ---
 
+## 7A. アプリ契約（`mobile/`。ワーカーアプリ）
+
+ワーカーアプリと api の境界は 5.3 と 6.11 だけです。**`mobile/` を書くときは `api/` のコードを読まず**、契約と実際のレスポンスだけを見ます（CLAUDE.md の絶対ルール 4）。書き方（コメント多め、1 機能 = 1 コミットで止まって変更点を案内する）は `mobile/CLAUDE.md` と docs/05 の 1・2 章に従います。
+
+### 7A.1 ディレクトリ（Step 3 で作る。機能ごとにまとめる）
+
+```
+mobile/
+├── CLAUDE.md                     コメントのルールと進め方（docs/05 の 1・2 章を写す）
+├── analysis_options.yaml         flutter_lints ＋ 厳しめのルール（strict-casts / strict-raw-types / strict-inference、avoid_print など）
+├── pubspec.yaml / pubspec.lock   依存（Rails の Gemfile / Gemfile.lock）
+├── assets/jobs.json              偽データ（Step 3。Step 7 で使わなくなる）
+└── lib/
+    ├── main.dart                 起動するだけ
+    ├── app.dart                  MaterialApp.router とテーマ（Next.js の app/layout.tsx）
+    ├── core/
+    │   ├── router.dart           go_router の定義（Next.js の app/ フォルダの構造）
+    │   ├── theme.dart
+    │   └── api/                  Step 6: ApiClient（dio）・AuthInterceptor・TokenStorage・ApiError
+    └── features/                 機能ごと（web/ の components/ と lib/ を機能で束ねた形）
+        ├── jobs/                 さがす（data/ リポジトリ、domain/ モデル、presentation/ 画面と Widget）
+        ├── schedule/             よてい（自分の応募）
+        ├── notices/              おしらせ（Step 10 まで中身なし）
+        └── account/              マイページ・ログイン・初回登録（Step 6）
+```
+
+- `data/` のリポジトリは抽象（`JobRepository`）と実装（Step 3〜5 は `FakeJobRepository`、Step 7 から `ApiJobRepository`）に分け、Riverpod の Provider で差し替える（Step 4。差し替えは Provider の 1 行だけ）
+- テストは Step 9 から `mobile/test/`（`rules/common/testing.md`）
+
+### 7A.2 接続先と起動
+
+| 項目 | 内容 |
+|---|---|
+| 接続先 | `--dart-define=API_BASE_URL=...` で渡し、コードでは `String.fromEnvironment('API_BASE_URL')` で読む。既定値は置かない（渡し忘れに気づけるように、空なら起動時にエラーを出す） |
+| iOS シミュレータ | `http://localhost:8002`（Mac の API にそのまま届く）。`http://` に繋がらないときは、Info.plist の App Transport Security にローカル開発だけの例外を足す（Step 6 で確かめる。13 章の 10） |
+| Android エミュレータ | `http://10.0.2.2:8002`（エミュレータから見た Mac の localhost） |
+| 起動 | `make mobile-run`（`flutter run -d ios --dart-define=API_BASE_URL=http://localhost:8002`）。静的解析は `make mobile-analyze`（`flutter analyze`） |
+| 秘密 | `--dart-define` に秘密を入れない（ビルドに埋め込まれる。`rules/common/security.md`） |
+
+### 7A.3 ルート（go_router）
+
+| パス | 画面 | タブ | Step | 使う API（6.11） |
+|---|---|---|---|---|
+| `/jobs` | 募集一覧（さがす） | さがす | 3（偽データ）→ 7 | `GET /api/worker/job-postings`、`GET /api/worker/locations` |
+| `/jobs/:id` | 募集の詳細・応募 | さがす | 3 → 7 | `GET /api/worker/job-postings/{id}`、`POST /api/worker/job-postings/{id}/applications` |
+| `/schedule` | 自分の応募（よてい） | よてい | 3（空）→ 8 | `GET /api/worker/applications` |
+| `/notices` | おしらせ | おしらせ | 3（空）→ 10 | （Step 10 で決める） |
+| `/account` | マイページ・ログアウト | マイページ | 3（空）→ 6 | `GET /api/worker/me`、`POST /api/worker/logout` |
+| `/login` | ログイン | タブの外 | 6 | `POST /api/worker/login` |
+| `/register` | 初回登録 | タブの外 | 6 | `POST /api/worker/register` |
+
+- 下タブの 4 画面は `StatefulShellRoute.indexedStack`（タブを切り替えても各タブの画面の状態が残る。Next.js の `layout.tsx` に近い）
+- Step 6 から、`redirect` で未ログインなら `/login` へ（Next.js の `proxy.ts`。本当の判定は API の 401）
+
+### 7A.4 規約
+
+| 項目 | 内容 |
+|---|---|
+| 業務ルールと検証 | **アプリに書かない**（CLAUDE.md の絶対ルール 1）。定員・二重応募・状態遷移・応募できるかは API が判定し、アプリは 422 の `message` を表示する。入力欄の下には `errors` の同じキーの文言を出す。ボタンを出すかどうかは `can.apply` を見る |
+| 残り枠 | API の `remaining` をそのまま出す。Step 3 の偽データの画面だけは学習のためアプリで計算してよいが、Step 7 で API の値に置き換える |
+| 状態の文言 | API が返す `{value, label}` の `label` を出す。色だけアプリが持つ（web の `lib/status.ts` と同じ考え方） |
+| API の呼び出し | `core/api/` の `ApiClient` だけが `dio` を持つ（web の `lib/api.ts` と同じ。Step 6）。リポジトリは `ApiClient` を通す |
+| レスポンスの型 | JSON を `Map` のまま使わず、モデルの `fromJson` で型に変えてから使う（Step 3 は手書き、Step 7 から `freezed` + `json_serializable`）。形が合わなければ例外にして、契約のずれとして報告する（web で zod の parse が落ちるのと同じ） |
+| 401 | トークンを消して `/login` へ戻す（`AuthInterceptor`）。無効にされたワーカーは 401 の `message` を出す |
+| トークン | `flutter_secure_storage` にだけ置く。ログに出さない（`rules/common/security.md`） |
+| 企業コード | ログイン後に `WorkerMeResource.company.code` を覚えておき、次のログインの入力欄に入れておく（秘密ではない） |
+| 日付と時刻 | 6.1 の形（`"2026-09-20"` `"09:00"` ISO 8601）を受け取り、表示は `2026/09/20（日）` `09:00〜17:00` の形にする（web の 7.5 と揃える） |
+
 ## 8. 非同期の契約（P4。詳細は [`03_非同期処理の設計.md`](03_非同期処理の設計.md)）
 
 | 要件 | きっかけ | 積むもの | キュー |
@@ -919,6 +996,16 @@ B と C の境界: C の `AttendanceService::save()` は B の `Application`（�
 
 マイグレーションを足したら `database-reviewer` に見せます（非同期のテーブルを足したときと同じ）。
 
+### 10.7 `mobile/`（ワーカーアプリ。docs/05 の Step 3・4・6〜10）
+
+| 担当 | 所有ファイル | 進め方 |
+|---|---|---|
+| リード（専用の implementer は作らない。docs/00 の決定 66） | `mobile/**`、`Makefile` の `mobile-*` のターゲット | 1 機能 = 1 コミットで止まって変更点を案内し、人の「次」を待つ（docs/05 の 1 章、決定 61）。push・PR・CI は、そのステップの機能がそろってから止まらずに進める |
+
+- レビューは `spec-reviewer` ∥ `code-reviewer`（`mobile/CLAUDE.md` をプロンプトで渡す）。トークンの扱いを変えたステップ（Step 6）は `security-reviewer` も
+- `tester` は使わない（mobile のテストは Step 9 から。そのときに担当を決める）
+- `mobile/` は Step 9 まで `make verify` と CI に入らない。`flutter analyze` の 0 件は手元の出力を PR に貼って示す
+
 ---
 
 ## 11. フェーズ（P0〜P6 の区切り）
@@ -934,6 +1021,20 @@ B と C の境界: C の `AttendanceService::save()` は B の `Application`（�
 | 4 | 非同期 | F-20〜F-23 と F-19 のキャッシュが動く |
 | 5 | 仕上げ | 通知履歴、README、docs の「想定と実際」 |
 | 6 | Could | F-25 Broadcasting |
+
+ワーカーアプリ（docs/05）は上のフェーズとは別に、Step の番号で進めます。1 Step = 1 issue が目安です。
+
+| Step（docs/05） | 内容 | 主に触る所 | 契約 |
+|---|---|---|---|
+| 0〜1 | 環境構築と TODO アプリ（`next_team/` の外） | — | — |
+| 3 | 偽データで画面を作る（issue #31 の T6） | `mobile/` | 7A |
+| 4 | Riverpod | `mobile/` | 7A.1 |
+| 5 | ワーカーの認証とワーカー用 API | `api/`、`web/`（WA） | 3.1・3.2・4.5・5.3・6.3・6.11・9.4・10.6 |
+| 6 | アプリでログイン | `mobile/` | 5.3・6.11・7A.2〜7A.4 |
+| 7 | 本物の API で検索・応募 | `mobile/` | 6.11・7A.4 |
+| 8 | 予定・取り下げ・キャンセル（要件 4.8 と F-14 を先に改訂。docs/00 の決定 63） | `api/` `mobile/` | Step 8 の issue で足す |
+| 9 | mobile のテスト（`make verify` と CI に入れる） | `mobile/test/`、`Makefile`、CI、Stop フック | Step 9 の issue で足す |
+| 10 | プッシュ通知（要件の外の学習。決定 59） | `api/` `mobile/` | Step 10 の issue で足す |
 
 ---
 
@@ -975,3 +1076,4 @@ B と C の境界: C の `AttendanceService::save()` は B の `Application`（�
 | 7 | guard `sanctum` に `provider: users` を付けると、ワーカー（`Worker`）のトークンは管理者の API で拒否される（Sanctum の `Guard::hasValidProvider()`）。Cookie（stateful）での管理者のログインには影響しない | ワーカー Step 5 の最初のテスト（`WorkerAuthTest` の「ワーカーのトークンで `/api/user` が 401」と、既存の `LoginTest` が緑のまま） |
 | 8 | `PersonalAccessToken::tokenable()` で `withoutGlobalScope('company')` にすれば、企業が決まる前でもトークンから `Worker` を読める（外さないと `CurrentCompany::id()` が例外） | 同上（`actingAsWorker()` ではなく、本物のトークンを `withToken()` で付けたテストを 1 本書く） |
 | 9 | 管理者の Cookie（stateful）で `/api/worker/me` を叩くと、Sanctum の guard `worker` は web ガードの `User` を返す（`Guard::__invoke` の stateful の分岐は provider を見ない。T3 の security-reviewer がソースで確認）。`worker` ミドルウェアの型の確認で 401 になる | 同上（`actingAsAdmin()` してから `/api/worker/me` が 401） |
+| 10 | iOS シミュレータのアプリから `http://localhost:8002` に、App Transport Security の例外なしで繋がるか | Step 6 で `ApiClient` を作ったとき、最初のリクエストで確かめる。繋がらなければ Info.plist に `NSAllowsLocalNetworking` を足し、7A.2 を直す |
