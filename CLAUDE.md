@@ -1,6 +1,6 @@
 # `next_team` — Next.js + Laravel API + 非同期処理 × ループエンジニアリング
 
-企業側管理画面（拠点・ワーカー・募集・応募/確定・勤怠/報酬・月次集計・通知）を、`api/`（Laravel 13 の JSON API）と `web/`（Next.js 16）の 2 スタックで実装する。主題は **Job / Queue を中心とした非同期処理**。
+企業側管理画面（拠点・ワーカー・募集・応募/確定・勤怠/報酬・月次集計・通知）を、`api/`（Laravel 13 の JSON API）と `web/`（Next.js 16）の 2 スタックで実装する。主題は **Job / Queue を中心とした非同期処理**。加えて、ワーカーがスマホで使う `mobile/`（Flutter）を足して `api/` と連携させる（計画: `docs/05_ワーカーアプリ学習計画.md`）。
 
 - 要件: `../00_要件定義.md`
 - 契約（テーブル・API・画面）: `docs/01_技術仕様_next.md`
@@ -8,16 +8,16 @@
 **このセッションは必ず `next_team/` で起動する。** 親フォルダで起動するとフックが一切効かない。
 
 ## 絶対ルール
-1. 業務ルールは `api/` のサービスに置く。コントローラは薄く、検証は FormRequest。**`web/` に業務ルールと検証を二重に書かない**
+1. 業務ルールは `api/` のサービスに置く。コントローラは薄く、検証は FormRequest。**`web/` と `mobile/` に業務ルールと検証を二重に書かない**
 2. `status` はサービス経由（`transitionTo()`）でしか変えない。企業の判定は `CurrentCompany::id()` だけ
-3. `api/` は JSON しか返さない。`web/` は `lib/api.ts` を通さずに `fetch` しない。レスポンスは zod で `parse` する
-4. api と web の境界は `docs/01` の API 契約だけ。web 担当は `api/` のコードを読まない。形がずれていたら web で吸収せず報告する
+3. `api/` は JSON しか返さない。`web/` は `lib/api.ts` を通さずに `fetch` しない。レスポンスは zod で `parse` する。`mobile/` は `core/api/` の `ApiClient` 以外で `dio` を使わない。レスポンスはモデルの `fromJson` で型にしてから使う（docs/01 の 7A.4。Step 3〜5 の偽データは除く）
+4. api と web・mobile の境界は `docs/01` の API 契約だけ（mobile は 6.11 と 7A）。web と mobile を書くときは `api/` のコードを読まない。形がずれていたら web・mobile で吸収せず報告する
 5. このリポジトリの外（親フォルダの他のプロジェクト）のコードを読まない。パッケージを勝手に足さない
 6. `.env`・`vendor/`・`node_modules/`・ロック後のマイグレーションは触らない（フックが止める）。フックと `settings.json` の編集は毎回人の承認を挟む（フックが承認ダイアログを出す）
 7. 赤のまま終わらない（Stop フックが差し戻す。5 回で打ち切り → 人に報告）。PR は CI（`make verify`）が緑であること
-8. 実装前に `/plan`。計画の承認と `main` へのマージは人が行う。リードが代行しない。承認後の実装・push・PR 作成・CI の確認は止まらずに進める
+8. 実装前に `/plan`。計画の承認と `main` へのマージは人が行う。リードが代行しない。承認後の実装・push・PR 作成・CI の確認は止まらずに進める。**例外: `mobile/` の学習のステップでは、1 機能 = 1 コミットごとに止まって変更点を案内し、人の「次」を待つ**（docs/05 の 1 章。push・PR・CI は、そのステップの機能がそろってから止まらずに進める）。`mobile/` のステップも、始める前に issue のタスク表を `/plan` で作って人の承認を得る（docs/05 の各ステップがその下書き）
 9. サブエージェントの「できました」は判定材料にしない。検証結果とレビュー表で判定する
-10. `web/` を書く前に `web/node_modules/next/dist/docs/` の該当ページを読む（Next 16 は学習データと違う）
+10. `web/` を書く前に `web/node_modules/next/dist/docs/` の該当ページを読む（Next 16 は学習データと違う）。`mobile/` を書く前に `mobile/CLAUDE.md`（コメントのルールと進め方）を読む
 
 ## 現在地の見方
 - タスク状態: **GitHub Issues**（本文のチェックリスト、`requires-human` ラベル）。ブランチは `issue/<番号>`。合否と差し戻しの履歴は CI と PR で見る
@@ -29,7 +29,7 @@
 知識スキル: `tdd-workflow` `myteam-domain-rules` `laravel-api-standards` `next-coding-standards` `async-rules`
 
 ## エージェント（`.claude/agents/`）
-planner, implementer-api, implementer-web, tester, spec-reviewer, code-reviewer, security-reviewer, database-reviewer, build-error-resolver。使い分けは `.claude/rules/common/agents.md`。契約（`docs/01`）の更新はリードが行う。モデルは **既定が `opus`**（planner もリードも同じ）。`fable` は必要なときだけ: 人が指示したときか、分解・契約の判断が難しいとリードが見たときに、Agent の呼び出しで `model` を指定する（リードは人が `/model` で切り替える）。利用上限に達したら `sonnet` に切り替える。**同時に実装 3 体・レビュー 4 体まで。issue-flow の工程は直列**
+planner, implementer-api, implementer-web, tester, spec-reviewer, code-reviewer, security-reviewer, database-reviewer, build-error-resolver。使い分けは `.claude/rules/common/agents.md`。`mobile/` は専用の担当を作らず、リードが書く（docs/00 の決定 66）。契約（`docs/01`）の更新はリードが行う。モデルは **既定が `opus`**（planner もリードも同じ）。`fable` は必要なときだけ: 人が指示したときか、分解・契約の判断が難しいとリードが見たときに、Agent の呼び出しで `model` を指定する（リードは人が `/model` で切り替える）。利用上限に達したら `sonnet` に切り替える。**同時に実装 3 体・レビュー 4 体まで。issue-flow の工程は直列**
 
 ## よく使うコマンド（`make help` で一覧）
 ```bash
@@ -43,10 +43,13 @@ make api-serve                    # http://localhost:8002
 make web-dev                      # http://localhost:3002
 make horizon                      # キューワーカー
 make ports                        # 8002 / 3002 を誰が使っているか
+make mobile-analyze               # flutter analyze（issue #31 の T6 で足す。Step 9 までは verify に入らない）
+make mobile-run                   # iOS シミュレータで mobile/ を起動（同上）
 ```
 
 ## この人と働くときの約束
 - 回答・コメント・ドキュメント・コミットメッセージは日本語
 - 読者は **Ruby on Rails の経験者**。Laravel の機能を説明するときは Rails の対応概念を一言添える
-- 解説には日本語ドキュメントの URL を付ける: Laravel は `https://readouble.com/laravel/13.x/ja/<ページ>.html`、PHP は `https://www.php.net/manual/ja/`
+- 解説には日本語ドキュメントの URL を付ける: Laravel は `https://readouble.com/laravel/13.x/ja/<ページ>.html`、PHP は `https://www.php.net/manual/ja/`。Flutter / Dart は `docs.flutter.dev`・`api.flutter.dev`・`dart.dev`（英語のみ）、Riverpod は `riverpod.dev/ja`。URL は開けることを確かめてから付ける
+- `mobile/` は React / Next.js の対応概念も一言添える（Flutter は初めて。docs/05）
 - 認証など Laravel 公式パッケージがあるものは公式を使う。技術の選択で迷ったら勝手に決めず、各案のメリット・デメリットを表にして質問する
