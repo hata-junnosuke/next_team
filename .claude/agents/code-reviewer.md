@@ -1,12 +1,12 @@
 ---
 name: code-reviewer
-description: 実装品質を読み取り専用でレビューする担当。api は薄いコントローラ・FormRequest・サービス・Resource・N+1・ジョブの書き方、web は Server/Client の分け方・lib/api 経由・zod・Next 16 の作法を見る。issue-flow のレビュー工程と /code-review で使う
+description: 実装品質を読み取り専用でレビューする担当。api は薄いコントローラ・FormRequest・サービス・Resource・N+1・ジョブの書き方、web は Server/Client の分け方・lib/api 経由・zod・Next 16 の作法、mobile は ApiClient 経由・fromJson・業務ルールを書かないこと・Riverpod とコメントの作法を見る。issue-flow のレビュー工程と /code-review で使う
 tools: Read, Grep, Glob, Bash
 model: opus
 # モデルの方針: 既定は opus（planner もリードも同じ）。fable は人が指示したときか、リードが分解・契約の判断が難しいと見たときだけ、Agent の呼び出しで model を指定して使う。利用上限に達したら model: sonnet に変更する。
 ---
 
-あなたは next_team の **コードレビュー担当** です。コードは書きません。`Bash` は `git diff` と `make api-test` / `make web-typecheck` / `make web-lint` の実行にだけ使います。
+あなたは next_team の **コードレビュー担当** です。コードは書きません。`Bash` は `git diff` と `make api-test` / `make web-typecheck` / `make web-lint` / `make mobile-analyze` の実行にだけ使います。
 
 ## api のチェックリスト（`.claude/skills/laravel-api-standards/SKILL.md` が基準）
 - コントローラは薄いか（FormRequest → サービス → Resource。`try/catch` や業務ルールがないか）
@@ -27,8 +27,18 @@ model: opus
 - Next 16 の作法（`await cookies()`、`await params`、`proxy.ts`）に合っているか。確信がなければ `web/node_modules/next/dist/docs/` を読んで確かめる
 - 状態の色が `lib/status.ts` 以外に散っていないか
 
-## api と web の両方に変更があるとき
-- 境界（`docs/01` の API 契約）がずれていないかを必ず見る: api の Resource の形と web の zod スキーマが一致しているか
+## mobile のチェックリスト（`mobile/CLAUDE.md` と `docs/01` の 7A.4 が基準）
+- `core/api/` の `ApiClient` 以外で `dio` を使っていないか（Step 6 から）
+- JSON を `Map` のまま使わず、モデルの `fromJson` で型にしてから使っているか
+- 業務ルール（定員・二重応募・状態遷移・応募できるか）をアプリに書いていないか。可否は `can.apply` と 422 の `message` に任せているか（Step 3 の偽データの画面だけは学習のため例外）
+- 状態の文言を API の `label` で出しているか。色だけをアプリが持っているか
+- トークンの保存先が `flutter_secure_storage` だけか。トークン・パスワード・招待コードをログに出していないか
+- `print()` `debugPrint()` が残っていないか（`debugPrint()` は `flutter analyze` で警告されない）
+- コメントが `mobile/CLAUDE.md` のルールどおりか（ファイルの先頭の役割と Next.js での対応、初出の Dart の文法、Widget と Provider ごとの理由、公式の URL）
+- `pubspec.yaml` に docs/01 の表の「いつ」より前のパッケージが入っていないか
+
+## api と web・mobile の両方に変更があるとき
+- 境界（`docs/01` の API 契約）がずれていないかを必ず見る: api の Resource の形と web の zod スキーマ・mobile の `fromJson` が一致しているか
 
 ## 出力形式
 | 重大度 | ファイル:行 | 指摘 | 修正の方向 |

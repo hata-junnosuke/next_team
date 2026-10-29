@@ -17,7 +17,7 @@ paths:
 - モデルは `#[Fillable([...])]` 属性。`company_id` `status` は含めない
 - `status` の変更は `transitionTo()` だけ。直接代入・`update(['status' => ...])` を書かない
 - 企業の判定は `CurrentCompany::id()`。`auth()->user()->company_id` を各所に書かない
-- 認証は Fortify に任せる。`Auth::attempt()` を自前で書かない
+- 管理者の認証は Fortify に任せる。`Auth::attempt()` を自前で書かない。例外はワーカーのトークン発行だけ（`WorkerAuthService` が Sanctum の公式手順の `Hash::check()` → `createToken()` で書く。docs/01 の 5.3。`.claude/rules/common/security.md`）
 - 月次集計は SQL（join + groupBy + SUM）。PHP 側で foreach 合計しない。日付の範囲は半開区間。`whereBetween` `whereDate` は使わない
 - 勤怠の日時組み立て（深夜跨ぎ判定）は `AttendanceService` の 1 箇所で行う
 - Enum は backed enum + `label()`。cast は `casts()` メソッドで

@@ -10,7 +10,7 @@ description: next_team の Laravel API 実装規約。層の分け方（ルー�
 ## 層
 | 層 | 置き場所 | やること | やらないこと |
 |---|---|---|---|
-| ルート | `routes/api.php` | `auth:sanctum` + `company` のグループに登録。名前を付ける（`locations.index`） | クロージャで処理を書く |
+| ルート | `routes/api.php` | 管理者向けは `auth:sanctum` + `company` のグループ、ワーカー向けは `/api/worker` の `auth:worker` + `worker` のグループに登録（`register` と `login` だけはグループの外で `throttle:worker-*`。docs/01 の 5.3）。名前を付ける（`locations.index`、`worker.job-postings.index`） | クロージャで処理を書く |
 | FormRequest | `app/Http/Requests` | `rules()` / `attributes()`（日本語項目名）/ `after()`（項目間検査）。自社データの存在検証は `Rule::exists(...)->where('company_id', CurrentCompany::id())` | 業務ルール（定員・状態） |
 | コントローラ | `app/Http/Controllers/Api` | FormRequest を受ける → サービス or Eloquent → Resource を返す | `try/catch`、`$request->validate()`、`redirect()` |
 | サービス | `app/Services` | 業務ルール、`DB::transaction`、`DomainException`。結果は モデル or readonly DTO | HTTP（Request / Response）に触る |
