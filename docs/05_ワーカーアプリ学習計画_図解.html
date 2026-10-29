@@ -214,7 +214,7 @@ sudo xcodebuild -runFirstLaunch</pre><div class="ref">📖 <a href="https://docs
 <pre>! flutter doctor</pre><div class="ref">📖 <a href="https://docs.flutter.dev/install/troubleshoot" target="_blank" rel="noopener">うまくいかないとき</a></div></div></div>
     <div class="sp"><div><b>試し場所を作り、テンプレートのアプリを動かす<span class="where term">Orca のターミナル</span></b>
       <div class="why">カウンタのアプリは動作確認だけの使い捨てなので、リポジトリの<b>外</b>に置く。<code>flutter run</code> は動かしっぱなしにするので、Orca のターミナルを 1 つ使う</div>
-<pre>open -a Simulator
+<pre>flutter emulators --launch apple_ios_simulator   # Xcode 27 では DeviceHub が開く
 mkdir -p ~/Desktop/Study/mobile_sandbox && cd ~/Desktop/Study/mobile_sandbox
 flutter create hello && cd hello
 cursor .        # Cursor で lib/main.dart を開いておく
