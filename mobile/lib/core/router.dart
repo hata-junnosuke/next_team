@@ -6,9 +6,12 @@
 // ルートの書き方: https://pub.dev/documentation/go_router/latest/topics/Configuration-topic.html
 // StatefulShellRoute: https://pub.dev/documentation/go_router/latest/go_router/StatefulShellRoute-class.html
 
+// kDebugMode（デバッグ実行かどうか）を使うために読み込む。
+import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/account/presentation/account_screen.dart';
+import '../features/jobs/presentation/job_detail_screen.dart';
 import '../features/jobs/presentation/job_list_screen.dart';
 import '../features/notices/presentation/notices_screen.dart';
 import '../features/schedule/presentation/schedule_screen.dart';
@@ -17,6 +20,9 @@ import 'scaffold_with_nav_bar.dart';
 final GoRouter router = GoRouter(
   // 起動したときに開くパス。
   initialLocation: '/jobs',
+  // 画面を移るたびに、行き先のパス（例: /jobs/3）を flutter run のターミナルに出す。
+  // デバッグ実行のときだけ。パスに秘密は入らない（トークンなどは URL に載せない）。
+  debugLogDiagnostics: kDebugMode,
   routes: [
     // StatefulShellRoute = 下タブのような「共通の外枠 ＋ 中身だけ切り替わる」形を作るルート。
     // Next.js の layout.tsx に近い。違いは、タブ（branch）ごとに画面の履歴と状態を別々に持つこと。
@@ -34,6 +40,21 @@ final GoRouter router = GoRouter(
             GoRoute(
               path: '/jobs',
               builder: (context, state) => const JobListScreen(),
+              // 子のルート。パスは親につながって /jobs/:id になる（Next.js の app/jobs/[id]/page.tsx）。
+              // 親の中に置くので、詳細は「さがす」タブの中で一覧の上に重なり、戻るボタンで一覧に戻れる。
+              routes: [
+                GoRoute(
+                  // :id はパスの引数（Next.js の [id]、Rails の routes の :id）。
+                  path: ':id',
+                  builder: (context, state) {
+                    // pathParameters は文字列なので数に変える。
+                    // int.tryParse: 数でなければ null を返す（例外にしない）。int? は「int か null」の型。
+                    // ! は「ここは null ではない」と言い切る印（ルートの定義上、id は必ずある）。
+                    final id = int.tryParse(state.pathParameters['id']!);
+                    return JobDetailScreen(jobId: id);
+                  },
+                ),
+              ],
             ),
           ],
         ),

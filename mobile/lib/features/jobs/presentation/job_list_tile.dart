@@ -5,6 +5,7 @@
 // ListTile: https://api.flutter.dev/flutter/material/ListTile-class.html
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/format.dart';
 import '../domain/job_posting.dart';
@@ -39,6 +40,9 @@ class JobListTile extends StatelessWidget {
           '時給 ${formatYen(job.hourlyWage)}',
           style: textTheme.titleSmall,
         ),
+        // 押したら詳細へ。context.go は go_router が足したメソッドで、パスで画面を移る（Next.js の router.push）。
+        // /jobs/3 は /jobs の子なので、一覧の上に詳細が重なり、戻るボタンが出る。
+        onTap: () => context.go('/jobs/${job.id}'),
       ),
     );
   }

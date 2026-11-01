@@ -131,4 +131,11 @@ class FakeJobRepository {
       ),
     ];
   }
+
+  // id で 1 件を探す。見つからなければ null（API なら 404 に当たる）。
+  // 戻り値の型の ? は「JobPosting か null」（TypeScript の JobPosting | null）。
+  JobPosting? findJobPosting(int id) {
+    // where で条件に合うものだけにし、firstOrNull で最初の 1 件（なければ null）を取る（Ruby の find）。
+    return fetchJobPostings().where((job) => job.id == id).firstOrNull;
+  }
 }
