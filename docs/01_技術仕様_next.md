@@ -856,7 +856,7 @@ mobile/
 | 接続先 | `--dart-define=API_BASE_URL=...` で渡し、コードでは `String.fromEnvironment('API_BASE_URL')` で読む。既定値は置かない（渡し忘れに気づけるように、**Step 6 で `ApiClient` を作ってから**は空なら起動時にエラーを出す。API を使わない Step 3〜5 では渡さなくても起動できる） |
 | iOS シミュレータ | `http://localhost:8002`（Mac の API にそのまま届く）。`http://` に繋がらないときは、Info.plist の App Transport Security にローカル開発だけの例外を足す（Step 6 で確かめる。13 章の 10） |
 | Android エミュレータ | `http://10.0.2.2:8002`（エミュレータから見た Mac の localhost） |
-| 起動 | `make mobile-run`（`flutter run -d ios --dart-define=API_BASE_URL=http://localhost:8002`）。静的解析は `make mobile-analyze`（`flutter analyze`）。**この 2 つは Step 3 で足す**。`make mobile-test` と、`make verify`・CI・Stop フックへの組み込みは Step 9 |
+| 起動 | `make mobile-run`（`flutter run -d iPhone --dart-define=API_BASE_URL=http://localhost:8002`。`-d` は機種名の前方一致で、`MOBILE_DEVICE=` で変えられる）。静的解析は `make mobile-analyze`（`flutter analyze`）。**この 2 つは Step 3 で足す**。`make mobile-test` と、`make verify`・CI・Stop フックへの組み込みは Step 9 |
 | 秘密 | `--dart-define` に秘密を入れない（ビルドに埋め込まれる。`rules/common/security.md`） |
 
 ### 7A.3 ルート（go_router）
