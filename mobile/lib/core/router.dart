@@ -20,8 +20,10 @@ import 'scaffold_with_nav_bar.dart';
 final GoRouter router = GoRouter(
   // 起動したときに開くパス。
   initialLocation: '/jobs',
-  // 画面を移るたびに、行き先のパス（例: /jobs/3）を flutter run のターミナルに出す。
-  // デバッグ実行のときだけ。パスに秘密は入らない（トークンなどは URL に載せない）。
+  // 画面を移るたびに、行き先のパス（例: going to /jobs/3）をログに出す。デバッグ実行のときだけ。
+  // ログは dart:developer の log() で出るので、flutter run のターミナルではなく DevTools の Logging タブに出る。
+  // https://docs.flutter.dev/tools/devtools/logging
+  // パスに秘密は入らない（トークンなどは URL に載せない）。
   debugLogDiagnostics: kDebugMode,
   routes: [
     // StatefulShellRoute = 下タブのような「共通の外枠 ＋ 中身だけ切り替わる」形を作るルート。
