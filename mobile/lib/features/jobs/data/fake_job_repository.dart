@@ -21,6 +21,7 @@ class FakeJobRepository {
   static const _shinagawa = JobLocation(id: 3, name: '品川センター');
 
   // 募集の一覧。勤務日 → 開始時刻の順に並べて返す（API の並び順と同じ。docs/01 の 6.11）。
+  // 残り枠（remaining）は API が数えて返す値の代わり。4 と 8 は満員（残り 0）にしてある。
   // List<JobPosting>: JobPosting だけが入るリスト（TypeScript の JobPosting[]）。
   List<JobPosting> fetchJobPostings() {
     // 勤務日は「今日から何日後か」で作る。固定の日付にすると、日がたつと全部過去の募集になってしまうため。
@@ -38,6 +39,8 @@ class FakeJobRepository {
         endTime: '17:00',
         hourlyWage: 1200,
         transportAllowance: 500,
+        capacity: 5,
+        remaining: 3,
       ),
       JobPosting(
         id: 2,
@@ -48,6 +51,8 @@ class FakeJobRepository {
         endTime: '22:00',
         hourlyWage: 1300,
         transportAllowance: 0,
+        capacity: 3,
+        remaining: 1,
       ),
       JobPosting(
         id: 3,
@@ -58,6 +63,8 @@ class FakeJobRepository {
         endTime: '12:00',
         hourlyWage: 1150,
         transportAllowance: 400,
+        capacity: 4,
+        remaining: 4,
       ),
       JobPosting(
         id: 4,
@@ -68,6 +75,8 @@ class FakeJobRepository {
         endTime: '18:00',
         hourlyWage: 1200,
         transportAllowance: 500,
+        capacity: 2,
+        remaining: 0,
       ),
       JobPosting(
         id: 5,
@@ -78,6 +87,8 @@ class FakeJobRepository {
         endTime: '15:00',
         hourlyWage: 1250,
         transportAllowance: 0,
+        capacity: 3,
+        remaining: 2,
       ),
       JobPosting(
         id: 6,
@@ -88,6 +99,8 @@ class FakeJobRepository {
         endTime: '05:00',
         hourlyWage: 1500,
         transportAllowance: 600,
+        capacity: 6,
+        remaining: 5,
       ),
       JobPosting(
         id: 7,
@@ -98,6 +111,8 @@ class FakeJobRepository {
         endTime: '17:00',
         hourlyWage: 1200,
         transportAllowance: 500,
+        capacity: 5,
+        remaining: 5,
       ),
       JobPosting(
         id: 8,
@@ -108,6 +123,8 @@ class FakeJobRepository {
         endTime: '11:00',
         hourlyWage: 1300,
         transportAllowance: 0,
+        capacity: 2,
+        remaining: 0,
       ),
       JobPosting(
         id: 9,
@@ -118,6 +135,8 @@ class FakeJobRepository {
         endTime: '17:00',
         hourlyWage: 1150,
         transportAllowance: 400,
+        capacity: 3,
+        remaining: 3,
       ),
       JobPosting(
         id: 10,
@@ -128,6 +147,8 @@ class FakeJobRepository {
         endTime: '23:00',
         hourlyWage: 1400,
         transportAllowance: 500,
+        capacity: 4,
+        remaining: 1,
       ),
     ];
   }

@@ -1,7 +1,6 @@
 // 募集のモデル（データの型）。画面とリポジトリの両方がこの型でやりとりする。
 // TypeScript で言うと web/ の zod スキーマから作る型（type JobPosting = z.infer<...>）に当たる。
 // 項目は docs/01 の 6.11 の WorkerJobPostingResource に合わせ、Step 7 で API に替えても画面を直さずに済むようにする。
-// 残り枠（capacity / remaining）は「残り○枠」のバッジのコミットで足す。
 //
 // クラス: https://dart.dev/language/classes
 // コンストラクタ: https://dart.dev/language/constructors
@@ -27,6 +26,8 @@ class JobPosting {
     required this.endTime,
     required this.hourlyWage,
     required this.transportAllowance,
+    required this.capacity,
+    required this.remaining,
   });
 
   final int id;
@@ -41,4 +42,8 @@ class JobPosting {
   // 時給と交通費（円）。
   final int hourlyWage;
   final int transportAllowance;
+  // 定員と残り枠（人数）。残り枠は API が数えて返す値をそのまま持つ（docs/01 の 6.11 の remaining）。
+  // アプリで「定員 − 確定数」を計算しないのは、数え方（どの状態の応募を数えるか）が業務ルールだから。
+  final int capacity;
+  final int remaining;
 }

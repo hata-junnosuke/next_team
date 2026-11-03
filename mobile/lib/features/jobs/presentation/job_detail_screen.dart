@@ -67,6 +67,10 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
           _DetailRow(label: '拠点', value: job.location.name),
           _DetailRow(label: '時給', value: formatYen(job.hourlyWage)),
           _DetailRow(label: '交通費', value: formatYen(job.transportAllowance)),
+          _DetailRow(
+            label: '残り枠',
+            value: '${job.remaining}枠（定員 ${job.capacity}人）',
+          ),
         ],
       ),
       // 画面の下に固定するボタン。この Scaffold は下タブの内側にあるので、ボタンは下タブのすぐ上に出る。
@@ -79,8 +83,19 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             // onPressed に null を渡すと、ボタンは押せない見た目（灰色）になる（HTML の disabled）。
             // setState: state を変えて「build をやり直して」と Flutter に伝える（React の setApplied(true)）。
             // _applied = true と書くだけでは画面は変わらない。必ず setState の中で変える。
-            onPressed: _applied ? null : () => setState(() => _applied = true),
-            child: Text(_applied ? '応募済み' : '応募する'),
+            // 満員（残り 0）のときも押せなくする。一覧からは入れないが、/jobs/4 を直に開いたとき用。
+            // Step 7 では、押せるかどうかを API の can.apply で決め、最後の判定は API の 422 に任せる。
+            onPressed: _applied || job.remaining == 0
+                ? null
+                : () => setState(() => _applied = true),
+            // 三項演算子の入れ子は読みにくい。応募の状態の文言は、後のコミットで switch 式に替える。
+            child: Text(
+              _applied
+                  ? '応募済み'
+                  : job.remaining == 0
+                  ? '満員'
+                  : '応募する',
+            ),
           ),
         ),
       ),
