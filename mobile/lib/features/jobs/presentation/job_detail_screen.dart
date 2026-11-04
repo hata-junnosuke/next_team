@@ -5,11 +5,13 @@
 // パスの引数: https://pub.dev/documentation/go_router/latest/topics/Configuration-topic.html
 // 画面遷移の全体像: https://docs.flutter.dev/ui/navigation
 // StatefulWidget と setState: https://docs.flutter.dev/ui/interactivity
+// FutureBuilder: https://api.flutter.dev/flutter/widgets/FutureBuilder-class.html
 
 import 'package:flutter/material.dart';
 
 import '../../../core/format.dart';
 import '../data/fake_job_repository.dart';
+import '../domain/job_posting.dart';
 
 // 「応募したか」をこの画面の中で覚えるので Stateful にする（React の useState を持つコンポーネント）。
 // StatefulWidget は 2 つのクラスの組になる:
@@ -32,17 +34,46 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   // 一覧に戻っても残すのは、後のコミット（状態を親に持ち上げる）でやる。
   bool _applied = false;
 
-  @override
-  Widget build(BuildContext context) {
+  // 募集が届く Future。一覧と同じく、build のたびに読み込み直さないように State に持つ（late は一覧の画面を参照）。
+  late final Future<JobPosting?> _jobFuture = _loadJob();
+
+  Future<JobPosting?> _loadJob() async {
     // State の中では、親から受け取った値（props）を widget.xxx で読む。
     // jobId をいったんローカル変数に入れると、null を確かめたあとの型の絞り込みが効き、! が要らない
     // （クラスの公開のフィールドのままだと絞り込まれない。https://dart.dev/tools/non-promotion-reasons ）。
     final jobId = widget.jobId;
-    // 条件 ? A : B は JavaScript と同じ三項演算子。
-    final job = jobId == null
-        ? null
-        : const FakeJobRepository().findJobPosting(jobId);
+    if (jobId == null) {
+      return null;
+    }
+    return const FakeJobRepository().findJobPosting(jobId);
+  }
 
+  @override
+  Widget build(BuildContext context) {
+    // 使い方は一覧の画面の FutureBuilder と同じ。
+    return FutureBuilder<JobPosting?>(
+      future: _jobFuture,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Scaffold(
+            appBar: AppBar(),
+            body: Center(child: Text('募集を読み込めませんでした\n${snapshot.error}')),
+          );
+        }
+        // 読み込み中。届いた結果が null（見つからない）と見分けるため、connectionState で「終わったか」を見る。
+        if (snapshot.connectionState != ConnectionState.done) {
+          return Scaffold(
+            appBar: AppBar(),
+            body: const Center(child: CircularProgressIndicator()),
+          );
+        }
+        return _buildJob(context, snapshot.data);
+      },
+    );
+  }
+
+  // 届いた募集を描く。job が null なら「見つかりません」。
+  Widget _buildJob(BuildContext context, JobPosting? job) {
     // 見つからないとき（API なら 404）。
     // AppBar を置くと、親のルート（一覧）があるので、戻るボタンが自動で出る。
     if (job == null) {
