@@ -12,6 +12,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/format.dart';
 import '../domain/job_posting.dart';
 import 'applied_jobs_scope.dart';
+import 'apply_status.dart';
 
 // 受け取った募集を表示するだけなので Stateless にする（props だけで描く関数コンポーネント）。
 class JobListTile extends StatelessWidget {
@@ -23,16 +24,18 @@ class JobListTile extends StatelessWidget {
   Widget build(BuildContext context) {
     // Theme.of(context): いちばん近い祖先のテーマを読む（React の useContext(ThemeContext)）。
     final textTheme = Theme.of(context).textTheme;
-    // 満員かどうか。Step 7 では API の can.apply（応募できるか）を見るように替える。
-    final isFull = job.remaining == 0;
     // 詳細で応募すると AppliedJobs が知らせるので、一覧に戻ったときにはこの行も描き直されている。
-    final applied = AppliedJobsScope.of(context).contains(job.id);
+    final status = ApplyStatus.of(
+      job,
+      applied: AppliedJobsScope.of(context).contains(job.id),
+    );
 
     return Card(
       // ListTile = 「上に見出し・下に補足・右に飾り」の 1 行の決まった形。
       child: ListTile(
         // enabled: false にすると、文字が灰色になり、onTap も呼ばれなくなる。
-        enabled: !isFull,
+        // 満員の行だけ押せなくする（応募済みなら満員でも詳細を見られる）。
+        enabled: status != ApplyStatus.full,
         title: Text(job.jobTitle, style: textTheme.titleMedium),
         // Column = 子を縦に並べる（CSS の flex-direction: column）。
         subtitle: Column(
@@ -57,11 +60,11 @@ class JobListTile extends StatelessWidget {
             ),
             // SizedBox を高さだけで使うと、すき間になる（CSS の margin の代わり）。
             const SizedBox(height: 4),
-            // if を [ ] の中に書くと、条件で並べる要素を選べる（collection if。JSX の条件 ? <A/> : <B/>）。
-            if (applied)
-              const _AppliedBadge()
-            else
-              _RemainingBadge(remaining: job.remaining),
+            // 状態ごとにバッジを選ぶ。|| は「どちらかに当てはまれば」のパターン（未応募と満員は残り枠を出す）。
+            switch (status) {
+              .applied => const _AppliedBadge(),
+              .notApplied || .full => _RemainingBadge(remaining: job.remaining),
+            },
           ],
         ),
         // 押したら詳細へ。context.go は go_router が足したメソッドで、パスで画面を移る（Next.js の router.push）。

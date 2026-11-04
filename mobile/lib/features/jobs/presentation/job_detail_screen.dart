@@ -14,6 +14,7 @@ import '../../../core/format.dart';
 import '../data/fake_job_repository.dart';
 import '../domain/job_posting.dart';
 import 'applied_jobs_scope.dart';
+import 'apply_status.dart';
 
 // 募集の Future を 1 回だけ作って持ち続けるので Stateful にする（React の useState を持つコンポーネント）。
 // 「応募したか」は前はこの State に持っていたが、画面と一緒に捨てられて一覧に戻ると消えるので、
@@ -87,7 +88,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
     // 外枠の AppliedJobs を読む。誰かが apply() を呼ぶと、この画面の build がやり直される。
     final appliedJobs = AppliedJobsScope.of(context);
-    final applied = appliedJobs.contains(job.id);
+    final status = ApplyStatus.of(job, applied: appliedJobs.contains(job.id));
 
     return Scaffold(
       appBar: AppBar(title: Text(job.jobTitle)),
@@ -117,19 +118,19 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
           child: FilledButton(
             // onPressed に null を渡すと、ボタンは押せない見た目（灰色）になる（HTML の disabled）。
             // 押したら外枠の AppliedJobs に入れる。setState は要らない（AppliedJobs が知らせて描き直させる）。
-            // 満員（残り 0）のときも押せなくする。一覧からは入れないが、/jobs/4 を直に開いたとき用。
+            // 押せるのは未応募のときだけ。満員は一覧からは入れないが、/jobs/4 を直に開いたとき用。
             // Step 7 では、押せるかどうかを API の can.apply で決め、最後の判定は API の 422 に任せる。
-            onPressed: applied || job.remaining == 0
-                ? null
-                : () => appliedJobs.apply(job.id),
-            // 三項演算子の入れ子は読みにくい。応募の状態の文言は、後のコミットで switch 式に替える。
-            child: Text(
-              applied
-                  ? '応募済み'
-                  : job.remaining == 0
-                  ? '満員'
-                  : '応募する',
-            ),
+            onPressed: status == ApplyStatus.notApplied
+                ? () => appliedJobs.apply(job.id)
+                : null,
+            // switch 式で状態ごとの文言を返す。ApplyStatus の値を 1 つでも書き漏らすとコンパイルエラーになる
+            // （状態を足したときに、文言を決め忘れた所を全部コンパイラが教えてくれる）。
+            // 値の前の . は「ApplyStatus.」の省略（switch の対象の型から分かるので書かなくてよい）。
+            child: Text(switch (status) {
+              .notApplied => '応募する',
+              .applied => '応募済み',
+              .full => '満員',
+            }),
           ),
         ),
       ),
