@@ -1,6 +1,7 @@
 // 募集の詳細の画面。パスは /jobs/:id（例: /jobs/3）。
 // Next.js で言うと app/jobs/[id]/page.tsx に当たる。下に「応募する」ボタンを置く。
 // 応募は、まだどこにも保存しない（押すと「応募済み」に変わるだけ）。Step 7 で API の応募（POST）に替える。
+// 「応募済み」はアプリの外枠が持つ AppliedJobs に入れるので、一覧に戻っても、開き直しても残る。
 //
 // パスの引数: https://pub.dev/documentation/go_router/latest/topics/Configuration-topic.html
 // 画面遷移の全体像: https://docs.flutter.dev/ui/navigation
@@ -12,8 +13,11 @@ import 'package:flutter/material.dart';
 import '../../../core/format.dart';
 import '../data/fake_job_repository.dart';
 import '../domain/job_posting.dart';
+import 'applied_jobs_scope.dart';
 
-// 「応募したか」をこの画面の中で覚えるので Stateful にする（React の useState を持つコンポーネント）。
+// 募集の Future を 1 回だけ作って持ち続けるので Stateful にする（React の useState を持つコンポーネント）。
+// 「応募したか」は前はこの State に持っていたが、画面と一緒に捨てられて一覧に戻ると消えるので、
+// アプリの外枠（AppliedJobs）に持ち上げた。
 // StatefulWidget は 2 つのクラスの組になる:
 // - JobDetailScreen（この class）: 親から受け取る値（props）だけを持つ。作り直されることがある
 // - _JobDetailScreenState: 変わる値（state）を持つ。画面に出ている間は同じものが使われ続ける
@@ -29,11 +33,6 @@ class JobDetailScreen extends StatefulWidget {
 }
 
 class _JobDetailScreenState extends State<JobDetailScreen> {
-  // 応募したか。state なので final にしない（React の const [applied, setApplied] = useState(false)）。
-  // 状態がこの画面の中にあるので、一覧に戻って詳細を開き直すと false に戻る（画面と一緒に捨てられるため）。
-  // 一覧に戻っても残すのは、後のコミット（状態を親に持ち上げる）でやる。
-  bool _applied = false;
-
   // 募集が届く Future。一覧と同じく、build のたびに読み込み直さないように State に持つ（late は一覧の画面を参照）。
   late final Future<JobPosting?> _jobFuture = _loadJob();
 
@@ -85,6 +84,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
     // ここから下では job は null でないと Dart が分かっている（上の if で return したため）。
     // これを「型の絞り込み（promotion）」と言う。TypeScript の if (!job) return と同じ。
+
+    // 外枠の AppliedJobs を読む。誰かが apply() を呼ぶと、この画面の build がやり直される。
+    final appliedJobs = AppliedJobsScope.of(context);
+    final applied = appliedJobs.contains(job.id);
+
     return Scaffold(
       appBar: AppBar(title: Text(job.jobTitle)),
       body: ListView(
@@ -112,16 +116,15 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
           // FilledButton: 塗りつぶしのボタン（いちばん目立たせたい操作に使う）。
           child: FilledButton(
             // onPressed に null を渡すと、ボタンは押せない見た目（灰色）になる（HTML の disabled）。
-            // setState: state を変えて「build をやり直して」と Flutter に伝える（React の setApplied(true)）。
-            // _applied = true と書くだけでは画面は変わらない。必ず setState の中で変える。
+            // 押したら外枠の AppliedJobs に入れる。setState は要らない（AppliedJobs が知らせて描き直させる）。
             // 満員（残り 0）のときも押せなくする。一覧からは入れないが、/jobs/4 を直に開いたとき用。
             // Step 7 では、押せるかどうかを API の can.apply で決め、最後の判定は API の 422 に任せる。
-            onPressed: _applied || job.remaining == 0
+            onPressed: applied || job.remaining == 0
                 ? null
-                : () => setState(() => _applied = true),
+                : () => appliedJobs.apply(job.id),
             // 三項演算子の入れ子は読みにくい。応募の状態の文言は、後のコミットで switch 式に替える。
             child: Text(
-              _applied
+              applied
                   ? '応募済み'
                   : job.remaining == 0
                   ? '満員'

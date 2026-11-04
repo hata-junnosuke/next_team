@@ -1,5 +1,6 @@
 // 募集一覧の 1 行。日付・時間帯・拠点・職種・時給と「残り○枠」のバッジを出す。
 // 残り枠が 0 の行は灰色にし、タップできなくする（詳細に入れないので応募もできない）。
+// 応募済みの募集は、バッジを「応募済み」に替える（外枠の AppliedJobs を読む）。
 // React で言うと、一覧の map の中で返す <JobListItem job={job} /> コンポーネントに当たる。
 //
 // Card: https://api.flutter.dev/flutter/material/Card-class.html
@@ -10,6 +11,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/format.dart';
 import '../domain/job_posting.dart';
+import 'applied_jobs_scope.dart';
 
 // 受け取った募集を表示するだけなので Stateless にする（props だけで描く関数コンポーネント）。
 class JobListTile extends StatelessWidget {
@@ -23,6 +25,8 @@ class JobListTile extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     // 満員かどうか。Step 7 では API の can.apply（応募できるか）を見るように替える。
     final isFull = job.remaining == 0;
+    // 詳細で応募すると AppliedJobs が知らせるので、一覧に戻ったときにはこの行も描き直されている。
+    final applied = AppliedJobsScope.of(context).contains(job.id);
 
     return Card(
       // ListTile = 「上に見出し・下に補足・右に飾り」の 1 行の決まった形。
@@ -53,7 +57,11 @@ class JobListTile extends StatelessWidget {
             ),
             // SizedBox を高さだけで使うと、すき間になる（CSS の margin の代わり）。
             const SizedBox(height: 4),
-            _RemainingBadge(remaining: job.remaining),
+            // if を [ ] の中に書くと、条件で並べる要素を選べる（collection if。JSX の条件 ? <A/> : <B/>）。
+            if (applied)
+              const _AppliedBadge()
+            else
+              _RemainingBadge(remaining: job.remaining),
           ],
         ),
         // 押したら詳細へ。context.go は go_router が足したメソッドで、パスで画面を移る（Next.js の router.push）。
@@ -93,6 +101,27 @@ class _RemainingBadge extends StatelessWidget {
           fontSize: 12,
           color: isFull ? colors.outline : colors.onPrimaryContainer,
         ),
+      ),
+    );
+  }
+}
+
+// 「応募済み」のバッジ。表示するだけなので Stateless。
+class _AppliedBadge extends StatelessWidget {
+  const _AppliedBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: colors.tertiaryContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        '応募済み',
+        style: TextStyle(fontSize: 12, color: colors.onTertiaryContainer),
       ),
     );
   }
