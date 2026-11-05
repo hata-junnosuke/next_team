@@ -17,8 +17,8 @@ import 'applied_jobs_scope.dart';
 import 'apply_status.dart';
 
 // 募集の Future を 1 回だけ作って持ち続けるので Stateful にする（React の useState を持つコンポーネント）。
-// 「応募したか」は前はこの State に持っていたが、画面と一緒に捨てられて一覧に戻ると消えるので、
-// アプリの外枠（AppliedJobs）に持ち上げた。
+// 「応募したか」はこの State には持たない。画面と一緒に捨てられて一覧に戻ると消えるので、
+// アプリの外枠（AppliedJobs）に置いている。
 // StatefulWidget は 2 つのクラスの組になる:
 // - JobDetailScreen（この class）: 親から受け取る値（props）だけを持つ。作り直されることがある
 // - _JobDetailScreenState: 変わる値（state）を持つ。画面に出ている間は同じものが使われ続ける
@@ -28,7 +28,8 @@ class JobDetailScreen extends StatefulWidget {
   // パスの :id。数でなかったら null（/jobs/abc など）。
   final int? jobId;
 
-  // この Widget の状態を持つ State を作る。Flutter が 1 回だけ呼ぶ。
+  // この Widget の状態を持つ State を作る。Widget がツリーに入るときに Flutter が呼ぶ。
+  // 同じ場所にある間は、できた State が使い回される（build のたびには呼ばれない）。
   @override
   State<JobDetailScreen> createState() => _JobDetailScreenState();
 }

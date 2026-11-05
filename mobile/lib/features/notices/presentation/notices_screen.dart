@@ -1,9 +1,10 @@
 // おしらせ タブの画面。パスは /notices。
 // おしらせの一覧。Step 10（プッシュ通知）で中身を作る。今は見出しだけの空の画面。
-// 書き方は features/jobs/presentation/job_list_screen.dart と同じ（Next.js の app/notices/page.tsx）。
+// Next.js で言うと app/notices/page.tsx に当たる。
 
 import 'package:flutter/material.dart';
 
+// 状態を持たない空の画面なので Stateless にする（React の、props も state もない関数コンポーネント）。
 class NoticesScreen extends StatelessWidget {
   const NoticesScreen({super.key});
 

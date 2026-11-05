@@ -12,8 +12,6 @@
 // dart: で始まるのは Dart に最初から入っているライブラリ。jsonDecode はここにある。
 import 'dart:convert';
 
-// DateUtils（日付だけを取り出す道具）を使うために読み込む。
-import 'package:flutter/material.dart';
 // rootBundle を使うために読み込む。
 import 'package:flutter/services.dart';
 
@@ -25,7 +23,7 @@ class FakeJobRepository {
   // jobs.json の日付は、この日を「今日」として書いてある。
   // 固定の日付のままだと日がたつと全部過去の募集になるので、読み込むときに今日までずらす。
   // ずらすのは偽データだけの都合なので、fromJson ではなくこのリポジトリの中でやる。
-  static final _baseDate = DateTime(2026, 1, 5);
+  static final _baseDate = DateTime.utc(2026, 1, 5);
 
   // 募集の一覧。勤務日 → 開始時刻の順に並んでいる（API の並び順と同じ。docs/01 の 6.11）。
   // Future<T>: 「あとで T が届く」という約束の値（JavaScript の Promise<T>）。
@@ -39,7 +37,10 @@ class FakeJobRepository {
     // 一覧の応答は {"data": [...], "meta": {...}}（docs/01 の 6.1）。今は data だけを使う。
     final data = json['data'] as List<dynamic>;
 
-    final shiftDays = DateUtils.dateOnly(DateTime.now())
+    // 今日が基準の日から何日あとか。UTC の 0 時どうしで引く（ローカル時刻のままだと、
+    // 間に夏時間の切り替えがあると 23 時間 × n になり、inDays の切り捨てで 1 日少なくなる）。
+    final now = DateTime.now();
+    final shiftDays = DateTime.utc(now.year, now.month, now.day)
         .difference(_baseDate)
         .inDays;
 

@@ -1,6 +1,7 @@
 // 募集のモデル（データの型）。画面とリポジトリの両方がこの型でやりとりする。
 // TypeScript で言うと web/ の zod スキーマから作る型（type JobPosting = z.infer<...>）に当たる。
-// 項目は docs/01 の 6.11 の WorkerJobPostingResource に合わせ、Step 7 で API に替えても画面を直さずに済むようにする。
+// 項目の名前と形は docs/01 の 6.11 の WorkerJobPostingResource に合わせ、Step 7 で API に替えても画面を直さずに済むようにする。
+// ただし今は Step 3 の画面で使う項目だけ。status / my_application / can は Step 7 で足す。
 //
 // JSON（API の形）から作る fromJson を、手で書いている（Step 7 で freezed + json_serializable の生成に替える）。
 // web/ で zod の parse をするのと同じく、形が違えばここで例外になる（契約のずれに気づける。docs/01 の 7A.4）。
@@ -63,7 +64,7 @@ class JobPosting {
 
   final int id;
   final JobLocation location;
-  // 職種（job_title）。Dart の名前は lowerCamelCase にする（JSON の snake_case との変換は fromJson のコミットで書く）。
+  // 職種（job_title）。Dart の名前は lowerCamelCase にする（JSON の snake_case との変換は下の fromJson でしている）。
   final String jobTitle;
   // 勤務日。時刻は使わず、日付だけを見る。
   final DateTime workDate;

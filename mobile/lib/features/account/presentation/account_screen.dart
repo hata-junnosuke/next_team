@@ -1,9 +1,10 @@
 // マイページ タブの画面。パスは /account。
-// マイページ。Step 6 でログイン中のワーカーとログアウトを出す。今は見出しだけの空の画面。
-// 書き方は features/jobs/presentation/job_list_screen.dart と同じ（Next.js の app/account/page.tsx）。
+// Step 6 でログイン中のワーカーとログアウトを出す。今は見出しだけの空の画面。
+// Next.js で言うと app/account/page.tsx に当たる。
 
 import 'package:flutter/material.dart';
 
+// 状態を持たない空の画面なので Stateless にする（React の、props も state もない関数コンポーネント）。
 class AccountScreen extends StatelessWidget {
   const AccountScreen({super.key});
 

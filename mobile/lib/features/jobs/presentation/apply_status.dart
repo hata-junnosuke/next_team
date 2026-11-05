@@ -1,7 +1,8 @@
 // 1 件の募集について、この人から見た応募の状態（未応募 / 応募済み / 満員）。
 // 一覧のバッジ・行を押せるか、詳細のボタンの文言・押せるかを、この 1 つの値から決める。
-// 前は「満員か」「応募済みか」の判定が一覧と詳細に散らばっていたので、ここに寄せた。
+// 「満員か」「応募済みか」の判定を一覧と詳細に散らさないよう、ここ 1 か所で決める。
 // Step 7 では、API の my_application（自分の応募）と can.apply（応募できるか）から決めるように替える。
+// そのとき「応募済み」の文言も、アプリで持たずに API の my_application.status.label（応募 / 確定 など）を出す。
 //
 // enum: https://dart.dev/language/enums
 // switch 式と、書き漏らしの検査（exhaustiveness）: https://dart.dev/language/branches#exhaustiveness-checking

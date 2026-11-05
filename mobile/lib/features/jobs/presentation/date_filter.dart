@@ -28,15 +28,18 @@ enum DateFilter {
     return switch (this) {
       DateFilter.all => null,
       DateFilter.today => (from: today, to: today),
-      DateFilter.tomorrow => (
-        from: today.add(const Duration(days: 1)),
-        to: today.add(const Duration(days: 1)),
-      ),
+      DateFilter.tomorrow => (from: _addDays(today, 1), to: _addDays(today, 1)),
       // 今週 = 今日から、その週の日曜まで（weekday は 月曜 = 1 … 日曜 = 7）。
       DateFilter.thisWeek => (
         from: today,
-        to: today.add(Duration(days: DateTime.sunday - today.weekday)),
+        to: _addDays(today, DateTime.sunday - today.weekday),
       ),
     };
   }
+
+  // 暦の上で days 日あとの日付（0 時）。
+  // today.add(Duration(days: 1)) は「24 時間後」なので、夏時間の切り替わる日は 23 時や 1 時になり、
+  // 日付の比べ方がずれる。DateTime(年, 月, 日 + days) なら、あふれた日は月にくり上がり、時刻は 0 時のまま。
+  static DateTime _addDays(DateTime date, int days) =>
+      DateTime(date.year, date.month, date.day + days);
 }

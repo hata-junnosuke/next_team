@@ -17,18 +17,21 @@ import '../features/notices/presentation/notices_screen.dart';
 import '../features/schedule/presentation/schedule_screen.dart';
 import 'scaffold_with_nav_bar.dart';
 
+// トップレベルの final なので、最初の 1 回しか作られない。ルートを書き換えたら r（ホットリロード）では
+// 反映されないので、R（ホットリスタート）を押す。
 final GoRouter router = GoRouter(
   // 起動したときに開くパス。
   initialLocation: '/jobs',
   // 画面を移るたびに、行き先のパス（例: going to /jobs/3）をログに出す。デバッグ実行のときだけ。
   // ログは dart:developer の log() で出るので、flutter run のターミナルではなく DevTools の Logging タブに出る。
   // https://docs.flutter.dev/tools/devtools/logging
-  // パスに秘密は入らない（トークンなどは URL に載せない）。
+  // だからパスに秘密を入れない。Step 6 で /login や /register を足すときも、トークン・パスワード・
+  // 招待コードはパスやクエリに載せない（rules/common/security.md）。
   debugLogDiagnostics: kDebugMode,
   routes: [
     // StatefulShellRoute = 下タブのような「共通の外枠 ＋ 中身だけ切り替わる」形を作るルート。
     // Next.js の layout.tsx に近い。違いは、タブ（branch）ごとに画面の履歴と状態を別々に持つこと。
-    // indexedStack: 4 つのタブの画面を重ねて全部持っておき、見えるものだけ切り替える。
+    // indexedStack: 一度開いたタブの画面を捨てずに重ねて持っておき、見えるものだけ切り替える。
     // だからタブを移って戻っても、スクロール位置や入力が消えない。
     StatefulShellRoute.indexedStack(
       // => は「1 つの式を返すだけの関数」の短い書き方（JavaScript のアロー関数と同じ）。
@@ -53,7 +56,10 @@ final GoRouter router = GoRouter(
                     // int.tryParse: 数でなければ null を返す（例外にしない）。int? は「int か null」の型。
                     // ! は「ここは null ではない」と言い切る印（ルートの定義上、id は必ずある）。
                     final id = int.tryParse(state.pathParameters['id']!);
-                    return JobDetailScreen(jobId: id);
+                    // key: go_router はページを「パスの形（/jobs/:id）」で見分けるので、/jobs/3 から /jobs/5 に
+                    // 移ると同じ State が使い回され、3 番の読み込み結果のままになる。id を key にすると、
+                    // id が変わったら State を作り直す（React で key を変えて作り直すのと同じ）。
+                    return JobDetailScreen(key: ValueKey(id), jobId: id);
                   },
                 ),
               ],
