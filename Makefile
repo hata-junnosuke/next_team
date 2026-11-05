@@ -4,7 +4,7 @@
 
 .PHONY: help up down ps api-serve web-dev horizon schedule fresh \
         api-test api-pint api-pint-test api-routes web-typecheck web-lint web-format web-format-check web-build \
-        verify verify-full worktree-env ports
+        verify verify-full worktree-env ports mobile-analyze mobile-run
 
 help: ## ターゲット一覧
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -51,6 +51,14 @@ web-build: ## 本番ビルド（遅いので Stop フックでは回さない。
 
 verify: api-pint-test api-test web-typecheck web-lint ## Stop フック相当を手で回す
 verify-full: verify web-format-check web-build ## + 整形チェックと本番ビルド
+
+# --- mobile（ワーカーアプリ。Step 9 までは verify に入れない。docs/01 の 7A.2） ---
+# 機種は名前の前方一致で選ぶ（flutter devices の名前）。別の機種なら make mobile-run MOBILE_DEVICE="iPhone 17 Pro"
+MOBILE_DEVICE ?= iPhone
+mobile-analyze: ## flutter analyze（警告 0 件がコミットの条件）
+	cd mobile && flutter analyze
+mobile-run: ## iOS シミュレータで mobile/ を起動（先にシミュレータを起動しておく。r でホットリロード）
+	cd mobile && flutter run -d "$(MOBILE_DEVICE)" --dart-define=API_BASE_URL=http://localhost:8002
 
 # --- worktree ---
 # main の作業ツリー（git worktree list の先頭）の .env / .env.local を WT にコピーする。中身は表示しない。

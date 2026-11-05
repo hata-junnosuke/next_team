@@ -1,0 +1,48 @@
+# 静的解析（flutter analyze）の設定。
+# Rails で言うと .rubocop.yml、Next.js で言うと eslint.config.mjs ＋ tsconfig.json の strict に当たる。
+# `make mobile-analyze` が 0 件であることをコミットの条件にする（docs/05 の 1 章）。
+#
+# 静的解析: https://dart.dev/tools/analysis
+# ルールの一覧: https://dart.dev/tools/linter-rules
+
+# Flutter 公式の推奨ルール集を土台にする（雛形の flutter_lints。https://pub.dev/packages/flutter_lints ）。
+# avoid_print（print を残さない）と prefer_const_constructors_in_immutables はここに入っている。
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  # 型を厳しく見る 3 つの設定（TypeScript の strict に近い）。
+  # https://dart.dev/tools/analysis#enabling-additional-type-checks
+  language:
+    # dynamic（型の分からない値）を、黙って別の型として扱わない。
+    # 例: jsonDecode の結果をそのまま String に入れるとエラーになり、`as String` と書かされる。
+    strict-casts: true
+    # List や Map の中身の型を省略させない（List ではなく List<String> と書く）。
+    strict-raw-types: true
+    # 型を推論できない所で、勝手に dynamic にしない（TypeScript の noImplicitAny）。
+    strict-inference: true
+  # 生成物とネイティブ側は見ない（雛形の既定のまま）。
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+
+linter:
+  rules:
+    # print は警告にする（flutter_lints に入っているが、守りたいので明示する）。
+    # debugPrint は警告されないので、レビューで見る（rules/common/coding-style.md）。
+    - avoid_print
+    # 変わらない Widget には const を付ける。毎回作り直さずに使い回せるので、再描画が軽くなる。
+    # flutter_lints 6 には入っていないので足す。
+    - prefer_const_constructors
+    - prefer_const_declarations
+    - prefer_const_literals_to_create_immutables
+    # 再代入しないローカル変数は final にする（TypeScript の const を基本にするのと同じ）。
+    - prefer_final_locals
+    # 文字列は '…' にそろえる（Dart の慣習。https://dart.dev/effective-dart/style ）。
+    - prefer_single_quotes
+    # 関数の戻り値の型を省略しない。
+    - always_declare_return_types
+    # dynamic の値のメソッドを呼ばない（型を確かめずに呼ぶと実行時に落ちる）。
+    - avoid_dynamic_calls
+    # await し忘れた Future を見つける（JavaScript で Promise を await し忘れるのと同じ事故）。
+    - unawaited_futures

@@ -1,6 +1,7 @@
 # テスト（常時適用）
 
 - 自動テストは `api/tests/` だけ。`web/` のテストは書かない。web は tsc と ESLint、それと issue に書いた画面の確認項目を人が確かめる
+- `mobile/` のテストは docs/05 の Step 9 から `mobile/test/` に書く（ユニット・Provider・Widget）。それまでは `flutter analyze` が 0 件であること（出力を PR に貼る）と、issue に書いた画面の確認項目を人がシミュレータで確かめる
 - 必須のテストファイル 6 本（`docs/01_技術仕様_next.md` の必須のテストファイル。Stop フックが常に存在を検査する）
   - 動線: `Feature/ApplicationTest.php`（定員超過）、`Unit/PayrollCalculatorTest.php`（報酬計算）、`Unit/ApplicationStatusTest.php`（状態遷移）、`Feature/AcceptanceScenarioTest.php`（動線 10 ステップ）
   - 非同期: `Feature/NotificationIdempotencyTest.php`（二重送信しない）、`Feature/FailedJobTest.php`（失敗の記録と再実行）

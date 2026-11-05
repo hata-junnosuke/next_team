@@ -1,0 +1,161 @@
+{
+  "data": [
+    {
+      "id": 1,
+      "location": {
+        "id": 1,
+        "name": "渋谷倉庫"
+      },
+      "job_title": "倉庫内ピッキング",
+      "work_date": "2026-01-05",
+      "start_time": "09:00",
+      "end_time": "17:00",
+      "hourly_wage": 1200,
+      "transport_allowance": 500,
+      "capacity": 5,
+      "remaining": 3
+    },
+    {
+      "id": 2,
+      "location": {
+        "id": 2,
+        "name": "新宿店"
+      },
+      "job_title": "品出し",
+      "work_date": "2026-01-05",
+      "start_time": "18:00",
+      "end_time": "22:00",
+      "hourly_wage": 1300,
+      "transport_allowance": 0,
+      "capacity": 3,
+      "remaining": 1
+    },
+    {
+      "id": 3,
+      "location": {
+        "id": 3,
+        "name": "品川センター"
+      },
+      "job_title": "検品",
+      "work_date": "2026-01-06",
+      "start_time": "08:00",
+      "end_time": "12:00",
+      "hourly_wage": 1150,
+      "transport_allowance": 400,
+      "capacity": 4,
+      "remaining": 4
+    },
+    {
+      "id": 4,
+      "location": {
+        "id": 1,
+        "name": "渋谷倉庫"
+      },
+      "job_title": "梱包",
+      "work_date": "2026-01-06",
+      "start_time": "13:00",
+      "end_time": "18:00",
+      "hourly_wage": 1200,
+      "transport_allowance": 500,
+      "capacity": 2,
+      "remaining": 0
+    },
+    {
+      "id": 5,
+      "location": {
+        "id": 2,
+        "name": "新宿店"
+      },
+      "job_title": "レジ補助",
+      "work_date": "2026-01-07",
+      "start_time": "10:00",
+      "end_time": "15:00",
+      "hourly_wage": 1250,
+      "transport_allowance": 0,
+      "capacity": 3,
+      "remaining": 2
+    },
+    {
+      "id": 6,
+      "location": {
+        "id": 3,
+        "name": "品川センター"
+      },
+      "job_title": "仕分け",
+      "work_date": "2026-01-08",
+      "start_time": "22:00",
+      "end_time": "05:00",
+      "hourly_wage": 1500,
+      "transport_allowance": 600,
+      "capacity": 6,
+      "remaining": 5
+    },
+    {
+      "id": 7,
+      "location": {
+        "id": 1,
+        "name": "渋谷倉庫"
+      },
+      "job_title": "倉庫内ピッキング",
+      "work_date": "2026-01-09",
+      "start_time": "09:00",
+      "end_time": "17:00",
+      "hourly_wage": 1200,
+      "transport_allowance": 500,
+      "capacity": 5,
+      "remaining": 5
+    },
+    {
+      "id": 8,
+      "location": {
+        "id": 2,
+        "name": "新宿店"
+      },
+      "job_title": "品出し",
+      "work_date": "2026-01-11",
+      "start_time": "07:00",
+      "end_time": "11:00",
+      "hourly_wage": 1300,
+      "transport_allowance": 0,
+      "capacity": 2,
+      "remaining": 0
+    },
+    {
+      "id": 9,
+      "location": {
+        "id": 3,
+        "name": "品川センター"
+      },
+      "job_title": "検品",
+      "work_date": "2026-01-14",
+      "start_time": "13:00",
+      "end_time": "17:00",
+      "hourly_wage": 1150,
+      "transport_allowance": 400,
+      "capacity": 3,
+      "remaining": 3
+    },
+    {
+      "id": 10,
+      "location": {
+        "id": 1,
+        "name": "渋谷倉庫"
+      },
+      "job_title": "棚卸し",
+      "work_date": "2026-01-17",
+      "start_time": "20:00",
+      "end_time": "23:00",
+      "hourly_wage": 1400,
+      "transport_allowance": 500,
+      "capacity": 4,
+      "remaining": 1
+    }
+  ],
+  "meta": {
+    "current_page": 1,
+    "last_page": 1,
+    "per_page": 20,
+    "total": 10
+  },
+  "links": {}
+}

@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ワーカーアプリ学習計画</title>
+<style>
+:root{
+  --bg:#f7f6f2;--card:#fff;--ink:#1d1d1b;--sub:#6b6a65;--line:#dedcd4;
+  --api:#c2410c;--api-bg:#fff1e8;--web:#1d4ed8;--web-bg:#eaf0ff;--mob:#0f766e;--mob-bg:#e6f6f3;
+  --you:#7c3aed;--you-bg:#f2ecff;--star:#b45309;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#17171a;--card:#212125;--ink:#ecebe6;--sub:#a3a29c;--line:#3a3a40;
+  --api:#fb923c;--api-bg:#3a2516;--web:#7aa2ff;--web-bg:#1c2540;--mob:#4fd1c5;--mob-bg:#14302d;
+  --you:#b794ff;--you-bg:#2a2140;--star:#fbbf24;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.7 "Hiragino Sans","Noto Sans JP",system-ui,sans-serif}
+main{max-width:1040px;margin:0 auto;padding:32px 16px 64px}
+h1{font-size:24px;margin:0 0 4px}
+.lead{color:var(--sub);margin:0 0 32px}
+h2{font-size:18px;margin:48px 0 6px;display:flex;gap:10px;align-items:center}
+h2 .n{background:var(--ink);color:var(--bg);border-radius:50%;width:26px;height:26px;display:inline-grid;place-items:center;font-size:13px}
+.desc{color:var(--sub);margin:0 0 16px;font-size:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px}
+
+/* 1. architecture */
+.arch{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.client{border-radius:10px;padding:14px 16px;border:2px solid}
+.client.web{border-color:var(--web);background:var(--web-bg)}
+.client.mob{border-color:var(--mob);background:var(--mob-bg)}
+.client .who{font-size:12px;color:var(--sub)}
+.client b{display:block;font-size:16px}
+.tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:99px;margin-top:6px;border:1px solid currentColor}
+.web .tag{color:var(--web)} .mob .tag{color:var(--mob)}
+.new{font-size:11px;font-weight:700;color:var(--mob);margin-left:6px}
+.arrows{display:grid;grid-template-columns:1fr 1fr;gap:16px;text-align:center;font-size:13px;color:var(--sub);padding:6px 0}
+.arrows code{font-size:12px}
+.server{border:2px solid var(--api);background:var(--api-bg);border-radius:10px;padding:14px 16px}
+.server b{font-size:16px}
+.core{margin-top:8px;padding:8px 12px;border:1px dashed var(--api);border-radius:8px;font-size:13px}
+.out{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.out span{font-size:13px;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:4px 10px}
+.out .n2{border-color:var(--mob);color:var(--mob)}
+.point{margin-top:14px;font-size:14px;border-left:4px solid var(--api);padding:4px 12px}
+
+/* 2. loop */
+.loop{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.st{border-radius:10px;padding:12px;text-align:center;position:relative}
+.st.y{background:var(--you-bg);border:1px solid var(--you)}
+.st.c{background:var(--mob-bg);border:1px solid var(--mob)}
+.st .k{font-size:22px;font-weight:700}
+.st .t{font-weight:700}
+.st .d{font-size:12px;color:var(--sub);line-height:1.5}
+.st .r{font-size:11px;font-weight:700;margin-bottom:4px}
+.st.y .r{color:var(--you)} .st.c .r{color:var(--mob)}
+.legend{display:flex;gap:16px;font-size:13px;margin-top:10px;color:var(--sub)}
+.dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:middle}
+
+/* 3. roadmap */
+.week{display:grid;grid-template-columns:90px 1fr;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.week:first-child{border-top:0}
+.wk{font-weight:700}
+.wk small{display:block;color:var(--sub);font-weight:400;font-size:12px}
+.steps{display:flex;flex-wrap:wrap;gap:8px}
+.s{border-radius:8px;padding:6px 10px;font-size:13px;border:1px solid var(--line);background:var(--card)}
+.s i{font-style:normal;font-weight:700;margin-right:4px}
+.s.m{border-color:var(--mob);background:var(--mob-bg)}
+.s.a{border-color:var(--api);background:var(--api-bg)}
+.s.sb{border-style:dashed}
+.s.goal{outline:2px solid var(--star);outline-offset:1px}
+.mile{color:var(--star);font-weight:700;font-size:13px;margin-top:6px}
+.line-must{margin-top:10px;padding:8px 12px;border:2px solid var(--star);border-radius:8px;font-weight:700;font-size:14px;text-align:center}
+
+/* 4. scenario */
+.scn{display:grid;grid-template-columns:1fr 60px 1fr;gap:0;font-size:14px}
+.col-h{font-weight:700;text-align:center;padding:6px;border-radius:8px}
+.col-h.w{background:var(--web-bg);color:var(--web)}
+.col-h.m{background:var(--mob-bg);color:var(--mob)}
+.row{display:contents}
+.cell{padding:8px 10px;border-bottom:1px solid var(--line);min-height:42px}
+.cell.empty{color:transparent}
+.mid{display:grid;place-items:center;border-bottom:1px solid var(--line);font-weight:700;color:var(--sub)}
+.num{display:inline-block;min-width:20px;height:20px;line-height:20px;text-align:center;border-radius:50%;background:var(--ink);color:var(--bg);font-size:11px;margin-right:6px}
+
+/* 5. map */
+.map{width:100%;border-collapse:collapse;font-size:14px}
+.map th,.map td{border-bottom:1px solid var(--line);padding:8px 10px;text-align:left}
+.map th{font-size:12px;color:var(--sub);font-weight:400}
+.map td:first-child{color:var(--web)}
+.map td:last-child{color:var(--mob);font-family:ui-monospace,Menlo,monospace;font-size:13px}
+
+/* 0. setup & procedure */
+.now{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.now span{font-size:13px;border-radius:99px;padding:3px 12px;border:1px solid var(--line);background:var(--card)}
+.now .ok{border-color:var(--mob);color:var(--mob)}
+.now .ng{border-color:var(--api);color:var(--api)}
+.setup{counter-reset:s;display:grid;gap:10px}
+.sp{display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:start;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+.sp::before{counter-increment:s;content:counter(s);width:28px;height:28px;border-radius:50%;background:var(--you);color:#fff;display:grid;place-items:center;font-weight:700;font-size:13px}
+.sp b{display:block}
+.sp .why{font-size:13px;color:var(--sub)}
+.sp pre{margin:6px 0 0;padding:8px 10px;background:var(--bg);border:1px solid var(--line);border-radius:6px;font:12.5px/1.6 ui-monospace,Menlo,monospace;overflow-x:auto;white-space:pre}
+.where{display:inline-block;font-size:11px;font-weight:700;border-radius:4px;padding:0 6px;margin-left:6px;vertical-align:1px}
+.where.term{background:var(--api-bg);color:var(--api)}
+.where.bang{background:var(--you-bg);color:var(--you)}
+.where.gui{background:var(--web-bg);color:var(--web)}
+.done-box{margin-top:12px;padding:10px 14px;border:2px solid var(--mob);border-radius:10px;background:var(--mob-bg);font-size:14px}
+.done-box ul{margin:4px 0 0;padding-left:20px}
+.lanes{display:grid;grid-template-columns:110px 1fr 1fr;font-size:14px;min-width:0}
+.lh{font-weight:700;text-align:center;padding:8px;border-radius:8px 8px 0 0}
+.lh.y{background:var(--you-bg);color:var(--you)}
+.lh.c{background:var(--mob-bg);color:var(--mob)}
+.ph{padding:10px 8px;border-top:1px solid var(--line);font-weight:700;font-size:13px}
+.ph small{display:block;font-weight:400;color:var(--sub)}
+.lc{padding:10px;border-top:1px solid var(--line)}
+.lc.y{background:color-mix(in srgb,var(--you-bg) 45%,transparent)}
+.lc.c{background:color-mix(in srgb,var(--mob-bg) 45%,transparent)}
+.it{display:block;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 10px;margin:0 0 6px;font-size:13px}
+.it:last-child{margin-bottom:0}
+.it b{color:var(--mob)}
+.it.here{outline:2px solid var(--star);outline-offset:1px}
+.gate{grid-column:1/-1;margin:6px 0;padding:8px 12px;border:2px dashed var(--star);border-radius:8px;font-size:13px;font-weight:700;color:var(--star);text-align:center}
+.gate span{font-weight:400;color:var(--sub)}
+
+.tracks{display:grid;grid-template-columns:1fr 24px 1.2fr 24px 1.2fr;align-items:stretch}
+.track{border-radius:10px;padding:14px;border:2px solid var(--line);background:var(--card)}
+.track.t0{border-color:var(--sub)}
+.track.t1{border-color:var(--you);background:var(--you-bg)}
+.track.t2{border-color:var(--star)}
+.th span{display:inline-block;font-size:11px;font-weight:700;color:var(--star)}
+.track.t1 .th span{color:var(--you)}
+.th b{display:block;font-size:16px}
+.th small{color:var(--sub);font-size:12px}
+.track ol{margin:8px 0;padding-left:20px;font-size:13px}
+.track ol b{display:inline-block;min-width:16px;color:var(--you)}
+.learn{font-size:12px;color:var(--sub);border-top:1px dashed var(--line);padding-top:6px}
+.arrow{display:grid;place-items:center;font-weight:700;color:var(--sub)}
+
+a{color:var(--web);text-decoration:underline;text-underline-offset:2px}
+.ref{font-size:12px;margin-top:6px;line-height:1.8}
+.ref a{white-space:nowrap}
+.docs{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+.docs a{display:block;text-decoration:none;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--card);font-size:13px}
+.docs a b{display:block;color:var(--web)}
+.docs a small{color:var(--sub)}
+
+@media (max-width:720px){
+  .tracks{grid-template-columns:1fr}
+  .arrow{transform:rotate(90deg);padding:4px 0}
+  .lanes{grid-template-columns:1fr}
+  .lh{display:none}
+  .lc.y::before{content:"👤 あなた";display:block;font-size:12px;font-weight:700;color:var(--you);margin-bottom:4px}
+  .lc.c::before{content:"🤖 Claude";display:block;font-size:12px;font-weight:700;color:var(--mob);margin-bottom:4px}
+  .arch,.arrows{grid-template-columns:1fr}
+  .arrows div:first-child{display:none}
+  .loop{grid-template-columns:1fr 1fr}
+  .week{grid-template-columns:1fr}
+  .scn{grid-template-columns:1fr 36px 1fr;font-size:13px}
+}
+</style>
+</head>
+<body>
+<main>
+<h1>ワーカーアプリ（Flutter）学習計画</h1>
+<p class="lead">next_team に <b>mobile/</b> を足し、既存の Laravel API と連携する。<br>2026-10-28 → 入社 2026-12-01 までに「連携が一通り動く」まで。</p>
+
+<h2><span class="n">📖</span>公式ドキュメントの入口</h2>
+<p class="desc">迷ったらここから引く。各手順の 📖 は、この中の該当ページ。URL は 2026-10-28 に開けることを確かめた。Flutter と Dart は英語のみ、Riverpod と Laravel（readouble）は日本語。</p>
+<div class="card"><div class="docs"><a href="https://docs.flutter.dev/" target="_blank" rel="noopener"><b>Flutter の文書</b><small>使い方・考え方（Rails ガイドに当たる）</small></a><a href="https://docs.flutter.dev/learn/pathway/tutorial" target="_blank" rel="noopener"><b>公式チュートリアル</b><small>作りながら順番に学ぶ</small></a><a href="https://docs.flutter.dev/reference/learning-resources" target="_blank" rel="noopener"><b>作例集（クックブック）</b><small>「リストを出す」などの小さな作例</small></a><a href="https://docs.flutter.dev/ui/widgets" target="_blank" rel="noopener"><b>Widget の一覧</b><small>カテゴリ別のカタログ</small></a><a href="https://api.flutter.dev/" target="_blank" rel="noopener"><b>API リファレンス</b><small>クラスごとの引数と例（Rails API に当たる）</small></a><a href="https://docs.flutter.dev/flutter-for/react-native-devs" target="_blank" rel="noopener"><b>React 経験者向け</b><small>React との対応表</small></a><a href="https://dart.dev/language" target="_blank" rel="noopener"><b>Dart の言語ガイド</b><small>文法の正</small></a><a href="https://dart.dev/resources/dart-cheatsheet" target="_blank" rel="noopener"><b>Dart の早見表</b><small>よく使う書き方を一気に</small></a><a href="https://pub.dev/" target="_blank" rel="noopener"><b>pub.dev</b><small>パッケージ（RubyGems / npm に当たる）</small></a><a href="https://riverpod.dev/ja/docs/introduction/getting_started" target="_blank" rel="noopener"><b>Riverpod（日本語）</b><small>Step 4 から</small></a><a href="https://readouble.com/laravel/13.x/ja/sanctum.html" target="_blank" rel="noopener"><b>Laravel Sanctum（日本語）</b><small>Step 5 の API 側</small></a><a href="https://firebase.google.com/docs/flutter/setup" target="_blank" rel="noopener"><b>Firebase と Flutter</b><small>Step 10</small></a></div></div>
+
+<h2><span class="n">🧰</span>道具の分け方：Orca と Cursor</h2>
+<p class="desc">Cursor はエディタとしてだけ使う。AI に書かせるのは Claude Code だけ（フックと CLAUDE.md のルールは Claude Code にしか効かない）。</p>
+<div class="card">
+  <div class="arch">
+    <div class="client mob"><span class="who">動かす・相談する・見る</span><b>Orca</b>ターミナル（<code>flutter run</code>・<code>r</code> / <code>R</code>・<code>flutter analyze</code>）<br>Claude Code<br>ブラウザ（DevTools・図解・管理画面）</div>
+    <div class="client web"><span class="who">読む・試す</span><b>Cursor（エディタとしてだけ）</b>Claude のコードと差分を読む・試しに書き換える<br>定義へのジャンプ・型の表示・ホバーの説明<br><span class="tag">AI に next_team/ を書かせない</span></div>
+  </div>
+  <div class="point"><b>守ること</b>：① <code>next_team/</code> のコードを Cursor の AI に書かせない（フックと CLAUDE.md は Claude Code にしか効かない） ② Cursor で開くのは issue の worktree か <code>mobile/</code>、TODO なら <code>~/Desktop/Study/flutter_todo</code>。<a href="https://docs.flutter.dev/tools/vs-code" target="_blank" rel="noopener">Flutter 拡張の使い方</a>・<a href="https://docs.flutter.dev/tools/devtools" target="_blank" rel="noopener">DevTools</a></div>
+</div>
+
+<h2><span class="n">0</span>環境構築（Step 0）の手順：上から順に、あなたが行う</h2>
+<p class="desc">システムに入れるものなので Claude は実行しない。2026-10-28 にこの Mac を調べた結果、今の状態は次のとおり。</p>
+<div class="card">
+  <div class="now">
+    <span class="ok">✓ Homebrew</span>
+    <span class="ok">✓ Xcode.app はある</span>
+    <span class="ng">✗ Xcode が選ばれていない（Command Line Tools が有効）</span>
+    <span class="ng">✗ Flutter</span>
+    <span class="ng">✗ CocoaPods</span>
+    <span class="ok">✓ Cursor（cursor コマンドあり）</span>
+    <span class="ng">✗ Cursor の Flutter 拡張</span>
+    <span class="ok">✓ Apple シリコン・空き 59GB</span>
+  </div>
+  <div class="setup">
+    <div class="sp"><div><b>Xcode を「使う Xcode」に選び、ライセンス同意と初回セットアップを済ませる<span class="where term">普通のターミナル（sudo）</span></b>
+      <div class="why">今は Command Line Tools が選ばれているので、Flutter から Xcode が見えない。sudo はパスワードを聞くので、Claude の <code>!</code> ではなく普通のターミナルで打つ</div>
+<pre>sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+sudo xcodebuild -license accept
+sudo xcodebuild -runFirstLaunch</pre><div class="ref">📖 <a href="https://docs.flutter.dev/platform-integration/ios/setup" target="_blank" rel="noopener">iOS の開発の準備（Flutter 公式）</a></div></div></div>
+    <div class="sp"><div><b>iOS シミュレータの本体（ランタイム）を入れる<span class="where bang">! でよい</span></b>
+      <div class="why">iOS のランタイムがないとシミュレータが起動しない。数 GB あるので時間がかかる。入っていればすぐ終わる</div>
+<pre>! xcodebuild -downloadPlatform iOS</pre><div class="ref">📖 <a href="https://developer.apple.com/documentation/xcode/downloading-and-installing-additional-xcode-components" target="_blank" rel="noopener">追加のコンポーネント（Apple）</a></div></div></div>
+    <div class="sp"><div><b>Flutter と CocoaPods を入れる<span class="where bang">! でよい</span></b>
+      <div class="why">CocoaPods は iOS のライブラリ管理（Ruby の Bundler に当たる）。Flutter のパッケージが iOS のネイティブコードを持つときに使う</div>
+<pre>! brew install --cask flutter
+! brew install cocoapods</pre><div class="ref">📖 <a href="https://docs.flutter.dev/install" target="_blank" rel="noopener">Flutter の導入</a> ・ <a href="https://guides.cocoapods.org/using/getting-started.html" target="_blank" rel="noopener">CocoaPods の導入</a></div></div></div>
+    <div class="sp"><div><b>Cursor に Flutter 拡張を入れる<span class="where bang">! でよい</span></b>
+      <div class="why">Dart 拡張も一緒に入る（Cursor の拡張のストア Open VSX に最新版がある）。定義へのジャンプ・型の表示・その場のエラー表示が効くようになり、Claude のコードを読みやすくなる</div>
+<pre>! cursor --install-extension Dart-Code.flutter</pre><div class="ref">📖 <a href="https://docs.flutter.dev/tools/vs-code" target="_blank" rel="noopener">Flutter 拡張の使い方（VS Code 向け。Cursor で読み替え）</a> ・ <a href="https://docs.flutter.dev/install/with-vs-code" target="_blank" rel="noopener">VS Code で導入</a></div></div></div>
+    <div class="sp"><div><b>flutter doctor で確かめる<span class="where bang">! で打つと結果が Claude に見える</span></b>
+      <div class="why">✗ が出たら 1 つずつ解消する。<b>Android の行は ✗ のままでよい</b>（Android は後回し）。詰まったら、結果を見て次の一手を案内する</div>
+<pre>! flutter doctor</pre><div class="ref">📖 <a href="https://docs.flutter.dev/install/troubleshoot" target="_blank" rel="noopener">うまくいかないとき</a></div></div></div>
+    <div class="sp"><div><b>試し場所を作り、テンプレートのアプリを動かす<span class="where term">Orca のターミナル</span></b>
+      <div class="why">カウンタのアプリは動作確認だけの使い捨てなので、リポジトリの<b>外</b>に置く。<code>flutter run</code> は動かしっぱなしにするので、Orca のターミナルを 1 つ使う</div>
+<pre>xcrun simctl boot "iPhone 17"   # シミュレータを起動する
+open /Applications/Xcode.app/Contents/Applications/DeviceHub.app   # 画面を出す（Xcode 27 は Simulator.app ではない）
+mkdir -p ~/Desktop/Study/mobile_sandbox && cd ~/Desktop/Study/mobile_sandbox
+flutter create hello && cd hello
+cursor .        # Cursor で lib/main.dart を開いておく
+flutter run     # シミュレータにカウンタのアプリが出る</pre><div class="ref">📖 <a href="https://docs.flutter.dev/reference/flutter-cli" target="_blank" rel="noopener">flutter コマンドの一覧</a></div></div></div>
+    <div class="sp"><div><b>ホットリロードを手で覚える<span class="where gui">Cursor ＋ Orca ＋ シミュレータ</span></b>
+      <div class="why">Cursor で <code>lib/main.dart</code> の文言を変えて保存し、Orca のターミナルで <code>r</code> を押すと 1 秒ほどで反映される（Cursor から F5 で起動すれば保存だけで反映される）。カウンタを何回か押してから、ターミナルで <code>r</code>（ホットリロード）と <code>R</code>（ホットリスタート）を打ち比べ、数字が残るかどうかを見る</div><div class="ref">📖 <a href="https://docs.flutter.dev/tools/hot-reload" target="_blank" rel="noopener">ホットリロード</a></div></div></div>
+  </div>
+  <div class="done-box"><b>Step 0 の完了条件</b>（ここまで来たら Claude に「Step 0 終わった」と伝える）
+    <ul>
+      <li><code>flutter doctor</code> の Flutter / Xcode の行が ✓（エディタの行は見なくてよい。Cursor は出ないことがある）</li><li>Cursor で <code>Text(</code> と打つと引数の候補が出る。AI の補完は出ない</li>
+      <li>カウンタのアプリがシミュレータに出て、文言を変えるとすぐ反映される</li>
+      <li>ホットリロードとホットリスタートの違いを 2〜3 行で言える</li>
+    </ul></div>
+</div>
+
+<h2><span class="n">◆</span>区切りは 3 段：環境 → 基本（TODO）→ 応用（Step 3）</h2>
+<p class="desc">TODO アプリは <code>next_team/</code> とは別の、独立した git リポジトリ（<code>~/Desktop/Study/flutter_todo/</code>）。Claude が 1 段 = 1 コミットで足していき、変更点を案内する。応用は別のアプリを作らず、Step 3 の <code>mobile/</code> に足す（同じ画面を 2 回作らない）。</p>
+<div class="card">
+  <div class="tracks">
+    <div class="track t0"><div class="th"><span>◆ 区切り 1</span><b>Step 0 環境構築</b><small>2h</small></div>
+      <ol><li>Xcode を選ぶ・Flutter を入れる</li><li>flutter doctor が ✓</li><li>カウンタのアプリが動く</li><li>ホットリロードを試す</li></ol>
+      <div class="learn">覚えること：ホットリロードとホットリスタートの違い</div><div class="ref">📖 <a href="https://docs.flutter.dev/platform-integration/ios/setup" target="_blank" rel="noopener">iOS の準備</a> ・ <a href="https://docs.flutter.dev/tools/hot-reload" target="_blank" rel="noopener">ホットリロード</a></div></div>
+    <div class="arrow">→</div>
+    <div class="track t1"><div class="th"><span>◆ 区切り 2・基本</span><b>Step 1 TODO アプリ</b><small>3h ・ flutter_todo/（git）</small></div>
+      <ol start="0"><li><b>1-0</b> 雛形・git init・CLAUDE.md</li><li><b>R</b> 3 件を一覧に並べる</li><li><b>C</b> 入力欄から追加</li><li><b>U</b> チェックで完了・取り消し線</li><li><b>U</b> タップで編集画面 → 保存して戻る</li><li><b>D</b> スワイプで削除・元に戻す</li><li>空なら追加できない・0 件の表示</li></ol>
+      <div class="learn">1 段 = 1 コミット（<code>1-3: 完了の切り替え</code>）。変更点で見る所：Widget の組み立て / setState / ListView / TextField / Navigator</div><div class="ref">📖 <a href="https://docs.flutter.dev/learn/pathway/tutorial/widget-fundamentals" target="_blank" rel="noopener">Widget の基本</a> ・ <a href="https://docs.flutter.dev/learn/pathway/tutorial/stateful-widget" target="_blank" rel="noopener">StatefulWidget</a> ・ <a href="https://docs.flutter.dev/cookbook/lists/long-lists" target="_blank" rel="noopener">長いリスト</a> ・ <a href="https://docs.flutter.dev/cookbook/forms/retrieve-input" target="_blank" rel="noopener">入力欄</a> ・ <a href="https://docs.flutter.dev/cookbook/navigation/returning-data" target="_blank" rel="noopener">画面から値を返す</a> ・ <a href="https://docs.flutter.dev/cookbook/gestures/dismissible" target="_blank" rel="noopener">スワイプで消す</a> ・ <a href="https://dart.dev/resources/dart-cheatsheet" target="_blank" rel="noopener">Dart 早見表</a></div></div>
+    <div class="arrow">→</div>
+    <div class="track t2"><div class="th"><span>応用・issue #31 の T6</span><b>Step 3 で続けて足す機能</b><small>mobile/ に 1 つずつ</small></div>
+      <ol><li>「残り○枠」バッジ・0 なら押せない</li><li>日付チップで絞り込む</li><li>偽データを JSON に移し fromJson で読む</li><li>一覧に戻っても「応募済み」が残る（状態を親に置く）</li><li>状態の文言を switch 式で出す</li></ol>
+      <div class="learn">覚えること：Future / fromJson / 状態の置き場所 → <b>Step 4 で Riverpod を入れる理由</b>になる</div><div class="ref">📖 <a href="https://pub.dev/packages/go_router" target="_blank" rel="noopener">go_router</a> ・ <a href="https://docs.flutter.dev/data-and-backend/serialization/json" target="_blank" rel="noopener">JSON</a> ・ <a href="https://dart.dev/libraries/async/async-await" target="_blank" rel="noopener">async / await</a> ・ <a href="https://docs.flutter.dev/data-and-backend/state-mgmt/simple" target="_blank" rel="noopener">状態を持ち上げる</a> ・ <a href="https://dart.dev/language/branches" target="_blank" rel="noopener">switch 式</a> ・ <a href="https://docs.flutter.dev/app-architecture/guide" target="_blank" rel="noopener">構成ガイド</a></div></div>
+  </div>
+  <div class="legend"><span>TODO の形（一覧・編集・状態の変更）を、そのまま募集に当てはめるのが Step 3。</span></div>
+</div>
+
+<h2><span class="n">0'</span>そのあとの進め方：TODO アプリと、issue #31 を並行して進める</h2>
+<p class="desc">琥珀の点線は「人が判断しないと先に進めない関門」。★ が今いる場所。T1〜T6 は issue #31 のタスク（案）。</p>
+<div class="card" style="overflow-x:auto">
+  <div class="lanes">
+    <div></div><div class="lh y">👤 あなた</div><div class="lh c">🤖 Claude（issue #31 の worktree）</div>
+
+    <div class="ph">いま<small>10/28</small></div>
+    <div class="lc y"><span class="it">Step 0 環境構築（上の 7 手順）</span><span class="it here">★ タスク表と曖昧点 Q1〜Q6 に答える</span></div>
+    <div class="lc c"><span class="it">/plan 31：planner がタスク表 T1〜T6 と曖昧点 Q1〜Q6 を作った</span></div>
+
+    <div class="gate">関門 1：タスク表を承認する <span>（あなた。承認したら issue #31 の本文に「人が承認」と書く）</span></div>
+
+    <div class="ph">P0<small>文書の整備</small></div>
+    <div class="lc y"><span class="it">Step 1 TODO アプリ（CRUD）◆ 区切り 2。別リポジトリで、1 段ずつ動かして変更点の案内を読む</span><span class="it">要件 4.8 と契約の文面を確かめる</span></div>
+    <div class="lc c"><span class="it"><b>T1</b> docs/05 と図解をコミット、決定 W1〜7 を docs/00 に記録</span><span class="it"><b>T2</b> 要件に「4.8 ワーカーアプリ」（技術の話は書かない）</span><span class="it"><b>T3</b> docs/01 にワーカーの認証と <code>/api/worker/*</code> の契約</span><span class="it"><b>T4</b> docs/01 に mobile/ の構成・パッケージ・担当</span><span class="it"><b>T5</b> ルールの改訂（security / coding-style / testing / CLAUDE.md）</span></div>
+
+    <div class="gate">関門 2：Step 0 の完了（flutter doctor が ✓）<span>— これが済むまで Claude は flutter create できない</span></div>
+
+    <div class="ph">Step 3<small>T6 mobile/ の雛形</small></div>
+    <div class="lc y"><span class="it">③ 1 機能ごとにシミュレータで動かす（下タブ・一覧 → 詳細・残り枠…）</span><span class="it">⑤ 案内を読んで質問し、「次」と言う</span><span class="it">説明：ShellRoute は何のためにある？ なぜ偽のリポジトリを挟む？</span></div>
+    <div class="lc c"><span class="it">② <b>T6</b> <code>flutter create</code>、analysis_options.yaml、mobile/CLAUDE.md（コメントのルール）</span><span class="it">1 機能 = 1 コミットで、下タブ → 偽データの一覧 → 詳細 → 応募ボタン → 残り枠・日付チップ・JSON・応募済みの保持・状態の文言。毎回 ④ 変更点を案内して止まる</span><span class="it"><code>flutter analyze</code> 0 件・<code>make verify</code> 緑 → push → PR → CI を確認</span></div>
+
+    <div class="gate">関門 3：PR を確かめて main にマージする <span>（あなた）→ issue #31 が閉じる</span></div>
+
+    <div class="ph">次の issue<small>11/4〜</small></div>
+    <div class="lc y"><span class="it">Step 4・6・7… も同じ ①〜⑤ で回す</span></div>
+    <div class="lc c"><span class="it">Step 4（Riverpod）と Step 5（api のワーカー認証。いつもの /epic-flow）を別の issue で立てる</span></div>
+  </div>
+  <div class="legend"><span>👤 あなたが手を動かす</span><span>🤖 Claude が書く</span><span style="color:var(--star)">┄ 関門（人が判断）</span></div>
+</div>
+
+<h2><span class="n">1</span>全体構成：同じ API・同じ DB を、2つのアプリが別の権限で使う</h2>
+<p class="desc">業務ルールは API のサービスにだけ置く。アプリは結果（422 のメッセージ）を表示するだけ。</p>
+<div class="card">
+  <div class="arch">
+    <div class="client web"><span class="who">管理者が使う</span><b>企業側 web（Next.js :3002）</b>募集を出す・応募を確定する<br><span class="tag">Cookie セッション（既存）</span></div>
+    <div class="client mob"><span class="who">ワーカーが使う（スマホ）</span><b>ワーカーアプリ（Flutter）<span class="new">NEW</span></b>募集を探す・応募する・予定を見る<br><span class="tag">Bearer トークン（Sanctum）</span></div>
+  </div>
+  <div class="arrows"><div>↓ <code>/api/admin/*</code></div><div>↓ <code>/api/worker/*</code> <span class="new">NEW</span></div></div>
+  <div class="server">
+    <b>Laravel API（:8002）</b>
+    <div class="core">ApplicationService::transitionTo() ← 応募・確定・キャンセルは両方ここを通る（定員・二重応募・状態遷移のチェック）</div>
+    <div class="out"><span>SQLite</span><span>Queue / Horizon</span><span>メール（Mailpit）</span><span class="n2">プッシュ通知 FCM（Step 10）</span></div>
+  </div>
+  <div class="point"><b>連携の正体</b>：ワーカーがアプリで応募 → 管理画面に「応募中」が出る → 管理者が確定 → アプリに「確定」が出て通知が届く</div>
+</div>
+
+<h2><span class="n">2</span>1 機能の回し方（全ステップ共通）</h2>
+<p class="desc">1 機能 = 1 コミット。Claude が書き、あなたは動かして読み、聞く。「次」と言うまで次へ進まない。1 機能は 15〜30 分。</p>
+<div class="card">
+  <div class="loop">
+    <div class="st c"><div class="r">Claude</div><div class="k">①</div><div class="t">宣言</div><div class="d">次に足す機能を 1 つ<br>新しい概念と公式 URL</div></div>
+    <div class="st c"><div class="r">Claude</div><div class="k">②</div><div class="t">実装・コミット</div><div class="d">コメント多め<br>analyze 0 件で 1 コミット</div></div>
+    <div class="st y"><div class="r">あなた</div><div class="k">③</div><div class="t">動かす</div><div class="d">シミュレータで r / R<br>「確認」を通す</div></div>
+    <div class="st c"><div class="r">Claude</div><div class="k">④</div><div class="t">変更点の案内</div><div class="d">ファイルと行ごとに<br>何が新しい・なぜ・React で言うと</div></div>
+    <div class="st y"><div class="r">あなた</div><div class="k">⑤</div><div class="t">質問・説明</div><div class="d">わからない所を聞く<br>2〜3 行で答えて「次」</div></div>
+  </div>
+  <div class="legend"><span><span class="dot" style="background:var(--you)"></span>あなた（動かす・読む・聞く）</span><span><span class="dot" style="background:var(--mob)"></span>Claude（書く・案内する）</span><span>差分は Orca（orca file diff）か Cursor で横に並べて見る</span></div>
+</div>
+
+<h2><span class="n">3</span>4週間のロードマップ</h2>
+<p class="desc">最初の1週間で「スマホに募集一覧が出る」まで行き、手応えを早く得る。</p>
+<div class="card">
+  <div class="week"><div class="wk">第1週<small>10/28〜</small></div><div>
+    <div class="steps">
+      <span class="s"><i>0</i>環境構築 ◆</span>
+      <span class="s sb"><i>1</i>TODO アプリ（CRUD・別リポジトリ）◆</span>
+      <span class="s m goal"><i>3</i>偽データで画面を作る（TODO の応用を含む）</span>
+    </div>
+    <div class="mile">★ スマホに募集一覧が出る</div></div></div>
+  <div class="week"><div class="wk">第2週<small>11/4〜</small></div><div>
+    <div class="steps">
+      <span class="s m"><i>4</i>Riverpod を入れる</span>
+      <span class="s a"><i>5</i>API：ワーカー認証と /api/worker/*</span>
+    </div></div></div>
+  <div class="week"><div class="wk">第3週<small>11/11〜</small></div><div>
+    <div class="steps">
+      <span class="s m"><i>6</i>アプリでログイン</span>
+      <span class="s m goal"><i>7</i>本物の API で検索・応募</span>
+    </div>
+    <div class="mile">★ アプリで応募すると管理画面に届く</div></div></div>
+  <div class="week"><div class="wk">第4週<small>11/18〜</small></div><div>
+    <div class="steps">
+      <span class="s a goal"><i>8</i>予定・取り下げ・キャンセル（API ＋ アプリ）</span>
+      <span class="s m"><i>9</i>テスト</span>
+    </div>
+    <div class="mile">★ 連携シナリオ 7 手順が通る</div></div></div>
+  <div class="line-must">ここまでが必達ライン（〜12/1）</div>
+  <div class="week"><div class="wk">以降<small>余力</small></div><div>
+    <div class="steps">
+      <span class="s m"><i>10</i>プッシュ通知（FCM）</span>
+      <span class="s"><i>11</i>仕上げ（README・振り返り）</span>
+    </div></div></div>
+  <div class="legend"><span><span class="dot" style="background:var(--mob)"></span>Flutter（mobile/）</span><span><span class="dot" style="background:var(--api)"></span>Laravel（api/）</span><span>点線＝next_team の外</span></div>
+</div>
+
+<h2><span class="n">4</span>必達ラインの連携シナリオ（Step 8）</h2>
+<p class="desc">シミュレータと管理画面を左右に並べて確かめる。</p>
+<div class="card">
+  <div class="scn">
+    <div class="col-h w">管理画面（管理者）</div><div></div><div class="col-h m">アプリ（ワーカー 山田）</div>
+    <div class="row"><div class="cell"><span class="num">1</span>山田を登録 → 招待メール</div><div class="mid">→</div><div class="cell empty">.</div></div>
+    <div class="row"><div class="cell empty">.</div><div class="mid">　</div><div class="cell"><span class="num">2</span>招待コードで初回登録（メール・コード・パスワード）</div></div>
+    <div class="row"><div class="cell">応募中で表示される</div><div class="mid">←</div><div class="cell"><span class="num">3</span>「9/20 ピッキング」に応募</div></div>
+    <div class="row"><div class="cell"><span class="num">4</span>確定する（確定メール F-20）</div><div class="mid">→</div><div class="cell">「よてい」に確定で出る</div></div>
+    <div class="row"><div class="cell">ワーカー都合キャンセル・1枠空く</div><div class="mid">←</div><div class="cell"><span class="num">5</span>アプリからキャンセル</div></div>
+    <div class="row"><div class="cell"><span class="num">6</span>別のワーカーを確定</div><div class="mid">　</div><div class="cell empty">.</div></div>
+    <div class="row"><div class="cell"><span class="num">7</span>募集を中止</div><div class="mid">→</div><div class="cell">「企業都合キャンセル」と表示</div></div>
+  </div>
+</div>
+
+<h2><span class="n">5</span>知っている Next.js と並べると</h2>
+<div class="card" style="overflow-x:auto">
+  <table class="map">
+    <tr><th>Next.js（web/）</th><th>役割</th><th>Flutter（mobile/）</th><th>公式</th></tr>
+    <tr><td>App Router / layout.tsx</td><td>画面遷移・共通レイアウト</td><td>go_router / ShellRoute</td><td style="font-family:inherit"><a href="https://pub.dev/documentation/go_router/latest/go_router/StatefulShellRoute-class.html" target="_blank" rel="noopener">StatefulShellRoute</a></td></tr>
+    <tr><td>lib/api.ts</td><td>API 呼び出し</td><td>dio ＋ AuthInterceptor</td><td style="font-family:inherit"><a href="https://pub.dev/packages/dio" target="_blank" rel="noopener">dio</a></td></tr>
+    <tr><td>zod</td><td>レスポンスの型</td><td>freezed ＋ json_serializable</td><td style="font-family:inherit"><a href="https://pub.dev/packages/freezed" target="_blank" rel="noopener">freezed</a></td></tr>
+    <tr><td>useState / Context</td><td>状態</td><td>Riverpod（AsyncValue）</td><td style="font-family:inherit"><a href="https://riverpod.dev/ja/docs/concepts2/providers" target="_blank" rel="noopener">Provider</a></td></tr>
+    <tr><td>Cookie（httpOnly）</td><td>ログイン状態</td><td>flutter_secure_storage</td><td style="font-family:inherit"><a href="https://pub.dev/packages/flutter_secure_storage" target="_blank" rel="noopener">flutter_secure_storage</a></td></tr>
+    <tr><td>middleware</td><td>未ログインなら追い返す</td><td>go_router の redirect</td><td style="font-family:inherit"><a href="https://pub.dev/documentation/go_router/latest/topics/Redirection-topic.html" target="_blank" rel="noopener">Redirection</a></td></tr>
+  </table>
+</div>
+</main>
+</body>
+</html>
