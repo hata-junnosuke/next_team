@@ -33,6 +33,14 @@ dependencies:
 
   go_router: ^18.1.2
 
+  # 状態管理（Step 4。docs/00 の決定 58）。Next.js で言うと、React の Context と SWR / TanStack Query を
+  # 合わせたもの。画面の外に「データの取り方と置き場所」（Provider）を持ち、画面はそれを読むだけにする。
+  # バージョンは pubspec.lock で固定する（Rails の Gemfile.lock、npm の package-lock.json と同じ）。
+  # https://riverpod.dev/ja/docs/introduction/getting_started
+  flutter_riverpod: ^3.4.3
+  # @riverpod という印（アノテーション）。これを付けた関数やクラスから、下の riverpod_generator が Provider を作る。
+  riverpod_annotation: ^4.0.7
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -43,6 +51,13 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+
+  # コード生成（Step 4）。開発のときだけ使うので dev_dependencies に置く（npm の devDependencies）。
+  # build_runner はコード生成の実行役、riverpod_generator は @riverpod から xxx.g.dart を作る役。
+  # Rails の generator に近いが、こちらは 1 回きりではなく、元のコードを変えるたびに作り直す。
+  # https://riverpod.dev/ja/docs/concepts/about_code_generation
+  riverpod_generator: ^4.0.9
+  build_runner: ^2.16.2
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
