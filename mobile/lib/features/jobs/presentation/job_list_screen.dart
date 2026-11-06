@@ -4,38 +4,39 @@
 // ListView.builder: https://api.flutter.dev/flutter/widgets/ListView/ListView.builder.html
 // 長いリストの作例: https://docs.flutter.dev/cookbook/lists/long-lists
 // ChoiceChip: https://api.flutter.dev/flutter/material/ChoiceChip-class.html
-// FutureBuilder: https://api.flutter.dev/flutter/widgets/FutureBuilder-class.html
+// ConsumerWidget / ConsumerStatefulWidget: https://riverpod.dev/ja/docs/concepts2/consumers
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../data/fake_job_repository.dart';
 import '../domain/job_posting.dart';
 import 'date_filter.dart';
+import 'job_list_provider.dart';
 import 'job_list_tile.dart';
 
-// 「どのチップを選んでいるか」を覚えるので Stateful にする。
+// 「どのチップを選んでいるか」を覚えるので Stateful にし、Provider も読むので Consumer にする。
+// ConsumerStatefulWidget = Provider を読める StatefulWidget（State の中で ref が使える）。
+// 選んだチップは T7 で Provider に移す。そうしたら State が要らなくなり、ConsumerWidget にできる。
 // 下タブは indexedStack なので、ほかのタブに移って戻っても、選んだチップは残る。
-class JobListScreen extends StatefulWidget {
+class JobListScreen extends ConsumerStatefulWidget {
   const JobListScreen({super.key});
 
   @override
-  State<JobListScreen> createState() => _JobListScreenState();
+  ConsumerState<JobListScreen> createState() => _JobListScreenState();
 }
 
-class _JobListScreenState extends State<JobListScreen> {
+// ConsumerState: State と同じだが、ref というフィールドを持つ（build の引数ではなく this.ref で読む）。
+class _JobListScreenState extends ConsumerState<JobListScreen> {
   // 選んでいるチップ。最初は「すべて」。
   DateFilter _filter = DateFilter.all;
 
-  // 募集の一覧が届く Future。読み込みは 1 回だけにしたいので、State に持っておく。
-  // late: 「初めて使うときに右辺を計算する」印。最初の build で 1 回だけ読み込みが始まり、
-  // チップを押して build がやり直されても、同じ Future（読み込み済みの結果）を使い回す。
-  // build の中で fetchJobPostings() を呼ぶと、build のたびに読み込み直してしまう（React の useEffect の外で fetch するのと同じ失敗）。
-  // Step 4 で Riverpod の Provider に移し、Step 7 で API の呼び出し（date_from / date_to つき）に替える。
-  late final Future<List<JobPosting>> _jobsFuture = const FakeJobRepository()
-      .fetchJobPostings();
-
   @override
   Widget build(BuildContext context) {
+    // ref.watch: Provider の値を読み、変わったらこの build をやり直させる（React の useQuery の戻り値に近い）。
+    // Step 3 では Future を late で State に持ち、「build のたびに読み込み直さない」ことを自分で守っていた。
+    // Provider は取ってきた結果を持っておく（キャッシュ）ので、build が何回呼ばれても取りに行くのは 1 回だけ。
+    final jobsAsync = ref.watch(jobListProvider);
+
     // 下タブは外枠（ScaffoldWithNavBar）の Scaffold が持つ。ここの Scaffold は上のバーと本文だけを持つ。
     return Scaffold(
       appBar: AppBar(title: const Text('さがす')),
@@ -62,25 +63,18 @@ class _JobListScreenState extends State<JobListScreen> {
           // Expanded: Column の残りの高さを全部リストに使う。
           // ListView は高さが決まらないと描けないので、Column の中では Expanded で包む。
           Expanded(
-            // FutureBuilder: Future の「待っている / 失敗した / 届いた」に合わせて描き分ける Widget。
-            // Future が終わると、自動で builder が呼ばれ直す（React で useEffect + useState で書くことを 1 つにしたもの）。
-            child: FutureBuilder<List<JobPosting>>(
-              future: _jobsFuture,
-              // snapshot: Future の今の様子（data に届いた値、error に例外が入る）。
-              builder: (context, snapshot) {
-                // 読み込みに失敗したとき（JSON の形が契約と違うなど）。
-                // 今は原因を見るために例外の中身も出す。Step 6 で ApiError を作り、利用者向けの文言に替える。
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Text('募集を読み込めませんでした\n${snapshot.error}'),
-                  );
-                }
-                final allJobs = snapshot.data;
-                // まだ届いていないとき（読み込み中）。くるくる回る印を出す。
-                if (allJobs == null) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
+            // when: AsyncValue の 3 つの状態ごとに、描くものを渡す。
+            // 3 つとも名前付きの必須引数なので、どれかを書き忘れるとコンパイルエラーになる
+            // （FutureBuilder のときは、読み込み中やエラーの if を書き忘れても通ってしまった）。
+            child: jobsAsync.when(
+              // 読み込み中。くるくる回る印を出す。
+              loading: () => const Center(child: CircularProgressIndicator()),
+              // 読み込みに失敗したとき（JSON の形が契約と違うなど）。(error, stackTrace) のうち stackTrace は使わないので _ にする。
+              // 今は原因を見るために例外の中身も出す。Step 6 で ApiError を作り、利用者向けの文言に替える。
+              error: (error, _) =>
+                  Center(child: Text('募集を読み込めませんでした\n$error')),
+              // 届いたとき。allJobs は List<JobPosting>（null ではない）。
+              data: (allJobs) {
                 final jobs = _applyFilter(allJobs);
                 if (jobs.isEmpty) {
                   return const Center(child: Text('該当する募集がありません'));

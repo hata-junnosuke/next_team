@@ -7,22 +7,25 @@
 // 画面遷移の全体像: https://docs.flutter.dev/ui/navigation
 // StatefulWidget と setState: https://docs.flutter.dev/ui/interactivity
 // FutureBuilder: https://api.flutter.dev/flutter/widgets/FutureBuilder-class.html
+// ref.read と ref.watch の使い分け: https://riverpod.dev/ja/docs/concepts2/refs
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/format.dart';
-import '../data/fake_job_repository.dart';
+import '../data/job_repository.dart';
 import '../domain/job_posting.dart';
 import 'applied_jobs_scope.dart';
 import 'apply_status.dart';
 
 // 募集の Future を 1 回だけ作って持ち続けるので Stateful にする（React の useState を持つコンポーネント）。
+// リポジトリを Provider から受け取るので Consumer にする（ConsumerStatefulWidget は一覧の画面を参照）。
 // 「応募したか」はこの State には持たない。画面と一緒に捨てられて一覧に戻ると消えるので、
 // アプリの外枠（AppliedJobs）に置いている。
 // StatefulWidget は 2 つのクラスの組になる:
 // - JobDetailScreen（この class）: 親から受け取る値（props）だけを持つ。作り直されることがある
 // - _JobDetailScreenState: 変わる値（state）を持つ。画面に出ている間は同じものが使われ続ける
-class JobDetailScreen extends StatefulWidget {
+class JobDetailScreen extends ConsumerStatefulWidget {
   const JobDetailScreen({required this.jobId, super.key});
 
   // パスの :id。数でなかったら null（/jobs/abc など）。
@@ -31,10 +34,10 @@ class JobDetailScreen extends StatefulWidget {
   // この Widget の状態を持つ State を作る。Widget がツリーに入るときに Flutter が呼ぶ。
   // 同じ場所にある間は、できた State が使い回される（build のたびには呼ばれない）。
   @override
-  State<JobDetailScreen> createState() => _JobDetailScreenState();
+  ConsumerState<JobDetailScreen> createState() => _JobDetailScreenState();
 }
 
-class _JobDetailScreenState extends State<JobDetailScreen> {
+class _JobDetailScreenState extends ConsumerState<JobDetailScreen> {
   // 募集が届く Future。一覧と同じく、build のたびに読み込み直さないように State に持つ（late は一覧の画面を参照）。
   late final Future<JobPosting?> _jobFuture = _loadJob();
 
@@ -46,7 +49,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     if (jobId == null) {
       return null;
     }
-    return const FakeJobRepository().findJobPosting(jobId);
+    // ref.read: 今の値を 1 回だけ読む（変化は購読しない）。
+    // ここは build ではなく、Future を 1 回だけ作る所なので read にする。
+    // build の中で値を描くときは ref.watch、ボタンを押したときや 1 回きりの処理では ref.read。
+    // 相手が偽物か API かは jobRepositoryProvider が決めるので、この画面は知らない。
+    return ref.read(jobRepositoryProvider).findJobPosting(jobId);
   }
 
   @override

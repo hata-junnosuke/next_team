@@ -36,6 +36,10 @@ class FakeJobRepository implements JobRepository {
   // @override: JobRepository の約束を、ここで中身を書いて果たしている印。
   @override
   Future<List<JobPosting>> fetchJobPostings() async {
+    // 本物の API は返事に時間がかかるので、偽物でも 1 秒待たせて、読み込み中の表示が見えるようにする。
+    // Future.delayed: 指定した時間がたったら終わる Future（JavaScript の await new Promise(r => setTimeout(r, 1000))）。
+    // <void> は「終わったことだけを知らせ、値は返さない」という型。
+    await Future<void>.delayed(const Duration(seconds: 1));
     // 同梱したファイルを文字列で読む（JavaScript の await (await fetch(url)).text()）。
     final body = await rootBundle.loadString('assets/jobs.json');
     // 文字列を Map / List にする（JSON.parse）。返り値は dynamic なので、as で形を確かめる。
