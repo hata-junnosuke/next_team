@@ -5,6 +5,8 @@
 // 長いリストの作例: https://docs.flutter.dev/cookbook/lists/long-lists
 // ChoiceChip: https://api.flutter.dev/flutter/material/ChoiceChip-class.html
 // ConsumerWidget / ConsumerStatefulWidget: https://riverpod.dev/ja/docs/concepts2/consumers
+// 引っ張って更新: https://riverpod.dev/ja/docs/how_to/pull_to_refresh
+// RefreshIndicator: https://api.flutter.dev/flutter/material/RefreshIndicator-class.html
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -74,18 +76,37 @@ class _JobListScreenState extends ConsumerState<JobListScreen> {
               error: (error, _) =>
                   Center(child: Text('募集を読み込めませんでした\n$error')),
               // 届いたとき。allJobs は List<JobPosting>（null ではない）。
+              // 引っ張って更新している間は、loading ではなく data のまま（前の一覧を出したまま）になる。
+              // when は既定で「取り直し中は前の値を見せる」ので、一覧が一瞬消えてくるくるに替わることはない。
+              // 取り直し中の印は、RefreshIndicator が上に出すくるくるだけ。
               data: (allJobs) {
                 final jobs = _applyFilter(allJobs);
-                if (jobs.isEmpty) {
-                  return const Center(child: Text('該当する募集がありません'));
-                }
-                // ListView.builder: 画面に見えている行だけを作るリスト（長くても軽い。React の仮想スクロールに近い）。
-                // itemBuilder は行の番号（index）を受け取って、その行の Widget を返す（jobs.map((job) => <JobListTile />) の 1 回分）。
-                return ListView.builder(
-                  padding: const EdgeInsets.all(8),
-                  itemCount: jobs.length,
-                  itemBuilder: (context, index) =>
-                      JobListTile(job: jobs[index]),
+                // RefreshIndicator: 中のリストを下に引っ張ると、上にくるくるを出して onRefresh を呼ぶ。
+                // onRefresh が返す Future が終わるまでくるくるを出し続け、終わったら閉じる。
+                return RefreshIndicator(
+                  onRefresh: _refresh,
+                  // 該当なしのときも引っ張れるように、文言も ListView に入れる（RefreshIndicator は
+                  // 中身がスクロールできるものでないと反応しない。Center と Text だけでは引っ張れない）。
+                  child: jobs.isEmpty
+                      ? ListView(
+                          // AlwaysScrollableScrollPhysics: 中身が画面より短くても、引っ張れるようにする。
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: const [
+                            Padding(
+                              padding: EdgeInsets.all(32),
+                              child: Center(child: Text('該当する募集がありません')),
+                            ),
+                          ],
+                        )
+                      // ListView.builder: 画面に見えている行だけを作るリスト（長くても軽い。React の仮想スクロールに近い）。
+                      // itemBuilder は行の番号（index）を受け取って、その行の Widget を返す（jobs.map((job) => <JobListTile />) の 1 回分）。
+                      : ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(8),
+                          itemCount: jobs.length,
+                          itemBuilder: (context, index) =>
+                              JobListTile(job: jobs[index]),
+                        ),
                 );
               },
             ),
@@ -93,6 +114,18 @@ class _JobListScreenState extends ConsumerState<JobListScreen> {
         ],
       ),
     );
+  }
+
+  // 引っ張って更新したときに呼ばれる。
+  // ref.invalidate: Provider の今の値を捨て、作り直させる（React の queryClient.invalidateQueries）。
+  // 一覧の画面は watch し続けているので、捨てた直後にすぐ作り直され、jobList() がもう一度呼ばれる。
+  // invalidate は「捨てて」と頼むだけで、取り直しが終わるのは待たない。RefreshIndicator には
+  // 「終わったら閉じて」と伝えたいので、.future（作り直した値が届く Future）を返して、届くまで待たせる。
+  // ボタンや引っ張る操作の中なので watch ではなく read（T3 の詳細の _loadJob と同じ考え方）。
+  // ref.refresh(jobListProvider.future) と書くと、この 2 行を 1 行にできる（invalidate して読む、の短縮）。
+  Future<void> _refresh() async {
+    ref.invalidate(jobListProvider);
+    await ref.read(jobListProvider.future);
   }
 
   // 選んでいるチップで絞り込む。range が null（すべて）なら絞り込まない。
