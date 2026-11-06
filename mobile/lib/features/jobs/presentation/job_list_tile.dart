@@ -1,33 +1,38 @@
 // 募集一覧の 1 行。日付・時間帯・拠点・職種・時給と「残り○枠」のバッジを出す。
 // 残り枠が 0 の行は灰色にし、タップできなくする（詳細に入れないので応募もできない）。
-// 応募済みの募集は、バッジを「応募済み」に替える（外枠の AppliedJobs を読む）。
+// 応募済みの募集は、バッジを「応募済み」に替える（appliedJobsProvider を読む）。
 // React で言うと、一覧の map の中で返す <JobListItem job={job} /> コンポーネントに当たる。
 //
 // Card: https://api.flutter.dev/flutter/material/Card-class.html
 // ListTile: https://api.flutter.dev/flutter/material/ListTile-class.html
+// ConsumerWidget: https://riverpod.dev/ja/docs/concepts2/consumers
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/format.dart';
 import '../domain/job_posting.dart';
-import 'applied_jobs_scope.dart';
+import 'applied_jobs_provider.dart';
 import 'apply_status.dart';
 
-// 受け取った募集を表示するだけなので Stateless にする（props だけで描く関数コンポーネント）。
-class JobListTile extends StatelessWidget {
+// 自分では状態を持たないが、「応募済みか」を Provider から読むので ConsumerWidget にする。
+// ConsumerWidget = Provider を読める StatelessWidget。build の 2 つめの引数で ref を受け取る
+// （ConsumerStatefulWidget と違い、State のクラスが要らない。React の関数コンポーネント ＋ useContext）。
+class JobListTile extends ConsumerWidget {
   const JobListTile({required this.job, super.key});
 
   final JobPosting job;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     // Theme.of(context): いちばん近い祖先のテーマを読む（React の useContext(ThemeContext)）。
     final textTheme = Theme.of(context).textTheme;
-    // 詳細で応募すると AppliedJobs が知らせるので、一覧に戻ったときにはこの行も描き直されている。
+    // ref.watch で応募した id の集まりを読む。詳細で応募すると state が入れ替わるので、
+    // 一覧に戻ったときにはこの行も描き直されている。
     final status = ApplyStatus.of(
       job,
-      applied: AppliedJobsScope.of(context).contains(job.id),
+      applied: ref.watch(appliedJobsProvider).contains(job.id),
     );
 
     return Card(

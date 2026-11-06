@@ -1,7 +1,7 @@
 // 募集の詳細の画面。パスは /jobs/:id（例: /jobs/3）。
 // Next.js で言うと app/jobs/[id]/page.tsx に当たる。下に「応募する」ボタンを置く。
 // 応募は、まだどこにも保存しない（押すと「応募済み」に変わるだけ）。Step 7 で API の応募（POST）に替える。
-// 「応募済み」はアプリの外枠が持つ AppliedJobs に入れるので、一覧に戻っても、開き直しても残る。
+// 「応募済み」は appliedJobsProvider に入れるので、一覧に戻っても、開き直しても残る。
 //
 // パスの引数: https://pub.dev/documentation/go_router/latest/topics/Configuration-topic.html
 // 画面遷移の全体像: https://docs.flutter.dev/ui/navigation
@@ -15,13 +15,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/format.dart';
 import '../data/job_repository.dart';
 import '../domain/job_posting.dart';
-import 'applied_jobs_scope.dart';
+import 'applied_jobs_provider.dart';
 import 'apply_status.dart';
 
 // 募集の Future を 1 回だけ作って持ち続けるので Stateful にする（React の useState を持つコンポーネント）。
 // リポジトリを Provider から受け取るので Consumer にする（ConsumerStatefulWidget は一覧の画面を参照）。
 // 「応募したか」はこの State には持たない。画面と一緒に捨てられて一覧に戻ると消えるので、
-// アプリの外枠（AppliedJobs）に置いている。
+// appliedJobsProvider（keepAlive）に置いている。
 // StatefulWidget は 2 つのクラスの組になる:
 // - JobDetailScreen（この class）: 親から受け取る値（props）だけを持つ。作り直されることがある
 // - _JobDetailScreenState: 変わる値（state）を持つ。画面に出ている間は同じものが使われ続ける
@@ -94,9 +94,11 @@ class _JobDetailScreenState extends ConsumerState<JobDetailScreen> {
     // ここから下では job は null でないと Dart が分かっている（上の if で return したため）。
     // これを「型の絞り込み（promotion）」と言う。TypeScript の if (!job) return と同じ。
 
-    // 外枠の AppliedJobs を読む。誰かが apply() を呼ぶと、この画面の build がやり直される。
-    final appliedJobs = AppliedJobsScope.of(context);
-    final status = ApplyStatus.of(job, applied: appliedJobs.contains(job.id));
+    // build の中で描く値なので ref.watch。apply() で state が入れ替わると、この画面の build がやり直される。
+    final status = ApplyStatus.of(
+      job,
+      applied: ref.watch(appliedJobsProvider).contains(job.id),
+    );
 
     return Scaffold(
       appBar: AppBar(title: Text(job.jobTitle)),
@@ -125,11 +127,13 @@ class _JobDetailScreenState extends ConsumerState<JobDetailScreen> {
           // FilledButton: 塗りつぶしのボタン（いちばん目立たせたい操作に使う）。
           child: FilledButton(
             // onPressed に null を渡すと、ボタンは押せない見た目（灰色）になる（HTML の disabled）。
-            // 押したら外枠の AppliedJobs に入れる。setState は要らない（AppliedJobs が知らせて描き直させる）。
+            // 押したら appliedJobsProvider の apply() を呼ぶ。setState は要らない（state が入れ替わると描き直される）。
+            // .notifier: Provider の値（Set<int>）ではなく、Notifier そのもの（AppliedJobs のインスタンス）を取る。
+            // メソッドを呼びたいときはこちら。押した瞬間に 1 回呼ぶだけなので watch ではなく read。
             // 押せるのは未応募のときだけ。満員は一覧からは入れないが、/jobs/4 を直に開いたとき用。
             // Step 7 では、押せるかどうかを API の can.apply で決め、最後の判定は API の 422 に任せる。
             onPressed: status == ApplyStatus.notApplied
-                ? () => appliedJobs.apply(job.id)
+                ? () => ref.read(appliedJobsProvider.notifier).apply(job.id)
                 : null,
             // switch 式で状態ごとの文言を返す。ApplyStatus の値を 1 つでも書き漏らすとコンパイルエラーになる
             // （状態を足したときに、文言を決め忘れた所を全部コンパイラが教えてくれる）。
