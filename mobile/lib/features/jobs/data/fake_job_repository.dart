@@ -1,6 +1,7 @@
 // 偽のリポジトリ。アプリに同梱した assets/jobs.json（API の一覧の応答と同じ形）を読んで募集を返す。
 // リポジトリ = 「データをどこから取るか」を画面から隠す層。画面は「募集の一覧をちょうだい」と頼むだけで、
 // 相手が偽物か本物の API かを知らない。Step 7 で ApiJobRepository（API を呼ぶ）に差し替える。
+// 差し替えは job_repository.dart の jobRepositoryProvider の 1 行だけ。
 // Rails で言うと、コントローラが ActiveRecord を直接呼ばずにサービスを通すのに近い。
 // Next.js で言うと web/ の lib/api.ts（画面は fetch を直接書かない）に当たる。
 //
@@ -16,8 +17,11 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 
 import '../domain/job_posting.dart';
+import 'job_repository.dart';
 
-class FakeJobRepository {
+// implements JobRepository: 「JobRepository の約束（メソッド）を全部持つ」と宣言する（TypeScript の implements）。
+// 1 つでも書き漏らすとコンパイルエラーになる。
+class FakeJobRepository implements JobRepository {
   const FakeJobRepository();
 
   // jobs.json の日付は、この日を「今日」として書いてある。
@@ -29,6 +33,8 @@ class FakeJobRepository {
   // Future<T>: 「あとで T が届く」という約束の値（JavaScript の Promise<T>）。
   // async を付けた関数の中では await で Future の中身を待てる。戻り値は自動で Future に包まれる。
   // ファイルの読み込みも API の呼び出しも時間がかかるので、どちらも Future を返す形にそろえておく。
+  // @override: JobRepository の約束を、ここで中身を書いて果たしている印。
+  @override
   Future<List<JobPosting>> fetchJobPostings() async {
     // 同梱したファイルを文字列で読む（JavaScript の await (await fetch(url)).text()）。
     final body = await rootBundle.loadString('assets/jobs.json');
@@ -58,6 +64,7 @@ class FakeJobRepository {
 
   // id で 1 件を探す。見つからなければ null（API なら 404 に当たる）。
   // 戻り値の型の ? は「JobPosting か null」（TypeScript の JobPosting | null）。
+  @override
   Future<JobPosting?> findJobPosting(int id) async {
     // await で一覧が届くのを待ってから探す。
     // where で条件に合うものだけにし、firstOrNull で最初の 1 件（なければ null）を取る（Ruby の find）。
