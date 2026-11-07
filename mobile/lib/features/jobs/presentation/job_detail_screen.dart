@@ -6,6 +6,8 @@
 // パスの引数: https://pub.dev/documentation/go_router/latest/topics/Configuration-topic.html
 // 画面遷移の全体像: https://docs.flutter.dev/ui/navigation
 // StatefulWidget と setState: https://docs.flutter.dev/ui/interactivity
+// initState: https://api.flutter.dev/flutter/widgets/State/initState.html
+// ConsumerStatefulWidget: https://riverpod.dev/ja/docs/concepts2/consumers
 // FutureBuilder: https://api.flutter.dev/flutter/widgets/FutureBuilder-class.html
 // ref.read と ref.watch の使い分け: https://riverpod.dev/ja/docs/concepts2/refs
 
@@ -18,8 +20,11 @@ import '../domain/job_posting.dart';
 import 'applied_jobs_provider.dart';
 import 'apply_status.dart';
 
-// 募集の Future を 1 回だけ作って持ち続けるので Stateful にする（React の useState を持つコンポーネント）。
-// リポジトリを Provider から受け取るので Consumer にする（ConsumerStatefulWidget は一覧の画面を参照）。
+// 募集の Future を 1 回だけ作って持ち続けるので Stateful にし、リポジトリを Provider から受け取るので
+// Consumer にする。2 つを合わせたのが ConsumerStatefulWidget（Provider を読める StatefulWidget）。
+// State の側は ConsumerState を継承し、ref をフィールドとして持つ（ConsumerWidget のように build の引数ではない）。
+// だから build だけでなく、initState やほかのメソッドからも ref が使える。
+// 一覧の画面は T7 で State が要らなくなり ConsumerWidget にしたが、この画面は Future を State に持つので残る。
 // 「応募したか」はこの State には持たない。画面と一緒に捨てられて一覧に戻ると消えるので、
 // appliedJobsProvider（keepAlive）に置いている。
 // StatefulWidget は 2 つのクラスの組になる:
@@ -38,8 +43,21 @@ class JobDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _JobDetailScreenState extends ConsumerState<JobDetailScreen> {
-  // 募集が届く Future。一覧と同じく、build のたびに読み込み直さないように State に持つ（late は一覧の画面を参照）。
-  late final Future<JobPosting?> _jobFuture = _loadJob();
+  // 募集が届く Future。build のたびに読み込み直さないように State に持つ。
+  // build の中で findJobPosting() を呼ぶと、描き直すたびに読み込み直してしまう
+  // （React で useEffect の外で fetch するのと同じ失敗）。
+  // late: 「宣言の時点ではまだ値を入れず、使う前に必ず入れる」印。値は下の initState で 1 回だけ入れる。
+  // final なので、一度入れたら入れ替えられない。
+  late final Future<JobPosting?> _jobFuture;
+
+  // initState: この State が作られた直後に 1 回だけ呼ばれる（React の useEffect(() => {...}, [])）。
+  // build より前に呼ばれ、2 回目の build からは呼ばれない。1 回だけ読み込みたいので、ここで Future を作る。
+  // super.initState() は、親クラス（State）の initState も忘れずに呼ぶための決まり文句。
+  @override
+  void initState() {
+    super.initState();
+    _jobFuture = _loadJob();
+  }
 
   Future<JobPosting?> _loadJob() async {
     // State の中では、親から受け取った値（props）を widget.xxx で読む。
@@ -50,7 +68,7 @@ class _JobDetailScreenState extends ConsumerState<JobDetailScreen> {
       return null;
     }
     // ref.read: 今の値を 1 回だけ読む（変化は購読しない）。
-    // ここは build ではなく、Future を 1 回だけ作る所なので read にする。
+    // ここは build ではなく、initState から 1 回だけ呼ばれる所なので read にする。
     // build の中で値を描くときは ref.watch、ボタンを押したときや 1 回きりの処理では ref.read。
     // 相手が偽物か API かは jobRepositoryProvider が決めるので、この画面は知らない。
     return ref.read(jobRepositoryProvider).findJobPosting(jobId);
@@ -58,9 +76,14 @@ class _JobDetailScreenState extends ConsumerState<JobDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // 使い方は一覧の画面の FutureBuilder と同じ。
+    // FutureBuilder: Future の「待っている / 失敗した / 届いた」に合わせて描き分ける Widget。
+    // Future が終わると、自動で builder が呼ばれ直す（React で useEffect + useState で書くことを 1 つにしたもの）。
+    // 一覧の画面は T3 で Provider の AsyncValue.when に替えた。詳細は「1 件をパスの id で取る」ので、
+    // Provider にするなら引数つき（family。T7 の jobListProvider(filter) と同じ形）になる。Step 7 で API の
+    // 詳細（GET /api/worker/job-postings/{id}）につなぐときに Provider に移す。
     return FutureBuilder<JobPosting?>(
       future: _jobFuture,
+      // snapshot: Future の今の様子（data に届いた値、error に例外、connectionState に終わったかが入る）。
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return Scaffold(

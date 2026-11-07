@@ -138,10 +138,12 @@ class JobListScreen extends ConsumerWidget {
     // 取り直しが失敗すると、.future も失敗する（例外が飛んでくる）。ここで受け止めないと、
     // RefreshIndicator の中で「誰も受け取らなかった例外」になる。失敗したことは、jobListProvider の値が
     // AsyncError になって when の error が画面に出すので、ここでは受け止めるだけでよい。
-    // try / catch は JavaScript と同じ。catch (_) は「例外を受け取るが使わない」。
+    // try / catch は JavaScript と同じ。on Exception catch (_) は「Exception だけを受け取り、中身は使わない」。
+    // Exception（通信の失敗など、起こりうる失敗）だけを受け止め、Error（プログラムのバグ）は受け止めずに
+    // そのまま表に出す（黙って隠すと、バグに気づけない）。
     try {
       await ref.read(jobListProvider(filter).future);
-    } catch (_) {
+    } on Exception catch (_) {
       // 画面の表示は when の error に任せる。
     }
   }
