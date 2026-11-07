@@ -24,7 +24,7 @@ final class JobListProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: _noRetry,
         name: r'jobListProvider',
         isAutoDispose: true,
         dependencies: null,
@@ -46,4 +46,4 @@ final class JobListProvider
   }
 }
 
-String _$jobListHash() => r'0cdefa811318ddb66ed69ea84e34e50f44089483';
+String _$jobListHash() => r'14ffeb20a906aa5963023e9c1db865e0540c49b0';

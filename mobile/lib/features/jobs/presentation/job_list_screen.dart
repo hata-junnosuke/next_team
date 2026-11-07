@@ -71,10 +71,18 @@ class _JobListScreenState extends ConsumerState<JobListScreen> {
             child: jobsAsync.when(
               // 読み込み中。くるくる回る印を出す。
               loading: () => const Center(child: CircularProgressIndicator()),
-              // 読み込みに失敗したとき（JSON の形が契約と違うなど）。(error, stackTrace) のうち stackTrace は使わないので _ にする。
-              // 今は原因を見るために例外の中身も出す。Step 6 で ApiError を作り、利用者向けの文言に替える。
-              error: (error, _) =>
-                  Center(child: Text('募集を読み込めませんでした\n$error')),
+              // 読み込みに失敗したとき（偽のリポジトリの 3 回に 1 回のエラー、JSON の形が契約と違うなど）。
+              // (error, stackTrace) のうち stackTrace は使わないので _ にする。
+              error: (error, _) => _ErrorView(
+                error: error,
+                // 「再読み込み」を押した後は、取り直しが終わるまで AsyncValue の isLoading が true になる。
+                // when は取り直し中も error を出したままにするので（前の値を見せる。T5 と同じ）、
+                // ボタンを押せなくしてくるくるを出し、押したことが伝わるようにする。
+                isRetrying: jobsAsync.isLoading,
+                // ボタンを押した瞬間に 1 回だけなので read の仲間の invalidate（T5 と同じ）。
+                // 値を捨てると、watch している この画面のために作り直され、もう一度取りに行く。
+                onRetry: () => ref.invalidate(jobListProvider),
+              ),
               // 届いたとき。allJobs は List<JobPosting>（null ではない）。
               // 引っ張って更新している間は、loading ではなく data のまま（前の一覧を出したまま）になる。
               // when は既定で「取り直し中は前の値を見せる」ので、一覧が一瞬消えてくるくるに替わることはない。
@@ -125,7 +133,15 @@ class _JobListScreenState extends ConsumerState<JobListScreen> {
   // ref.refresh(jobListProvider.future) と書くと、この 2 行を 1 行にできる（invalidate して読む、の短縮）。
   Future<void> _refresh() async {
     ref.invalidate(jobListProvider);
-    await ref.read(jobListProvider.future);
+    // 取り直しが失敗すると、.future も失敗する（例外が飛んでくる）。ここで受け止めないと、
+    // RefreshIndicator の中で「誰も受け取らなかった例外」になる。失敗したことは、jobListProvider の値が
+    // AsyncError になって when の error が画面に出すので、ここでは受け止めるだけでよい。
+    // try / catch は JavaScript と同じ。catch (_) は「例外を受け取るが使わない」。
+    try {
+      await ref.read(jobListProvider.future);
+    } catch (_) {
+      // 画面の表示は when の error に任せる。
+    }
   }
 
   // 選んでいるチップで絞り込む。range が null（すべて）なら絞り込まない。
@@ -143,5 +159,58 @@ class _JobListScreenState extends ConsumerState<JobListScreen> {
               !job.workDate.isAfter(range.to),
         )
         .toList();
+  }
+}
+
+// 読み込みに失敗したときの表示。文言と「再読み込み」ボタンを出す。
+// 押したときにすることは親（一覧の画面）から受け取るので、自分では Provider を読まない → StatelessWidget。
+// React で言うと <ErrorView error={e} onRetry={() => refetch()} /> のように、関数を props で渡す形。
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({
+    required this.error,
+    required this.isRetrying,
+    required this.onRetry,
+  });
+
+  final Object error;
+  final bool isRetrying;
+  // VoidCallback = 引数なし・戻り値なしの関数の型（TypeScript の () => void）。
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          // mainAxisSize.min: Column の高さを中身の分だけにする（既定は使える高さを全部使う）。
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, size: 48),
+            const SizedBox(height: 12),
+            const Text('募集を読み込めませんでした'),
+            const SizedBox(height: 4),
+            // 今は原因を見るために例外の中身も出す。Step 6 で ApiError を作り、利用者向けの文言に替える。
+            Text(
+              '$error',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 16),
+            // FilledButton.icon: アイコンつきの塗りつぶしボタン。取り直し中は押せなくし、アイコンをくるくるに替える。
+            FilledButton.icon(
+              onPressed: isRetrying ? null : onRetry,
+              icon: isRetrying
+                  ? const SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh),
+              label: const Text('再読み込み'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

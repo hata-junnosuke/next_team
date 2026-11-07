@@ -38,12 +38,14 @@ abstract interface class JobRepository {
 // 何を持つか: リポジトリの実体 1 つ。
 // いつ作り直されるか: 作り直さない。keepAlive: true にすると、誰も読んでいない間も捨てずに持ち続ける。
 // 既定（keepAlive なし）だと、読む画面がなくなったときに捨てられ、次に読まれたときに作り直される。
-// リポジトリは状態を持たない道具なので、アプリが動いている間 1 つを使い回せばよい
+// リポジトリは画面に出す状態を持たない道具なので、アプリが動いている間 1 つを使い回せばよい
 // （Step 6 で ApiClient を持つようになると、作り直さないことに意味が出てくる）。
+// 偽のリポジトリは「3 回に 1 回失敗」のために呼ばれた回数を持つ（T6）。作り直すと数え直しになる。
 //
 // Ref: Provider の中からほかの Provider を読むための入口（Step 6 で ref.watch(apiClientProvider) を書く）。
 @Riverpod(keepAlive: true)
 JobRepository jobRepository(Ref ref) {
   // Step 7 で本物の API に替えるときは、この 1 行を `ApiJobRepository(...)` にするだけ（docs/01 の 7A.1）。
-  return const FakeJobRepository();
+  // FakeJobRepository は呼ばれた回数を数えるので const ではない（T6）。keepAlive なので 1 つだけ作られる。
+  return FakeJobRepository();
 }

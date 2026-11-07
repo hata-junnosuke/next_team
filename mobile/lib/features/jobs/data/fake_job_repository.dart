@@ -22,7 +22,13 @@ import 'job_repository.dart';
 // implements JobRepository: 「JobRepository の約束（メソッド）を全部持つ」と宣言する（TypeScript の implements）。
 // 1 つでも書き漏らすとコンパイルエラーになる。
 class FakeJobRepository implements JobRepository {
-  const FakeJobRepository();
+  // 呼ばれた回数を数えて中身が変わるので、const（中身が変わらない値）にはできない。
+  // jobRepositoryProvider が keepAlive で 1 つだけ作って使い回すので、回数はアプリが動いている間続く。
+  FakeJobRepository();
+
+  // 一覧を取った回数。3 回に 1 回わざと失敗させ、エラーの表示と「再読み込み」を試せるようにする（T6）。
+  // _ で始まる名前は、このファイルの外から見えない（TypeScript の private に近い）。
+  int _fetchCount = 0;
 
   // jobs.json の日付は、この日を「今日」として書いてある。
   // 固定の日付のままだと日がたつと全部過去の募集になるので、読み込むときに今日までずらす。
@@ -40,6 +46,19 @@ class FakeJobRepository implements JobRepository {
     // Future.delayed: 指定した時間がたったら終わる Future（JavaScript の await new Promise(r => setTimeout(r, 1000))）。
     // <void> は「終わったことだけを知らせ、値は返さない」という型。
     await Future<void>.delayed(const Duration(seconds: 1));
+
+    // 3 回目・6 回目…はわざと失敗させる（通信が切れた、サーバーが落ちた、の代わり）。
+    // throw した例外は、この Future の失敗になり、jobListProvider の値が AsyncError になる。
+    // % は割った余り（JavaScript と同じ）。
+    _fetchCount++;
+    if (_fetchCount % 3 == 0) {
+      throw Exception('偽のエラーです（$_fetchCount 回目。3 回に 1 回失敗します）');
+    }
+    return _loadAll();
+  }
+
+  // 募集を全部読む。詳細（findJobPosting）は失敗させたくないので、数える前のこちらを使う。
+  Future<List<JobPosting>> _loadAll() async {
     // 同梱したファイルを文字列で読む（JavaScript の await (await fetch(url)).text()）。
     final body = await rootBundle.loadString('assets/jobs.json');
     // 文字列を Map / List にする（JSON.parse）。返り値は dynamic なので、as で形を確かめる。
@@ -70,9 +89,10 @@ class FakeJobRepository implements JobRepository {
   // 戻り値の型の ? は「JobPosting か null」（TypeScript の JobPosting | null）。
   @override
   Future<JobPosting?> findJobPosting(int id) async {
-    // await で一覧が届くのを待ってから探す。
+    // 一覧と同じく 1 秒待たせる。失敗させるのは一覧だけなので、fetchJobPostings ではなく _loadAll を呼ぶ。
     // where で条件に合うものだけにし、firstOrNull で最初の 1 件（なければ null）を取る（Ruby の find）。
-    final jobs = await fetchJobPostings();
+    await Future<void>.delayed(const Duration(seconds: 1));
+    final jobs = await _loadAll();
     return jobs.where((job) => job.id == id).firstOrNull;
   }
 
