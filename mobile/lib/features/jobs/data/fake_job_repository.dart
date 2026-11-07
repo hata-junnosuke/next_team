@@ -41,7 +41,7 @@ class FakeJobRepository implements JobRepository {
   // ファイルの読み込みも API の呼び出しも時間がかかるので、どちらも Future を返す形にそろえておく。
   // @override: JobRepository の約束を、ここで中身を書いて果たしている印。
   @override
-  Future<List<JobPosting>> fetchJobPostings() async {
+  Future<List<JobPosting>> fetchJobPostings({DateTime? from, DateTime? to}) async {
     // 本物の API は返事に時間がかかるので、偽物でも 1 秒待たせて、読み込み中の表示が見えるようにする。
     // Future.delayed: 指定した時間がたったら終わる Future（JavaScript の await new Promise(r => setTimeout(r, 1000))）。
     // <void> は「終わったことだけを知らせ、値は返さない」という型。
@@ -54,7 +54,19 @@ class FakeJobRepository implements JobRepository {
     if (_fetchCount % 3 == 0) {
       throw Exception('偽のエラーです（$_fetchCount 回目。3 回に 1 回失敗します）');
     }
-    return _loadAll();
+    final jobs = await _loadAll();
+
+    // 日付の範囲で絞り込む。本物では API が絞り込む（date_from / date_to）ので、偽物でも同じ所（リポジトリ）でやる。
+    // T6 までは一覧の画面が絞り込んでいた。画面に置くと、Step 7 で API に任せるときに画面も書き換えることになる。
+    // where: 条件に合うものだけを残す（JavaScript の filter）。toList() でリストに戻す。
+    // !isBefore / !isAfter で「from 以上・to 以下」を書く（DateTime には >= がない）。
+    return jobs
+        .where(
+          (job) =>
+              (from == null || !job.workDate.isBefore(from)) &&
+              (to == null || !job.workDate.isAfter(to)),
+        )
+        .toList();
   }
 
   // 募集を全部読む。詳細（findJobPosting）は失敗させたくないので、数える前のこちらを使う。

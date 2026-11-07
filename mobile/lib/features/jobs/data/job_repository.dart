@@ -24,7 +24,11 @@ part 'job_repository.g.dart';
 // 画面はこの型に対して書くので、実装を替えても画面のコードは変わらない。
 abstract interface class JobRepository {
   // 募集の一覧。勤務日 → 開始時刻の順（API の並び順と同じ。docs/01 の 6.11）。
-  Future<List<JobPosting>> fetchJobPostings();
+  // from / to を渡すと、勤務日がその範囲（両端を含む）の募集だけを返す。null なら絞り込まない。
+  // Step 7 では、これをそのまま API の date_from / date_to（YYYY-MM-DD）にして渡す（docs/01 の 6.11）。
+  // {DateTime? from, DateTime? to}: { } で囲んだ引数は「名前付き引数」で、呼ぶ側は fetchJobPostings(from: …, to: …)
+  // と名前を書く（TypeScript で引数を 1 つのオブジェクト { from, to } にするのに近い）。省略すると null になる。
+  Future<List<JobPosting>> fetchJobPostings({DateTime? from, DateTime? to});
 
   // id で 1 件。見つからなければ null（API なら 404）。
   Future<JobPosting?> findJobPosting(int id);

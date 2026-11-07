@@ -7,37 +7,34 @@
 // ConsumerWidget / ConsumerStatefulWidget: https://riverpod.dev/ja/docs/concepts2/consumers
 // 引っ張って更新: https://riverpod.dev/ja/docs/how_to/pull_to_refresh
 // RefreshIndicator: https://api.flutter.dev/flutter/material/RefreshIndicator-class.html
+// 引数つきの Provider（family）: https://riverpod.dev/ja/docs/concepts2/family
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../domain/job_posting.dart';
 import 'date_filter.dart';
+import 'date_filter_provider.dart';
 import 'job_list_provider.dart';
 import 'job_list_tile.dart';
 
-// 「どのチップを選んでいるか」を覚えるので Stateful にし、Provider も読むので Consumer にする。
-// ConsumerStatefulWidget = Provider を読める StatefulWidget（State の中で ref が使える）。
-// 選んだチップは T7 で Provider に移す。そうしたら State が要らなくなり、ConsumerWidget にできる。
-// 下タブは indexedStack なので、ほかのタブに移って戻っても、選んだチップは残る。
-class JobListScreen extends ConsumerStatefulWidget {
+// 自分では状態を持たず、選んでいるチップ（selectedDateFilterProvider）と一覧（jobListProvider）を
+// Provider から読んで描くだけなので ConsumerWidget にする。
+// T6 までは選んだチップを State に持っていたので ConsumerStatefulWidget だった。チップを Provider に移したので
+// State が要らなくなった（setState もなくなる）。
+// 下タブは indexedStack なので、ほかのタブに移って戻っても、選んだチップは残る（この画面が watch し続けるため）。
+class JobListScreen extends ConsumerWidget {
   const JobListScreen({super.key});
 
   @override
-  ConsumerState<JobListScreen> createState() => _JobListScreenState();
-}
-
-// ConsumerState: State と同じだが、ref というフィールドを持つ（build の引数ではなく this.ref で読む）。
-class _JobListScreenState extends ConsumerState<JobListScreen> {
-  // 選んでいるチップ。最初は「すべて」。
-  DateFilter _filter = DateFilter.all;
-
-  @override
-  Widget build(BuildContext context) {
-    // ref.watch: Provider の値を読み、変わったらこの build をやり直させる（React の useQuery の戻り値に近い）。
-    // Step 3 では Future を late で State に持ち、「build のたびに読み込み直さない」ことを自分で守っていた。
-    // Provider は取ってきた結果を持っておく（キャッシュ）ので、build が何回呼ばれても取りに行くのは 1 回だけ。
-    final jobsAsync = ref.watch(jobListProvider);
+  Widget build(BuildContext context, WidgetRef ref) {
+    // 選んでいるチップ。変わるとこの build がやり直される。
+    final filter = ref.watch(selectedDateFilterProvider);
+    // jobListProvider(filter): 引数つきの Provider（family）。引数ごとに別の Provider として、別々に値を持つ。
+    // チップを「今日」に変えると jobListProvider(DateFilter.today) を読むことになり、まだ値がないので取りに行く
+    // （React の useQuery({ queryKey: ['jobs', filter] }) で、キーが変わると取り直すのと同じ）。
+    // Step 3 では全部を取ってから画面で絞り込んでいたが、今は絞り込みを Provider とリポジトリに任せる。
+    // Step 7 では、この条件がそのまま API の date_from / date_to になる。
+    final jobsAsync = ref.watch(jobListProvider(filter));
 
     // 下タブは外枠（ScaffoldWithNavBar）の Scaffold が持つ。ここの Scaffold は上のバーと本文だけを持つ。
     return Scaffold(
@@ -51,13 +48,17 @@ class _JobListScreenState extends ConsumerState<JobListScreen> {
               spacing: 8,
               children: [
                 // for を [ ] の中に書くと、要素を繰り返して並べられる（collection for。JSX の map に当たる）。
-                for (final filter in DateFilter.values)
+                for (final value in DateFilter.values)
                   ChoiceChip(
-                    label: Text(filter.label),
-                    selected: filter == _filter,
-                    // チップを押したら、選んだものを state に入れて build をやり直す。
+                    label: Text(value.label),
+                    selected: value == filter,
+                    // チップを押したら、選んだものを Provider に入れる。setState は要らない
+                    // （Provider の state が変わると、watch しているこの build がやり直される）。
+                    // 押した瞬間に 1 回だけなので read。メソッドを呼ぶので .notifier（T4 の「応募する」と同じ）。
                     // (_) は「引数を受け取るが使わない」印（ここでは選ばれたかどうかの bool）。
-                    onSelected: (_) => setState(() => _filter = filter),
+                    onSelected: (_) => ref
+                        .read(selectedDateFilterProvider.notifier)
+                        .select(value),
                   ),
               ],
             ),
@@ -69,7 +70,7 @@ class _JobListScreenState extends ConsumerState<JobListScreen> {
             // 3 つとも名前付きの必須引数なので、どれかを書き忘れるとコンパイルエラーになる
             // （FutureBuilder のときは、読み込み中やエラーの if を書き忘れても通ってしまった）。
             child: jobsAsync.when(
-              // 読み込み中。くるくる回る印を出す。
+              // 読み込み中。くるくる回る印を出す。起動直後と、まだ開いていないチップに切り替えたときに出る。
               loading: () => const Center(child: CircularProgressIndicator()),
               // 読み込みに失敗したとき（偽のリポジトリの 3 回に 1 回のエラー、JSON の形が契約と違うなど）。
               // (error, stackTrace) のうち stackTrace は使わないので _ にする。
@@ -80,19 +81,18 @@ class _JobListScreenState extends ConsumerState<JobListScreen> {
                 // ボタンを押せなくしてくるくるを出し、押したことが伝わるようにする。
                 isRetrying: jobsAsync.isLoading,
                 // ボタンを押した瞬間に 1 回だけなので read の仲間の invalidate（T5 と同じ）。
-                // 値を捨てると、watch している この画面のために作り直され、もう一度取りに行く。
-                onRetry: () => ref.invalidate(jobListProvider),
+                // 今のチップの分（jobListProvider(filter)）だけを捨てて取り直す。
+                onRetry: () => ref.invalidate(jobListProvider(filter)),
               ),
-              // 届いたとき。allJobs は List<JobPosting>（null ではない）。
+              // 届いたとき。jobs は List<JobPosting>（null ではない）。絞り込み済み。
               // 引っ張って更新している間は、loading ではなく data のまま（前の一覧を出したまま）になる。
               // when は既定で「取り直し中は前の値を見せる」ので、一覧が一瞬消えてくるくるに替わることはない。
               // 取り直し中の印は、RefreshIndicator が上に出すくるくるだけ。
-              data: (allJobs) {
-                final jobs = _applyFilter(allJobs);
+              data: (jobs) {
                 // RefreshIndicator: 中のリストを下に引っ張ると、上にくるくるを出して onRefresh を呼ぶ。
                 // onRefresh が返す Future が終わるまでくるくるを出し続け、終わったら閉じる。
                 return RefreshIndicator(
-                  onRefresh: _refresh,
+                  onRefresh: () => _refresh(ref, filter),
                   // 該当なしのときも引っ張れるように、文言も ListView に入れる（RefreshIndicator は
                   // 中身がスクロールできるものでないと反応しない。Center と Text だけでは引っ張れない）。
                   child: jobs.isEmpty
@@ -125,40 +125,25 @@ class _JobListScreenState extends ConsumerState<JobListScreen> {
   }
 
   // 引っ張って更新したときに呼ばれる。
+  // ConsumerWidget では ref は build の引数なので、ほかのメソッドで使うときは引数で受け取る
+  // （ConsumerStatefulWidget のときは State のフィールドだったので、引数が要らなかった）。
   // ref.invalidate: Provider の今の値を捨て、作り直させる（React の queryClient.invalidateQueries）。
   // 一覧の画面は watch し続けているので、捨てた直後にすぐ作り直され、jobList() がもう一度呼ばれる。
   // invalidate は「捨てて」と頼むだけで、取り直しが終わるのは待たない。RefreshIndicator には
   // 「終わったら閉じて」と伝えたいので、.future（作り直した値が届く Future）を返して、届くまで待たせる。
   // ボタンや引っ張る操作の中なので watch ではなく read（T3 の詳細の _loadJob と同じ考え方）。
-  // ref.refresh(jobListProvider.future) と書くと、この 2 行を 1 行にできる（invalidate して読む、の短縮）。
-  Future<void> _refresh() async {
-    ref.invalidate(jobListProvider);
+  // ref.refresh(jobListProvider(filter).future) と書くと、この 2 行を 1 行にできる（invalidate して読む、の短縮）。
+  Future<void> _refresh(WidgetRef ref, DateFilter filter) async {
+    ref.invalidate(jobListProvider(filter));
     // 取り直しが失敗すると、.future も失敗する（例外が飛んでくる）。ここで受け止めないと、
     // RefreshIndicator の中で「誰も受け取らなかった例外」になる。失敗したことは、jobListProvider の値が
     // AsyncError になって when の error が画面に出すので、ここでは受け止めるだけでよい。
     // try / catch は JavaScript と同じ。catch (_) は「例外を受け取るが使わない」。
     try {
-      await ref.read(jobListProvider.future);
+      await ref.read(jobListProvider(filter).future);
     } catch (_) {
       // 画面の表示は when の error に任せる。
     }
-  }
-
-  // 選んでいるチップで絞り込む。range が null（すべて）なら絞り込まない。
-  // where: 条件に合うものだけを残す（JavaScript の filter）。toList() でリストに戻す。
-  // !isBefore / !isAfter で「from 以上・to 以下」を書く（DateTime には >= がない）。
-  List<JobPosting> _applyFilter(List<JobPosting> jobs) {
-    final range = _filter.range(DateUtils.dateOnly(DateTime.now()));
-    if (range == null) {
-      return jobs;
-    }
-    return jobs
-        .where(
-          (job) =>
-              !job.workDate.isBefore(range.from) &&
-              !job.workDate.isAfter(range.to),
-        )
-        .toList();
   }
 }
 
