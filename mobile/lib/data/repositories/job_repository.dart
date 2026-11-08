@@ -7,7 +7,7 @@
 //
 // クラスの修飾子（interface など）: https://dart.dev/language/class-modifiers
 
-import '../domain/job_posting.dart';
+import '../../domain/models/job_posting.dart';
 
 // abstract interface class = 「このメソッドを持つこと」という約束だけを書いた型（TypeScript の interface）。
 // - abstract: 中身のないメソッドを持てる。この型そのものは new（作成）できない

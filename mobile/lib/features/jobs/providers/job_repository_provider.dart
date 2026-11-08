@@ -9,8 +9,8 @@
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../data/fake_job_repository.dart';
-import '../data/job_repository.dart';
+import '../../../data/repositories/fake_job_repository.dart';
+import '../../../data/repositories/job_repository.dart';
 
 // part: 生成されたファイル（job_repository_provider.g.dart）を、このファイルの一部として取り込む印。
 // .g.dart は `dart run build_runner build` で作られる。手で書き換えない（作り直すと消える）。

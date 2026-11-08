@@ -16,7 +16,7 @@ import 'dart:convert';
 // rootBundle を使うために読み込む。
 import 'package:flutter/services.dart';
 
-import '../domain/job_posting.dart';
+import '../../domain/models/job_posting.dart';
 import 'job_repository.dart';
 
 // implements JobRepository: 「JobRepository の約束（メソッド）を全部持つ」と宣言する（TypeScript の implements）。

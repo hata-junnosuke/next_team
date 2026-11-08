@@ -12,7 +12,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../domain/date_filter.dart';
+import '../../../domain/models/date_filter.dart';
 import '../providers/date_filter_provider.dart';
 import '../providers/job_list_provider.dart';
 import 'job_list_tile.dart';
