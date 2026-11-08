@@ -1,7 +1,7 @@
 // アプリの依存の組み立て: どの実装を使うかを決める Provider を置く所（Flutter 公式の case study の config/dependencies.dart）。
 // 今は jobRepositoryProvider だけ。Step 6 から ApiClient などの Provider もここに足す。
 // data/ は Riverpod を import しないので、Provider は data/ の外のここに置き、
-// 「どの実装を使うか」の差し替えは、この 1 か所でだけ行う（docs/01 の 7A.1。issue #35 の T5・T10）。
+// 「どの実装を使うか」の差し替えは、この 1 か所でだけ行う（docs/01 の 7A.1。issue #35 の T10）。
 // Rails で言うと config/initializers で「このインターフェースにはこの実装を使う」と決める所。
 // Next.js で言うと、lib/api.ts を偽物に差し替える 1 行（モックの切り替え）を 1 ファイルにまとめたもの。
 //

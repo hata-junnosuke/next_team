@@ -29,14 +29,14 @@ part 'job_list_provider.g.dart';
 // いつ作られるか: 画面が初めて ref.watch したとき（それまでは取りに行かない）。
 // いつ作り直されるか:
 // - 中で ref.watch している jobRepositoryProvider が変わったとき（Step 7 で API に差し替えても、ここはそのまま）
-// - ref.invalidate(jobListProvider(filter)) されたとき（T5 の引っ張って更新、T6 の再読み込み）
+// - ref.invalidate(jobListProvider(filter)) されたとき（issue #33 の T5 の引っ張って更新、T6 の再読み込み）
 // - keepAlive を付けていないので、読む画面がなくなると捨てられ、次に読まれたときに取り直す。
 //   チップを「すべて」から「今日」に変えると、誰も読まなくなった jobListProvider(DateFilter.all) は捨てられる。
 //   だから「すべて」に戻すと、もう一度取りに行く（auto dispose が目に見える所）
 //
 // retry: 失敗したときに自動でやり直すかどうか。Riverpod 3 は既定で、Exception で失敗すると 200ms 後から
 // 間を倍にしながら（6.4 秒で頭打ち）最大 10 回やり直す（Error = プログラムのバグはやり直さない）。
-// それだと 3 回に 1 回のエラー（T6）がすぐ自動で直ってしまい、エラー画面と「再読み込み」を
+// それだと 3 回に 1 回のエラー（issue #33 の T6）がすぐ自動で直ってしまい、エラー画面と「再読み込み」を
 // 試せないので、この Provider だけ自動のやり直しを切る（_noRetry）。やり直すかは人が「再読み込み」で決める。
 // Step 7 で API につなぐとき、通信の切断だけ自動でやり直すかを決め直す（422 や 404 はやり直しても同じなので、やり直さない）。
 @Riverpod(retry: _noRetry)

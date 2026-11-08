@@ -854,13 +854,14 @@ mobile/
 ```
 
 - `domain/models/` はモデル（`JobPosting`）と、画面に依存しない値の定義（`DateFilter`・`ApplyStatus` などの enum）。Flutter（`package:flutter`）も Riverpod も import しない
-- `data/repositories/` のリポジトリは抽象（`JobRepository`）と実装（Step 3〜5 は `FakeJobRepository`、Step 7 から `ApiJobRepository`）に分ける。`data/services/` は API との通信だけを持つ（Step 6）。`data/` は Riverpod を import しない（Flutter の `rootBundle` などの読み込みには使ってよい）。公式は API の型を `data/services/model/` に分けて置くが、ここでは Step 7 で `domain/models/` のモデルに `fromJson` を持たせる（分けるかは Step 7 で決める）
+- `data/repositories/` のリポジトリは抽象（`JobRepository`）と実装（Step 3〜5 は `FakeJobRepository`、Step 7 から `ApiJobRepository`）に分ける。`data/services/` は API との通信だけを持つ（Step 6）。`data/` は Riverpod を import しない（Flutter の `rootBundle` などの読み込みには使ってよい）。公式のサンプル（compass_app）は API の型を `data/services/api/model/` に分けて置くが、ここでは Step 7 で `domain/models/` のモデルに `fromJson` を持たせる（分けるかは Step 7 で決める）
 - `config/dependencies.dart` は、どの実装を使うかを決める Provider（`jobRepositoryProvider`。Step 4）と、その生成物。差し替えはこの Provider の 1 行だけ。Riverpod を `data/` に持ち込まないために、`data/` の外に置く
 - `ui/<機能>/view_models/` は、その機能の画面の状態を持つ Riverpod の Provider（`@riverpod` の関数と Notifier）と、その生成物（`*.g.dart`）だけ。リポジトリは `config/dependencies.dart` の Provider 経由で使う。公式の ViewModel に当たる（公式は ChangeNotifier が前提なので、Riverpod の Provider を当てはめている。React の hooks のフォルダに近い）。Provider でない部品（変換の関数など）は置かず、`domain/models/` か `utils/` に置く
 - `ui/<機能>/widgets/` は画面（`<機能>_screen.dart`）と Widget だけ。`view_models/` の Provider を `ref.watch` / `ref.read` で読む。`config/` と `data/` を直接読まない（1 件の取得も `jobDetailProvider(id)` のような引数つきの Provider を通す）
 - 機能をまたいで使う状態は `view_models/` に置かない。今の `appliedJobsProvider` は jobs の中だけで使うので `ui/jobs/view_models/` に置く。Step 8 で schedule からも使うようになったら、状態の持ち主を `data/repositories/` のリポジトリ（Riverpod を知らない）にし、それを返す Provider を `config/dependencies.dart` に置いて、jobs と schedule の `view_models/` がそれぞれ読む（公式の「共有する状態はリポジトリに持つ」。issue #35 の Q4=A）
 - `ui/core/` は複数の画面で使う Widget（`ui/`）とテーマ（`themes/`）だけ。状態は置かない
-- 依存の向きは一方通行: `routing → ui/*/widgets`、`ui/*/widgets → ui/*/view_models → config → data → domain`（`ui` は `domain` のモデルと `utils` を使ってよい）。`domain` は誰にも依存しない
+- 依存の向きは一方通行: `app.dart → routing・ui/core/themes`、`routing → ui/*/widgets・ui/core/ui`、`ui/*/widgets → ui/*/view_models → config → data → domain`（`ui` は `domain` のモデルと `utils` を使ってよい）。`domain` は誰にも依存しない
+- 公式のサンプルにある `main_development.dart` / `main_staging.dart`（環境ごとの入口）と `testing/`（テスト用の偽物）は、今は作らない。接続先は `--dart-define`（7A.2）で切り替え、テスト用の置き場は Step 9 で決める
 - テストは Step 9 から `mobile/test/`（`lib/` と同じ形。`rules/common/testing.md`）
 
 ### 7A.2 接続先と起動

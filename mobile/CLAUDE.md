@@ -85,4 +85,4 @@ lib/
   data/services/            ApiClient など（Step 6）
 ```
 
-依存の向き: `routing → widgets → view_models → config → data → domain`（一方通行。widgets は config と data を直接読まない）
+依存の向き: `routing → widgets → view_models → config → data → domain`（一方通行。widgets は config と data を直接読まない）。`ui` は `domain` のモデルと `utils` を直接使ってよい。`routing` は `ui/core/ui` も使う（docs/01 の 7A.1）

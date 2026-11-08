@@ -26,7 +26,7 @@ class FakeJobRepository implements JobRepository {
   // jobRepositoryProvider が keepAlive で 1 つだけ作って使い回すので、回数はアプリが動いている間続く。
   FakeJobRepository();
 
-  // 一覧を取った回数。3 回に 1 回わざと失敗させ、エラーの表示と「再読み込み」を試せるようにする（T6）。
+  // 一覧を取った回数。3 回に 1 回わざと失敗させ、エラーの表示と「再読み込み」を試せるようにする（issue #33 の T6）。
   // _ で始まる名前は、このファイルの外から見えない（TypeScript の private に近い）。
   int _fetchCount = 0;
 
@@ -57,7 +57,7 @@ class FakeJobRepository implements JobRepository {
     final jobs = await _loadAll();
 
     // 日付の範囲で絞り込む。本物では API が絞り込む（date_from / date_to）ので、偽物でも同じ所（リポジトリ）でやる。
-    // T6 までは一覧の画面が絞り込んでいた。画面に置くと、Step 7 で API に任せるときに画面も書き換えることになる。
+    // issue #33 の T6 までは一覧の画面が絞り込んでいた。画面に置くと、Step 7 で API に任せるときに画面も書き換えることになる。
     // where: 条件に合うものだけを残す（JavaScript の filter）。toList() でリストに戻す。
     // !isBefore / !isAfter で「from 以上・to 以下」を書く（DateTime には >= がない）。
     return jobs

@@ -26,7 +26,7 @@ part 'job_detail_provider.g.dart';
 //
 // retry は既定のまま（Exception で失敗したら自動でやり直す）。偽のリポジトリの findJobPosting は失敗しない。
 // やり直している間、値は AsyncLoading のままなので、画面は読み込み中（くるくる）を出し続ける。
-// エラーの表示が出るのは、やり直しをやめた後（既定では最大 10 回。T4 の前の FutureBuilder はすぐエラーを出していた）。
+// エラーの表示が出るのは、やり直しをやめた後（既定では最大 10 回。issue #35 の T4 の前の FutureBuilder はすぐエラーを出していた）。
 // 見つからないのは失敗ではなく null なので、やり直しの対象にならない。
 // Step 7 で API につなぐとき、jobListProvider と一緒にやり直しの方針を決め直す。
 @riverpod

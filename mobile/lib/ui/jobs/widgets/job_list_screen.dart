@@ -19,7 +19,7 @@ import 'job_list_tile.dart';
 
 // 自分では状態を持たず、選んでいるチップ（selectedDateFilterProvider）と一覧（jobListProvider）を
 // Provider から読んで描くだけなので ConsumerWidget にする。
-// T6 までは選んだチップを State に持っていたので ConsumerStatefulWidget だった。チップを Provider に移したので
+// issue #33 の T6 までは選んだチップを State に持っていたので ConsumerStatefulWidget だった。チップを Provider に移したので
 // State が要らなくなった（setState もなくなる）。
 // 下タブは indexedStack なので、ほかのタブに移って戻っても、選んだチップは残る（この画面が watch し続けるため）。
 class JobListScreen extends ConsumerWidget {
@@ -54,7 +54,7 @@ class JobListScreen extends ConsumerWidget {
                     selected: value == filter,
                     // チップを押したら、選んだものを Provider に入れる。setState は要らない
                     // （Provider の state が変わると、watch しているこの build がやり直される）。
-                    // 押した瞬間に 1 回だけなので read。メソッドを呼ぶので .notifier（T4 の「応募する」と同じ）。
+                    // 押した瞬間に 1 回だけなので read。メソッドを呼ぶので .notifier（詳細の画面の「応募する」と同じ）。
                     // (_) は「引数を受け取るが使わない」印（ここでは選ばれたかどうかの bool）。
                     onSelected: (_) => ref
                         .read(selectedDateFilterProvider.notifier)
@@ -77,10 +77,10 @@ class JobListScreen extends ConsumerWidget {
               error: (error, _) => _ErrorView(
                 error: error,
                 // 「再読み込み」を押した後は、取り直しが終わるまで AsyncValue の isLoading が true になる。
-                // when は取り直し中も error を出したままにするので（前の値を見せる。T5 と同じ）、
+                // when は取り直し中も error を出したままにするので（前の値を見せる。issue #33 の T5 と同じ）、
                 // ボタンを押せなくしてくるくるを出し、押したことが伝わるようにする。
                 isRetrying: jobsAsync.isLoading,
-                // ボタンを押した瞬間に 1 回だけなので read の仲間の invalidate（T5 と同じ）。
+                // ボタンを押した瞬間に 1 回だけなので read の仲間の invalidate（issue #33 の T5 と同じ）。
                 // 今のチップの分（jobListProvider(filter)）だけを捨てて取り直す。
                 onRetry: () => ref.invalidate(jobListProvider(filter)),
               ),
@@ -131,7 +131,7 @@ class JobListScreen extends ConsumerWidget {
   // 一覧の画面は watch し続けているので、捨てた直後にすぐ作り直され、jobList() がもう一度呼ばれる。
   // invalidate は「捨てて」と頼むだけで、取り直しが終わるのは待たない。RefreshIndicator には
   // 「終わったら閉じて」と伝えたいので、.future（作り直した値が届く Future）を返して、届くまで待たせる。
-  // ボタンや引っ張る操作の中なので watch ではなく read（T3 の詳細の _loadJob と同じ考え方）。
+  // ボタンや引っ張る操作の中なので watch ではなく read（詳細の画面の「応募する」と同じ考え方）。
   // ref.refresh(jobListProvider(filter).future) と書くと、この 2 行を 1 行にできる（invalidate して読む、の短縮）。
   Future<void> _refresh(WidgetRef ref, DateFilter filter) async {
     ref.invalidate(jobListProvider(filter));

@@ -1,5 +1,5 @@
 // 一覧で選んでいる日付のチップ（すべて / 今日 / 明日 / 今週）を持つ Provider。
-// T6 までは一覧の画面の State（setState）が持っていた。Provider に移すと、画面は読んで描くだけになり、
+// issue #33 の T6 までは一覧の画面の State（setState）が持っていた。Provider に移すと、画面は読んで描くだけになり、
 // ほかの画面や Provider からも「今どのチップか」を読めるようになる。
 // React で言うと、useState を Zustand の store（または URL の検索パラメータ）に移したのに近い。
 //
@@ -11,7 +11,7 @@ import '../../../domain/models/date_filter.dart';
 
 part 'date_filter_provider.g.dart';
 
-// 値（今のチップ）と、それを変えるメソッド（select）を持つので、クラスの @riverpod（Notifier）にする（T4 と同じ形）。
+// 値（今のチップ）と、それを変えるメソッド（select）を持つので、クラスの @riverpod（Notifier）にする（issue #33 の T4 の appliedJobsProvider と同じ形）。
 // 生成される Provider の名前は selectedDateFilterProvider。
 //
 // 何を持つか: 選んでいる DateFilter（最初は「すべて」）。
