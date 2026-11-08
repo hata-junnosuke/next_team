@@ -1,7 +1,7 @@
 // 偽のリポジトリ。アプリに同梱した assets/jobs.json（API の一覧の応答と同じ形）を読んで募集を返す。
 // リポジトリ = 「データをどこから取るか」を画面から隠す層。画面は「募集の一覧をちょうだい」と頼むだけで、
 // 相手が偽物か本物の API かを知らない。Step 7 で ApiJobRepository（API を呼ぶ）に差し替える。
-// 差し替えは providers/job_repository_provider.dart の jobRepositoryProvider の 1 行だけ。
+// 差し替えは config/dependencies.dart の jobRepositoryProvider の 1 行だけ。
 // Rails で言うと、コントローラが ActiveRecord を直接呼ばずにサービスを通すのに近い。
 // Next.js で言うと web/ の lib/api.ts（画面は fetch を直接書かない）に当たる。
 //

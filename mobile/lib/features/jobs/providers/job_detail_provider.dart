@@ -7,8 +7,8 @@
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../config/dependencies.dart';
 import '../../../domain/models/job_posting.dart';
-import 'job_repository_provider.dart';
 
 part 'job_detail_provider.g.dart';
 

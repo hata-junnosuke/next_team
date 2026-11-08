@@ -9,9 +9,9 @@
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../config/dependencies.dart';
 import '../../../domain/models/date_filter.dart';
 import '../../../domain/models/job_posting.dart';
-import 'job_repository_provider.dart';
 
 part 'job_list_provider.g.dart';
 
