@@ -840,13 +840,17 @@ mobile/
     │   ├── theme.dart
     │   └── api/                  Step 6: ApiClient（dio）・AuthInterceptor・TokenStorage・ApiError
     └── features/                 機能ごと（web/ の components/ と lib/ を機能で束ねた形）
-        ├── jobs/                 さがす（data/ リポジトリ、domain/ モデル、presentation/ 画面と Widget）
+        ├── jobs/                 さがす（data/ リポジトリ、domain/ モデルと値の定義、application/ 状態（Provider）、presentation/ 画面と Widget）
         ├── schedule/             よてい（自分の応募）
         ├── notices/              おしらせ（Step 10 まで中身なし）
         └── account/              マイページ・ログイン・初回登録（Step 6）
 ```
 
-- `data/` のリポジトリは抽象（`JobRepository`）と実装（Step 3〜5 は `FakeJobRepository`、Step 7 から `ApiJobRepository`）に分け、Riverpod の Provider で差し替える（Step 4。差し替えは Provider の 1 行だけ）
+- `data/` のリポジトリは抽象（`JobRepository`）と実装（Step 3〜5 は `FakeJobRepository`、Step 7 から `ApiJobRepository`）に分ける。`data/` は Riverpod を import しない純粋な Dart にする。どの実装を使うかは `application/` の `jobRepositoryProvider` が決める（Step 4。差し替えはその Provider の 1 行だけ）
+- `domain/` はモデル（`JobPosting`）と、画面に依存しない値の定義（`DateFilter`・`ApplyStatus` などの enum）。Flutter（`package:flutter`）を import しない
+- `application/` は Riverpod の Provider（`@riverpod` の関数と Notifier）と、その生成物（`*.g.dart`）。画面の状態を持ち、`data/` のリポジトリを `jobRepositoryProvider` 経由で使う。Flutter 公式の構成ガイドの ViewModel に当たる
+- `presentation/` は画面と Widget だけ。`application/` の Provider を `ref.watch` / `ref.read` で読む。リポジトリを直接読まない（1 件の取得も `jobDetailProvider(id)` のような引数つきの Provider を通す）
+- 依存の向きは `presentation → application → data / domain` の一方通行（`data` は `domain` のモデルを使う）
 - テストは Step 9 から `mobile/test/`（`rules/common/testing.md`）
 
 ### 7A.2 接続先と起動
