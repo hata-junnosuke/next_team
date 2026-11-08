@@ -1,5 +1,5 @@
 // 募集を取ってくるリポジトリの「約束（型）」。
-// どの実装を使うかは application/job_repository_provider.dart の jobRepositoryProvider が決める（issue #35 の T5）。
+// どの実装を使うかは providers/job_repository_provider.dart の jobRepositoryProvider が決める（issue #35 の T5）。
 // このファイル（と data/ 全体）は Riverpod を import しない（docs/01 の 7A.1。偽物が assets を読む Flutter の rootBundle は使ってよい）。
 // 相手が偽物（FakeJobRepository）か本物の API（Step 7 の ApiJobRepository）かは、使う側（jobListProvider・jobDetailProvider）は知らない。
 // Next.js で言うと、web/ の lib/api.ts の関数の型（シグネチャ）だけを公開しているのに近い。
@@ -12,7 +12,7 @@ import '../domain/job_posting.dart';
 // abstract interface class = 「このメソッドを持つこと」という約束だけを書いた型（TypeScript の interface）。
 // - abstract: 中身のないメソッドを持てる。この型そのものは new（作成）できない
 // - interface: ほかのファイルからは implements（約束を守る）だけができ、extends（中身の継承）はできない
-// application/ の Provider はこの型に対して書くので、実装を替えても Provider と画面のコードは変わらない。
+// providers/ の Provider はこの型に対して書くので、実装を替えても Provider と画面のコードは変わらない。
 abstract interface class JobRepository {
   // 募集の一覧。勤務日 → 開始時刻の順（API の並び順と同じ。docs/01 の 6.11）。
   // from / to を渡すと、勤務日がその範囲（両端を含む）の募集だけを返す。null なら絞り込まない。

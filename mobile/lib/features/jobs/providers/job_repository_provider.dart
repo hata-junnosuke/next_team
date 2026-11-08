@@ -1,6 +1,6 @@
 // どのリポジトリを使うかを決める Provider。
 // issue #35 の T5 で data/job_repository.dart から移した。data/ は Riverpod を知らないふつうの Dart にし、
-// 「どの実装を使うか」の差し替えは、この application/ の 1 か所でだけ行う（docs/01 の 7A.1）。
+// 「どの実装を使うか」の差し替えは、この providers/ の 1 か所でだけ行う（docs/01 の 7A.1）。
 // Rails で言うと config/initializers で「このインターフェースにはこの実装を使う」と決める所。
 // Next.js で言うと、lib/api.ts を偽物に差し替える 1 行（モックの切り替え）を 1 ファイルにまとめたもの。
 //

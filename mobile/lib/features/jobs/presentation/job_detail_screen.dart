@@ -14,10 +14,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/format.dart';
-import '../application/applied_jobs_provider.dart';
-import '../application/job_detail_provider.dart';
 import '../domain/apply_status.dart';
 import '../domain/job_posting.dart';
+import '../providers/applied_jobs_provider.dart';
+import '../providers/job_detail_provider.dart';
 
 // 自分では状態を持たないので ConsumerWidget（Provider を読める StatelessWidget）にする。
 // issue #35 の T4 の前は、募集の Future を 1 回だけ作って持ち続けるために ConsumerStatefulWidget にし、

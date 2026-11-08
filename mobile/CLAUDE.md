@@ -75,5 +75,5 @@ lib/
   main.dart          起動するだけ
   app.dart           MaterialApp.router とテーマ（Next.js の app/layout.tsx）
   core/              router.dart（go_router）、theme.dart、api/（Step 6）
-  features/<機能>/   data/（リポジトリ）、domain/（モデルと enum）、application/（Provider）、presentation/（画面と Widget）
+  features/<機能>/   data/（リポジトリ）、domain/（モデルと enum）、providers/（Riverpod の Provider）、presentation/（画面と Widget）
 ```
