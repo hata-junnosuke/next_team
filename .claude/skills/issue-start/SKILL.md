@@ -1,6 +1,6 @@
 ---
 name: issue-start
-description: 計画が承認された issue の作業場所を作る。main（司令塔）から issue 用の worktree（ブランチ issue/<番号>）を切り、依存・.env の確認・DB まで整える。Orca を使用していれば、その worktree の画面（issue ごとのポート）と Claude（最初の指示 /epic-flow か /issue-flow つき）も開く。「issue #◯ を始めて」「#◯ の worktree を作って」で使う
+description: issue の作業場所を作る。承認済みのタスク表がなければ、先にこのセッションで /plan の手順を回して人の承認を得る。main（司令塔）から issue 用の worktree（ブランチ issue/<番号>）を切り、依存・.env の確認・DB まで整える。Orca を使用していれば、その worktree の画面（issue ごとのポート）と Claude（最初の指示 /epic-flow か /issue-flow つき）も開く。「issue #◯ を始めて」「#◯ の worktree を作って」で使う
 argument-hint: <issue 番号>
 ---
 
@@ -8,7 +8,7 @@ argument-hint: <issue 番号>
 
 対象: **issue #$ARGUMENTS**（番号がなければ `gh issue list --state open` を見せて聞く）
 
-役目は**作業場所づくりと、そこで作業を始めさせるところまで**。このセッション（main）では実装・計画・片付けはしない（片付けは `/dev-refresh`）。Orca を使用していれば、作った worktree の画面と Claude を開き、その Claude に `/epic-flow` か `/issue-flow` を最初の指示として渡す。Orca の外なら、人が worktree で Claude を起動してそれを打つ。
+役目は**作業場所づくりと、そこで作業を始めさせるところまで**。このセッション（main）では実装と片付けはしない（片付けは `/dev-refresh`）。計画は、承認済みのタスク表がないときだけ手順 1 で行い、issue の本文だけを書き換える（ファイルは書かない）。Orca を使用していれば、作った worktree の画面と Claude を開き、その Claude に `/epic-flow` か `/issue-flow` を最初の指示として渡す。Orca の外なら、人が worktree で Claude を起動してそれを打つ。
 
 ## 前提
 - このスキルは **main の作業ツリー（司令塔）** で使う。main ではコードを書かない（`.claude/rules/common/git-workflow.md`）
@@ -28,8 +28,17 @@ gh issue view <番号> --json number,title,state,labels,body
 | 見ること | どうするか |
 |---|---|
 | `state` が OPEN でない | 止めて人に聞く |
-| 本文にタスクのチェックリスト（`- [ ] **ID**`）と完了条件がない、または「人が承認」の記載がない | 止めて `/plan <番号>` を案内する（loop-rules 1: 完了条件のないタスクは着手しない）。小さな issue で本文に「完了条件」があればそのまま進めてよい |
+| 本文にタスクのチェックリスト（`- [ ] **ID**`）と完了条件がない、または「人が承認」の記載がない | 下の「計画がないとき」を行う（loop-rules 1: 完了条件のないタスクは着手しない）。小さな issue で本文に「完了条件」があれば、計画なしでそのまま 2 へ進めてよい |
 | `requires-human` ラベルが付いている | 止めて、理由のコメントを人に見せる |
+
+#### 計画がないとき（このセッションで計画を立てる）
+止めずに、このセッション（main）で `.claude/skills/plan/SKILL.md` の手順 2〜5 を行う（手順はそちらを読む。ここに書き写さない）。
+- 本文にタスク表の下書き（チェックリストと完了条件）がすでにあり、「人が承認」だけがないときは、planner を回さずに plan の手順 5（人に示して承認を待つ）から行う。下書きを上書きしない
+- planner の下書きを issue 本文の「タスク」の見出しに書き、タスク表を要約して人に見せ、承認を待つ
+- **承認の前に worktree を作らない**（2 以降に進まない）
+- 承認されたら、「タスク」の見出しに「（日付 人が承認）」と書いて 2 へ進む
+- planner の質問が 2 往復しても解けないとき、または人が承認しないとき（作り直しを求められて決まらないときを含む）は、止まって人に報告する（loop-rules 4）
+- main で書き換えるのは **issue の本文だけ**。計画で契約（`docs/01` を含む）やファイルの変更が要ると分かっても、main では書かず、タスク表の T1 などに入れて worktree で行う
 
 ### 2. 場所を決める
 - `BRANCH=issue/<番号>`、`WT=<置き場所>/issue-<番号>`（前提の「置き場所」）
@@ -51,7 +60,7 @@ git fetch origin main
 git worktree add -b <BRANCH> <WT> origin/main
 git -C <WT> log -1 --oneline
 ```
-main の作業ツリーに未コミットの変更があっても、worktree は `origin/main` から切るので持ち込まない。逆に「main にまだ push していない変更（例: issue の計画に合わせて直した契約の `docs/01`）」があるなら、先に人に push / PR してもらうか聞く。
+main の作業ツリーに未コミットの変更があっても、worktree は `origin/main` から切るので持ち込まない。逆に「main にまだ push していない変更（例: 人が main で直して、まだ push していない変更。計画の中では main でファイルを書かない。手順 1 の「計画がないとき」）」があるなら、先に人に push / PR してもらうか聞く。
 
 ### 4. 依存を入れる
 ```bash
@@ -79,13 +88,14 @@ make -C <WT> fresh
 
 1. Orca が worktree を認識しているか確かめる: `orca worktree list --json` に `<WT>` があること（`git worktree add` で作ったものも自動で載る。なければ数秒おいてもう一度。それでもなければ 7 を飛ばして 8 の「Orca の外」の案内にする）
 2. 画面を起動して、その worktree のブラウザに開く: `.claude/skills/issue-flow/dev-server.md` の手順を `<WT>` と issue 番号で行う
-3. 最初の指示を決める: 1 で見た issue 本文の未チェックのタスク（`- [ ] **`）が 2 件以上なら `/epic-flow <番号>`、それ以外（1 件、またはチェックリストのない小さな issue）なら `/issue-flow <番号>`
+3. 最初の指示を決める: `gh issue view <番号> --json body` で本文を**読み直し**（1 で計画を書いたときは書いた後の本文）、未チェックのタスク（`- [ ] **`）が 2 件以上なら `/epic-flow <番号>`、それ以外（1 件、またはチェックリストのない小さな issue）なら `/issue-flow <番号>`
 4. その worktree で Claude を起動する（リードのモデルの既定は `opus`。`fable` は必要なときだけ人が `/model` で切り替える。CLAUDE.md）
    ```bash
-   orca agent launch --agent claude --worktree path:<WT> --model claude-opus-5-5 --prompt "<3 の指示>" --focus --json
+   orca agent launch --agent claude --worktree path:<WT> --surface terminal --model claude-opus-5-5 --prompt "<3 の指示>" --focus --json
    ```
-   - モデルの指定でエラーになったら、`--model` を外してもう一度（起動した Claude で人が `/model` を切り替える）
-   - 結果の `outcome.kind`（chat / terminal）と `receipt.detail` を報告に書く
+   - `--surface terminal`: worktree の Claude はターミナル（CLI）で開く。チャットの画面は使わない
+   - モデルの指定でエラーになったら、`--model` を外してもう一度（起動した Claude で人が `/model` を切り替える）。そのときも `--surface terminal` は残す
+   - 結果の `outcome.kind` を報告に書く。`terminal` でなければ、`receipt.detail` も報告に書く（ターミナルで開けなかった理由）
    - Claude は worktree の直下で起動するので、その worktree のフックが効く（SessionStart に issue 番号が出る）
 
 ### 8. 報告

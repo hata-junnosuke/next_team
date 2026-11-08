@@ -8,7 +8,7 @@
 // switch 式と、書き漏らしの検査（exhaustiveness）: https://dart.dev/language/branches#exhaustiveness-checking
 // sealed: https://dart.dev/language/class-modifiers#sealed
 
-import '../domain/job_posting.dart';
+import 'job_posting.dart';
 
 // 3 つの状態は、どれもほかのデータを持たないので enum にする。
 // 状態ごとに違うデータを持たせたいとき（例: 応募済みなら応募の id と状態の文言を持つ）は sealed class にする。

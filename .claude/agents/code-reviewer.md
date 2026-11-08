@@ -28,7 +28,8 @@ model: opus
 - 状態の色が `lib/status.ts` 以外に散っていないか
 
 ## mobile のチェックリスト（`mobile/CLAUDE.md` と `docs/01` の 7A.4 が基準）
-- `core/api/` の `ApiClient` 以外で `dio` を使っていないか（Step 6 から）
+- `data/services/` の `ApiClient` 以外で `dio` を使っていないか（Step 6 から）
+- 置き場所と依存の向きが docs/01 の 7A.1 どおりか（`ui/*/widgets` が `config/` と `data/` を直接読まない、`data/` が Riverpod を import しない、`domain/` が Flutter と Riverpod を import しない、機能をまたぐ状態を `view_models/` に置かない）
 - JSON を `Map` のまま使わず、モデルの `fromJson` で型にしてから使っているか
 - 業務ルール（定員・二重応募・状態遷移・応募できるか）をアプリに書いていないか。可否は `can.apply` と 422 の `message` に任せているか（Step 3 の偽データの画面だけは学習のため例外）
 - 状態の文言を API の `label` で出しているか。色だけをアプリが持っているか

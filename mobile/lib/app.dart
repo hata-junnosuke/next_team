@@ -7,8 +7,8 @@
 
 import 'package:flutter/material.dart';
 
-import 'core/router.dart';
-import 'core/theme.dart';
+import 'routing/router.dart';
+import 'ui/core/themes/theme.dart';
 
 // 状態を持たず、テーマとルーターを組み合わせて返すだけなので Stateless にする。
 class WorkerApp extends StatelessWidget {
@@ -20,7 +20,7 @@ class WorkerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // MaterialApp.router: URL（パス）で画面を決めるルーター版の MaterialApp。
-    // 画面の切り替えはすべて router（core/router.dart）に任せる。
+    // 画面の切り替えはすべて router（routing/router.dart）に任せる。
     return MaterialApp.router(
       title: 'ワーカーアプリ',
       theme: appTheme,

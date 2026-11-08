@@ -10,12 +10,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 
-import '../features/account/presentation/account_screen.dart';
-import '../features/jobs/presentation/job_detail_screen.dart';
-import '../features/jobs/presentation/job_list_screen.dart';
-import '../features/notices/presentation/notices_screen.dart';
-import '../features/schedule/presentation/schedule_screen.dart';
-import 'scaffold_with_nav_bar.dart';
+import '../ui/account/widgets/account_screen.dart';
+import '../ui/core/ui/scaffold_with_nav_bar.dart';
+import '../ui/jobs/widgets/job_detail_screen.dart';
+import '../ui/jobs/widgets/job_list_screen.dart';
+import '../ui/notices/widgets/notices_screen.dart';
+import '../ui/schedule/widgets/schedule_screen.dart';
 
 // トップレベルの final なので、最初の 1 回しか作られない。ルートを書き換えたら r（ホットリロード）では
 // 反映されないので、R（ホットリスタート）を押す。
@@ -57,8 +57,11 @@ final GoRouter router = GoRouter(
                     // ! は「ここは null ではない」と言い切る印（ルートの定義上、id は必ずある）。
                     final id = int.tryParse(state.pathParameters['id']!);
                     // key: go_router はページを「パスの形（/jobs/:id）」で見分けるので、/jobs/3 から /jobs/5 に
-                    // 移ると同じ State が使い回され、3 番の読み込み結果のままになる。id を key にすると、
-                    // id が変わったら State を作り直す（React で key を変えて作り直すのと同じ）。
+                    // 移ると同じページ（ルート）が使い回される。id を key にすると、id が変わったら、その下の
+                    // 画面の Widget（JobDetailScreen）だけを作り直す（ルートの遷移アニメーションは起きない。
+                    // React で key を変えて作り直すのと同じ）。詳細の画面は issue #35 の T4 で State を持たなくなり、
+                    // 募集は jobDetailProvider(id) が id ごとに分けて持つので、key がなくても 3 番の結果は出ない。
+                    // それでも念のため残す（State を持つ子の Widget を足したときに、前の募集の状態を持ち越さない保険）。
                     return JobDetailScreen(key: ValueKey(id), jobId: id);
                   },
                 ),

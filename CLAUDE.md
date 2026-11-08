@@ -10,7 +10,7 @@
 ## 絶対ルール
 1. 業務ルールは `api/` のサービスに置く。コントローラは薄く、検証は FormRequest。**`web/` と `mobile/` に業務ルールと検証を二重に書かない**
 2. `status` はサービス経由（`transitionTo()`）でしか変えない。企業の判定は `CurrentCompany::id()` だけ
-3. `api/` は JSON しか返さない。`web/` は `lib/api.ts` を通さずに `fetch` しない。レスポンスは zod で `parse` する。`mobile/` は `core/api/` の `ApiClient` 以外で `dio` を使わない。レスポンスはモデルの `fromJson` で型にしてから使う（docs/01 の 7A.4。Step 3〜5 の偽データは除く）
+3. `api/` は JSON しか返さない。`web/` は `lib/api.ts` を通さずに `fetch` しない。レスポンスは zod で `parse` する。`mobile/` は `data/services/` の `ApiClient` 以外で `dio` を使わない。レスポンスはモデルの `fromJson` で型にしてから使う（docs/01 の 7A.4。Step 3〜5 の偽データは除く）
 4. api と web・mobile の境界は `docs/01` の API 契約だけ（mobile は 6.11 と 7A）。web と mobile を書くときは `api/` のコードを読まない。形がずれていたら web・mobile で吸収せず報告する
 5. このリポジトリの外（親フォルダの他のプロジェクト）のコードを読まない。パッケージを勝手に足さない
 6. `.env`・`vendor/`・`node_modules/`・ロック後のマイグレーションは触らない（フックが止める）。フックと `settings.json` の編集は毎回人の承認を挟む（フックが承認ダイアログを出す）

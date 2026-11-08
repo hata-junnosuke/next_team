@@ -1,7 +1,7 @@
 // 偽のリポジトリ。アプリに同梱した assets/jobs.json（API の一覧の応答と同じ形）を読んで募集を返す。
 // リポジトリ = 「データをどこから取るか」を画面から隠す層。画面は「募集の一覧をちょうだい」と頼むだけで、
 // 相手が偽物か本物の API かを知らない。Step 7 で ApiJobRepository（API を呼ぶ）に差し替える。
-// 差し替えは job_repository.dart の jobRepositoryProvider の 1 行だけ。
+// 差し替えは config/dependencies.dart の jobRepositoryProvider の 1 行だけ。
 // Rails で言うと、コントローラが ActiveRecord を直接呼ばずにサービスを通すのに近い。
 // Next.js で言うと web/ の lib/api.ts（画面は fetch を直接書かない）に当たる。
 //
@@ -16,7 +16,7 @@ import 'dart:convert';
 // rootBundle を使うために読み込む。
 import 'package:flutter/services.dart';
 
-import '../domain/job_posting.dart';
+import '../../domain/models/job_posting.dart';
 import 'job_repository.dart';
 
 // implements JobRepository: 「JobRepository の約束（メソッド）を全部持つ」と宣言する（TypeScript の implements）。
@@ -26,7 +26,7 @@ class FakeJobRepository implements JobRepository {
   // jobRepositoryProvider が keepAlive で 1 つだけ作って使い回すので、回数はアプリが動いている間続く。
   FakeJobRepository();
 
-  // 一覧を取った回数。3 回に 1 回わざと失敗させ、エラーの表示と「再読み込み」を試せるようにする（T6）。
+  // 一覧を取った回数。3 回に 1 回わざと失敗させ、エラーの表示と「再読み込み」を試せるようにする（issue #33 の T6）。
   // _ で始まる名前は、このファイルの外から見えない（TypeScript の private に近い）。
   int _fetchCount = 0;
 
@@ -57,7 +57,7 @@ class FakeJobRepository implements JobRepository {
     final jobs = await _loadAll();
 
     // 日付の範囲で絞り込む。本物では API が絞り込む（date_from / date_to）ので、偽物でも同じ所（リポジトリ）でやる。
-    // T6 までは一覧の画面が絞り込んでいた。画面に置くと、Step 7 で API に任せるときに画面も書き換えることになる。
+    // issue #33 の T6 までは一覧の画面が絞り込んでいた。画面に置くと、Step 7 で API に任せるときに画面も書き換えることになる。
     // where: 条件に合うものだけを残す（JavaScript の filter）。toList() でリストに戻す。
     // !isBefore / !isAfter で「from 以上・to 以下」を書く（DateTime には >= がない）。
     return jobs

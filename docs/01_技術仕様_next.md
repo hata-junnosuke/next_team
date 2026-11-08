@@ -824,7 +824,9 @@ export type FormState = { ok?: boolean; message?: string; errors?: Record<string
 
 ワーカーアプリと api の境界は 5.3 と 6.11 だけです。**`mobile/` を書くときは `api/` のコードを読まず**、契約と実際のレスポンスだけを見ます（CLAUDE.md の絶対ルール 4）。書き方（コメント多め、1 機能 = 1 コミットで止まって変更点を案内する）は `mobile/CLAUDE.md` と docs/05 の 1・2 章に従います。
 
-### 7A.1 ディレクトリ（Step 3 で作る。機能ごとにまとめる）
+### 7A.1 ディレクトリ（Step 3 で作り、issue #35 で Flutter 公式の case study の構成に合わせた）
+
+Flutter 公式の構成ガイドの case study の Package structure（https://docs.flutter.dev/app-architecture/case-study ）に合わせる。`data/` と `domain/` は種類ごと（複数の機能から使う）、`ui/` は機能ごと（1 機能 = 画面と、その状態）に分ける。
 
 ```
 mobile/
@@ -835,19 +837,32 @@ mobile/
 └── lib/
     ├── main.dart                 起動するだけ
     ├── app.dart                  MaterialApp.router とテーマ（Next.js の app/layout.tsx）
-    ├── core/
-    │   ├── router.dart           go_router の定義（Next.js の app/ フォルダの構造）
-    │   ├── theme.dart
-    │   └── api/                  Step 6: ApiClient（dio）・AuthInterceptor・TokenStorage・ApiError
-    └── features/                 機能ごと（web/ の components/ と lib/ を機能で束ねた形）
-        ├── jobs/                 さがす（data/ リポジトリ、domain/ モデル、presentation/ 画面と Widget）
-        ├── schedule/             よてい（自分の応募）
-        ├── notices/              おしらせ（Step 10 まで中身なし）
-        └── account/              マイページ・ログイン・初回登録（Step 6）
+    ├── routing/router.dart       go_router の定義（Next.js の app/ フォルダの構造）
+    ├── config/dependencies.dart  どの実装を使うかを決める Provider（jobRepositoryProvider）。Step 6 から ApiClient なども
+    ├── utils/format.dart         日付・時刻・金額の表示の形（web の lib/format.ts）
+    ├── ui/
+    │   ├── core/ui/              複数の画面で使う Widget（scaffold_with_nav_bar.dart）
+    │   ├── core/themes/          テーマ（theme.dart）
+    │   ├── jobs/                 さがす（view_models/ 状態（Riverpod の Provider）、widgets/ 画面と Widget）
+    │   ├── schedule/             よてい（自分の応募）
+    │   ├── notices/              おしらせ（Step 10 まで中身なし）
+    │   └── account/              マイページ・ログイン・初回登録（Step 6）
+    ├── domain/models/            モデル（JobPosting）と値の定義（DateFilter・ApplyStatus）
+    └── data/
+        ├── repositories/         リポジトリ（JobRepository と実装）
+        └── services/             Step 6: ApiClient（dio）・AuthInterceptor・TokenStorage・ApiError
 ```
 
-- `data/` のリポジトリは抽象（`JobRepository`）と実装（Step 3〜5 は `FakeJobRepository`、Step 7 から `ApiJobRepository`）に分け、Riverpod の Provider で差し替える（Step 4。差し替えは Provider の 1 行だけ）
-- テストは Step 9 から `mobile/test/`（`rules/common/testing.md`）
+- `domain/models/` はモデル（`JobPosting`）と、画面に依存しない値の定義（`DateFilter`・`ApplyStatus` などの enum）。Flutter（`package:flutter`）も Riverpod も import しない
+- `data/repositories/` のリポジトリは抽象（`JobRepository`）と実装（Step 3〜5 は `FakeJobRepository`、Step 7 から `ApiJobRepository`）に分ける。`data/services/` は API との通信だけを持つ（Step 6）。`data/` は Riverpod を import しない（Flutter の `rootBundle` などの読み込みには使ってよい）。公式のサンプル（compass_app）は API の型を `data/services/api/model/` に分けて置くが、ここでは Step 7 で `domain/models/` のモデルに `fromJson` を持たせる（分けるかは Step 7 で決める）
+- `config/dependencies.dart` は、どの実装を使うかを決める Provider（`jobRepositoryProvider`。Step 4）と、その生成物。差し替えはこの Provider の 1 行だけ。Riverpod を `data/` に持ち込まないために、`data/` の外に置く
+- `ui/<機能>/view_models/` は、その機能の画面の状態を持つ Riverpod の Provider（`@riverpod` の関数と Notifier）と、その生成物（`*.g.dart`）だけ。リポジトリは `config/dependencies.dart` の Provider 経由で使う。公式の ViewModel に当たる（公式は ChangeNotifier が前提なので、Riverpod の Provider を当てはめている。React の hooks のフォルダに近い）。Provider でない部品（変換の関数など）は置かず、`domain/models/` か `utils/` に置く
+- `ui/<機能>/widgets/` は画面（`<機能>_screen.dart`）と Widget だけ。`view_models/` の Provider を `ref.watch` / `ref.read` で読む。`config/` と `data/` を直接読まない（1 件の取得も `jobDetailProvider(id)` のような引数つきの Provider を通す）
+- 機能をまたいで使う状態は `view_models/` に置かない。今の `appliedJobsProvider` は jobs の中だけで使うので `ui/jobs/view_models/` に置く。Step 8 で schedule からも使うようになったら、状態の持ち主を `data/repositories/` のリポジトリ（Riverpod を知らない）にし、それを返す Provider を `config/dependencies.dart` に置いて、jobs と schedule の `view_models/` がそれぞれ読む（公式の「共有する状態はリポジトリに持つ」。issue #35 の Q4=A）
+- `ui/core/` は複数の画面で使う Widget（`ui/`）とテーマ（`themes/`）だけ。状態は置かない
+- 依存の向きは一方通行: `app.dart → routing・ui/core/themes`、`routing → ui/*/widgets・ui/core/ui`、`ui/*/widgets → ui/*/view_models → config → data → domain`（`ui` は `domain` のモデルと `utils` を使ってよい）。`domain` は誰にも依存しない
+- 公式のサンプルにある `main_development.dart` / `main_staging.dart`（環境ごとの入口）と `testing/`（テスト用の偽物）は、今は作らない。接続先は `--dart-define`（7A.2）で切り替え、テスト用の置き場は Step 9 で決める
+- テストは Step 9 から `mobile/test/`（`lib/` と同じ形。`rules/common/testing.md`）
 
 ### 7A.2 接続先と起動
 
@@ -881,7 +896,7 @@ mobile/
 | 業務ルールと検証 | **アプリに書かない**（CLAUDE.md の絶対ルール 1）。定員・二重応募・状態遷移・応募できるかは API が判定し、アプリは 422 の `message` を表示する。入力欄の下には `errors` の同じキーの文言を出す。ボタンを出すかどうかは `can.apply` を見る |
 | 残り枠 | API の `remaining` をそのまま出す。Step 3 の偽データの画面だけは学習のためアプリで計算してよいが、Step 7 で API の値に置き換える |
 | 状態の文言 | API が返す `{value, label}` の `label` を出す。色だけアプリが持つ（web の `lib/status.ts` と同じ考え方） |
-| API の呼び出し | `core/api/` の `ApiClient` だけが `dio` を持つ（web の `lib/api.ts` と同じ。Step 6）。リポジトリは `ApiClient` を通す |
+| API の呼び出し | `data/services/` の `ApiClient` だけが `dio` を持つ（web の `lib/api.ts` と同じ。Step 6）。リポジトリは `ApiClient` を通す |
 | レスポンスの型 | JSON を `Map` のまま使わず、モデルの `fromJson` で型に変えてから使う（Step 3 は手書き、Step 7 から `freezed` + `json_serializable`）。形が合わなければ例外にして、契約のずれとして報告する（web で zod の parse が落ちるのと同じ） |
 | 401 | トークンを消して `/login` へ戻す（`AuthInterceptor`）。無効にされたワーカーは 401 の `message` を出す |
 | トークン | `flutter_secure_storage` にだけ置く。ログに出さない（`rules/common/security.md`） |
