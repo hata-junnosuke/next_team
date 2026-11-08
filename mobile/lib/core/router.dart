@@ -10,11 +10,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 
-import '../features/account/presentation/account_screen.dart';
-import '../features/jobs/presentation/job_detail_screen.dart';
-import '../features/jobs/presentation/job_list_screen.dart';
-import '../features/notices/presentation/notices_screen.dart';
-import '../features/schedule/presentation/schedule_screen.dart';
+import '../ui/account/widgets/account_screen.dart';
+import '../ui/jobs/widgets/job_detail_screen.dart';
+import '../ui/jobs/widgets/job_list_screen.dart';
+import '../ui/notices/widgets/notices_screen.dart';
+import '../ui/schedule/widgets/schedule_screen.dart';
 import 'scaffold_with_nav_bar.dart';
 
 // トップレベルの final なので、最初の 1 回しか作られない。ルートを書き換えたら r（ホットリロード）では

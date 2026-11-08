@@ -16,8 +16,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/format.dart';
 import '../../../domain/models/apply_status.dart';
 import '../../../domain/models/job_posting.dart';
-import '../../../ui/jobs/view_models/applied_jobs_provider.dart';
-import '../../../ui/jobs/view_models/job_detail_provider.dart';
+import '../view_models/applied_jobs_provider.dart';
+import '../view_models/job_detail_provider.dart';
 
 // 自分では状態を持たないので ConsumerWidget（Provider を読める StatelessWidget）にする。
 // issue #35 の T4 の前は、募集の Future を 1 回だけ作って持ち続けるために ConsumerStatefulWidget にし、

@@ -13,8 +13,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../domain/models/date_filter.dart';
-import '../../../ui/jobs/view_models/date_filter_provider.dart';
-import '../../../ui/jobs/view_models/job_list_provider.dart';
+import '../view_models/date_filter_provider.dart';
+import '../view_models/job_list_provider.dart';
 import 'job_list_tile.dart';
 
 // 自分では状態を持たず、選んでいるチップ（selectedDateFilterProvider）と一覧（jobListProvider）を
