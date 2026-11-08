@@ -15,10 +15,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/format.dart';
+import '../application/applied_jobs_provider.dart';
 import '../data/job_repository.dart';
-import '../domain/job_posting.dart';
-import 'applied_jobs_provider.dart';
 import '../domain/apply_status.dart';
+import '../domain/job_posting.dart';
 
 // 募集の Future を 1 回だけ作って持ち続けるので Stateful にし、リポジトリを Provider から受け取るので
 // Consumer にする。2 つを合わせたのが ConsumerStatefulWidget（Provider を読める StatefulWidget）。

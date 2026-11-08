@@ -10,8 +10,8 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../data/job_repository.dart';
-import '../domain/job_posting.dart';
 import '../domain/date_filter.dart';
+import '../domain/job_posting.dart';
 
 part 'job_list_provider.g.dart';
 
