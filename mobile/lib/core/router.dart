@@ -57,8 +57,10 @@ final GoRouter router = GoRouter(
                     // ! は「ここは null ではない」と言い切る印（ルートの定義上、id は必ずある）。
                     final id = int.tryParse(state.pathParameters['id']!);
                     // key: go_router はページを「パスの形（/jobs/:id）」で見分けるので、/jobs/3 から /jobs/5 に
-                    // 移ると同じ State が使い回され、3 番の読み込み結果のままになる。id を key にすると、
-                    // id が変わったら State を作り直す（React で key を変えて作り直すのと同じ）。
+                    // 移ると同じページが使い回される。id を key にすると、id が変わったらページごと作り直す
+                    // （React で key を変えて作り直すのと同じ）。詳細の画面は issue #35 の T4 で State を持たなくなり、
+                    // 募集は jobDetailProvider(id) が id ごとに分けて持つので、key がなくても 3 番の結果は出ない。
+                    // それでも、別の募集をスクロールの位置などを持ち越さずに開き直すために残す。
                     return JobDetailScreen(key: ValueKey(id), jobId: id);
                   },
                 ),

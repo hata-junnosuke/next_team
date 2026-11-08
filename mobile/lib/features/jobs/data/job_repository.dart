@@ -37,7 +37,7 @@ abstract interface class JobRepository {
 // どのリポジトリを使うかを決める Provider。
 // @riverpod を付けた関数から、build_runner が jobRepositoryProvider という変数を作る（.g.dart の中）。
 // 関数の名前 jobRepository に Provider を付けた名前になる。
-// 一覧は jobListProvider の中で ref.watch(jobRepositoryProvider)、詳細の画面は ref.read で受け取る。
+// 一覧は jobListProvider、詳細は jobDetailProvider の中で ref.watch(jobRepositoryProvider) して受け取る（画面は直接読まない）。
 //
 // 何を持つか: リポジトリの実体 1 つ。
 // いつ作り直されるか: 作り直さない。keepAlive: true にすると、誰も読んでいない間も捨てずに持ち続ける。

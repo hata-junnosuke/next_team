@@ -2,13 +2,12 @@
 // Next.js で言うと app/jobs/[id]/page.tsx に当たる。下に「応募する」ボタンを置く。
 // 応募は、まだどこにも保存しない（押すと「応募済み」に変わるだけ）。Step 7 で API の応募（POST）に替える。
 // 「応募済み」は appliedJobsProvider に入れるので、一覧に戻っても、開き直しても残る。
+// 募集の取得は jobDetailProvider(id) に任せ、この画面はリポジトリを直接読まない（T4。docs/01 の 7A.1）。
 //
 // パスの引数: https://pub.dev/documentation/go_router/latest/topics/Configuration-topic.html
 // 画面遷移の全体像: https://docs.flutter.dev/ui/navigation
-// StatefulWidget と setState: https://docs.flutter.dev/ui/interactivity
-// initState: https://api.flutter.dev/flutter/widgets/State/initState.html
-// ConsumerStatefulWidget: https://riverpod.dev/ja/docs/concepts2/consumers
-// FutureBuilder: https://api.flutter.dev/flutter/widgets/FutureBuilder-class.html
+// ConsumerWidget: https://riverpod.dev/ja/docs/concepts2/consumers
+// 引数つきの Provider（family）: https://riverpod.dev/ja/docs/concepts2/family
 // ref.read と ref.watch の使い分け: https://riverpod.dev/ja/docs/concepts2/refs
 
 import 'package:flutter/material.dart';
@@ -16,95 +15,53 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/format.dart';
 import '../application/applied_jobs_provider.dart';
-import '../data/job_repository.dart';
+import '../application/job_detail_provider.dart';
 import '../domain/apply_status.dart';
 import '../domain/job_posting.dart';
 
-// 募集の Future を 1 回だけ作って持ち続けるので Stateful にし、リポジトリを Provider から受け取るので
-// Consumer にする。2 つを合わせたのが ConsumerStatefulWidget（Provider を読める StatefulWidget）。
-// State の側は ConsumerState を継承し、ref をフィールドとして持つ（ConsumerWidget のように build の引数ではない）。
-// だから build だけでなく、initState やほかのメソッドからも ref が使える。
-// 一覧の画面は T7 で State が要らなくなり ConsumerWidget にしたが、この画面は Future を State に持つので残る。
-// 「応募したか」はこの State には持たない。画面と一緒に捨てられて一覧に戻ると消えるので、
-// appliedJobsProvider（keepAlive）に置いている。
-// StatefulWidget は 2 つのクラスの組になる:
-// - JobDetailScreen（この class）: 親から受け取る値（props）だけを持つ。作り直されることがある
-// - _JobDetailScreenState: 変わる値（state）を持つ。画面に出ている間は同じものが使われ続ける
-class JobDetailScreen extends ConsumerStatefulWidget {
+// 自分では状態を持たないので ConsumerWidget（Provider を読める StatelessWidget）にする。
+// T4 の前は、募集の Future を 1 回だけ作って持ち続けるために ConsumerStatefulWidget にし、
+// initState で Future を作って FutureBuilder で描き分けていた。
+// 「1 回だけ取る」「取った結果を持ち続ける」は jobDetailProvider(id) が引き受けるので、State も initState も要らない
+// （React で言うと、useState + useEffect の fetch を、useQuery 1 行に置き換えたのと同じ）。
+// 「応募したか」も、画面と一緒に捨てられないように appliedJobsProvider（keepAlive）に置いている。
+class JobDetailScreen extends ConsumerWidget {
   const JobDetailScreen({required this.jobId, super.key});
 
   // パスの :id。数でなかったら null（/jobs/abc など）。
   final int? jobId;
 
-  // この Widget の状態を持つ State を作る。Widget がツリーに入るときに Flutter が呼ぶ。
-  // 同じ場所にある間は、できた State が使い回される（build のたびには呼ばれない）。
   @override
-  ConsumerState<JobDetailScreen> createState() => _JobDetailScreenState();
-}
-
-class _JobDetailScreenState extends ConsumerState<JobDetailScreen> {
-  // 募集が届く Future。build のたびに読み込み直さないように State に持つ。
-  // build の中で findJobPosting() を呼ぶと、描き直すたびに読み込み直してしまう
-  // （React で useEffect の外で fetch するのと同じ失敗）。
-  // late: 「宣言の時点ではまだ値を入れず、使う前に必ず入れる」印。値は下の initState で 1 回だけ入れる。
-  // final なので、一度入れたら入れ替えられない。
-  late final Future<JobPosting?> _jobFuture;
-
-  // initState: この State が作られた直後に 1 回だけ呼ばれる（React の useEffect(() => {...}, [])）。
-  // build より前に呼ばれ、2 回目の build からは呼ばれない。1 回だけ読み込みたいので、ここで Future を作る。
-  // super.initState() は、親クラス（State）の initState も忘れずに呼ぶための決まり文句。
-  @override
-  void initState() {
-    super.initState();
-    _jobFuture = _loadJob();
-  }
-
-  Future<JobPosting?> _loadJob() async {
-    // State の中では、親から受け取った値（props）を widget.xxx で読む。
+  Widget build(BuildContext context, WidgetRef ref) {
     // jobId をいったんローカル変数に入れると、null を確かめたあとの型の絞り込みが効き、! が要らない
     // （クラスの公開のフィールドのままだと絞り込まれない。https://dart.dev/tools/non-promotion-reasons ）。
-    final jobId = widget.jobId;
-    if (jobId == null) {
-      return null;
+    final id = jobId;
+    // id が数でないときは、取りに行くまでもなく「見つかりません」（Provider の引数は int で、null を渡せない）。
+    if (id == null) {
+      return _buildJob(context, ref, null);
     }
-    // ref.read: 今の値を 1 回だけ読む（変化は購読しない）。
-    // ここは build ではなく、initState から 1 回だけ呼ばれる所なので read にする。
-    // build の中で値を描くときは ref.watch、ボタンを押したときや 1 回きりの処理では ref.read。
-    // 相手が偽物か API かは jobRepositoryProvider が決めるので、この画面は知らない。
-    return ref.read(jobRepositoryProvider).findJobPosting(jobId);
-  }
 
-  @override
-  Widget build(BuildContext context) {
-    // FutureBuilder: Future の「待っている / 失敗した / 届いた」に合わせて描き分ける Widget。
-    // Future が終わると、自動で builder が呼ばれ直す（React で useEffect + useState で書くことを 1 つにしたもの）。
-    // 一覧の画面は T3 で Provider の AsyncValue.when に替えた。詳細は「1 件をパスの id で取る」ので、
-    // Provider にするなら引数つき（family。T7 の jobListProvider(filter) と同じ形）になる。Step 7 で API の
-    // 詳細（GET /api/worker/job-postings/{id}）につなぐときに Provider に移す。
-    return FutureBuilder<JobPosting?>(
-      future: _jobFuture,
-      // snapshot: Future の今の様子（data に届いた値、error に例外、connectionState に終わったかが入る）。
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Scaffold(
-            appBar: AppBar(),
-            body: Center(child: Text('募集を読み込めませんでした\n${snapshot.error}')),
-          );
-        }
-        // 読み込み中。届いた結果が null（見つからない）と見分けるため、connectionState で「終わったか」を見る。
-        if (snapshot.connectionState != ConnectionState.done) {
-          return Scaffold(
+    // build の中で描く値なので ref.watch。読み込みが終わると、この build がやり直される。
+    // 値は AsyncValue<JobPosting?>（読み込み中 / エラー / データ。一覧の jobListProvider と同じ）。
+    // when で 3 つを全部書く。FutureBuilder の connectionState や hasError を自分で見なくてよい。
+    return ref
+        .watch(jobDetailProvider(id))
+        .when(
+          loading: () => Scaffold(
             appBar: AppBar(),
             body: const Center(child: CircularProgressIndicator()),
-          );
-        }
-        return _buildJob(context, snapshot.data);
-      },
-    );
+          ),
+          error: (error, _) => Scaffold(
+            appBar: AppBar(),
+            body: Center(child: Text('募集を読み込めませんでした\n$error')),
+          ),
+          // 届いた結果が null（見つからない）でも data に来る。null かどうかは _buildJob が見る。
+          data: (job) => _buildJob(context, ref, job),
+        );
   }
 
   // 届いた募集を描く。job が null なら「見つかりません」。
-  Widget _buildJob(BuildContext context, JobPosting? job) {
+  Widget _buildJob(BuildContext context, WidgetRef ref, JobPosting? job) {
     // 見つからないとき（API なら 404）。
     // AppBar を置くと、親のルート（一覧）があるので、戻るボタンが自動で出る。
     if (job == null) {
