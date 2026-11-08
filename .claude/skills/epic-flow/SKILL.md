@@ -18,7 +18,7 @@ disable-model-invocation: true
 - `git rev-parse --path-format=absolute --git-dir --git-common-dir` の 2 行が同じなら main の作業ツリー。そうなら、またはブランチが `issue/<番号>` でなければ、ブランチを作らずに止まって `/issue-start <番号>`（main で打つ）を案内する
 
 ### 1. 計画（planner）
-- 通常は main の `/plan <番号>` で計画と承認が済んでから `/issue-start` している（`/issue-start` は承認済みのタスク表がなければ止まる）。issue 本文にすでに承認済みのタスク表（チェックリスト）があれば、1・2 を飛ばして 3 へ
+- 通常は main の `/plan <番号>` で計画と承認が済んでから `/issue-start` している（`/issue-start` は承認済みのタスク表がなければ、worktree を作る前に main で `/plan` の手順を回して人の承認を得る）。issue 本文にすでに承認済みのタスク表（チェックリスト）があれば、1・2 を飛ばして 3 へ
 1. `/plan <番号>` と同じ手順で planner に分解させ、リードが issue 本文に書く
 2. planner が質問を返したら、**分解を進めずに人へ質問する**
 
