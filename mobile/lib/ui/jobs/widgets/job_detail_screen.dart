@@ -13,9 +13,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/format.dart';
 import '../../../domain/models/apply_status.dart';
 import '../../../domain/models/job_posting.dart';
+import '../../../utils/format.dart';
 import '../view_models/applied_jobs_provider.dart';
 import '../view_models/job_detail_provider.dart';
 

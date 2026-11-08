@@ -11,11 +11,11 @@ import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 
 import '../ui/account/widgets/account_screen.dart';
+import '../ui/core/ui/scaffold_with_nav_bar.dart';
 import '../ui/jobs/widgets/job_detail_screen.dart';
 import '../ui/jobs/widgets/job_list_screen.dart';
 import '../ui/notices/widgets/notices_screen.dart';
 import '../ui/schedule/widgets/schedule_screen.dart';
-import 'scaffold_with_nav_bar.dart';
 
 // トップレベルの final なので、最初の 1 回しか作られない。ルートを書き換えたら r（ホットリロード）では
 // 反映されないので、R（ホットリスタート）を押す。

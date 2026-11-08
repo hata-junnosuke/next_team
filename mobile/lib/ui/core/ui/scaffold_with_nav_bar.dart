@@ -1,6 +1,6 @@
 // 下タブ（さがす / よてい / おしらせ / マイページ）を持つ、4 画面に共通の外枠。
 // Next.js で言うと、タブのナビゲーションを持つ layout.tsx（children の所に各タブの画面が入る）に当たる。
-// docs/01 の 7A.1 の core/ に、router.dart から切り出して置いた。
+// routing/router.dart から切り出し、複数の画面で使う Widget の置き場 ui/core/ui/ に置いた（docs/01 の 7A.1）。
 //
 // NavigationBar: https://api.flutter.dev/flutter/material/NavigationBar-class.html
 // Scaffold: https://api.flutter.dev/flutter/material/Scaffold-class.html

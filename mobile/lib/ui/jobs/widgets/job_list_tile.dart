@@ -11,9 +11,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/format.dart';
 import '../../../domain/models/apply_status.dart';
 import '../../../domain/models/job_posting.dart';
+import '../../../utils/format.dart';
 import '../view_models/applied_jobs_provider.dart';
 
 // 自分では状態を持たないが、「応募済みか」を Provider から読むので ConsumerWidget にする。
