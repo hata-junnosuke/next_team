@@ -2,7 +2,7 @@
 // Next.js で言うと app/jobs/[id]/page.tsx に当たる。下に「応募する」ボタンを置く。
 // 応募は、まだどこにも保存しない（押すと「応募済み」に変わるだけ）。Step 7 で API の応募（POST）に替える。
 // 「応募済み」は appliedJobsProvider に入れるので、一覧に戻っても、開き直しても残る。
-// 募集の取得は jobDetailProvider(id) に任せ、この画面はリポジトリを直接読まない（T4。docs/01 の 7A.1）。
+// 募集の取得は jobDetailProvider(id) に任せ、この画面はリポジトリを直接読まない（issue #35 の T4。docs/01 の 7A.1）。
 //
 // パスの引数: https://pub.dev/documentation/go_router/latest/topics/Configuration-topic.html
 // 画面遷移の全体像: https://docs.flutter.dev/ui/navigation
@@ -20,7 +20,7 @@ import '../domain/apply_status.dart';
 import '../domain/job_posting.dart';
 
 // 自分では状態を持たないので ConsumerWidget（Provider を読める StatelessWidget）にする。
-// T4 の前は、募集の Future を 1 回だけ作って持ち続けるために ConsumerStatefulWidget にし、
+// issue #35 の T4 の前は、募集の Future を 1 回だけ作って持ち続けるために ConsumerStatefulWidget にし、
 // initState で Future を作って FutureBuilder で描き分けていた。
 // 「1 回だけ取る」「取った結果を持ち続ける」は jobDetailProvider(id) が引き受けるので、State も initState も要らない
 // （React で言うと、useState + useEffect の fetch を、useQuery 1 行に置き換えたのと同じ）。

@@ -15,16 +15,18 @@ part 'job_detail_provider.g.dart';
 // id で 1 件。見つからなければ null（API なら 404）。
 // jobListProvider(filter) と同じ引数つきの Provider で、画面からは jobDetailProvider(3) のように読む。
 // id ごとに別の Provider になるので、/jobs/3 と /jobs/5 の結果が混ざらない
-// （T4 の前は、画面の State に Future を持ち、router.dart の key で id ごとに State を作り直していた）。
+// （issue #35 の T4 の前は、画面の State に Future を持ち、router.dart の key で id ごとに State を作り直していた）。
 //
 // 何を持つか: その id の募集（null なら見つからない）。id ごとに 1 つずつ。
 // いつ作られるか: 詳細の画面が初めて ref.watch したとき。
 // いつ作り直されるか:
 // - 中で ref.watch している jobRepositoryProvider が変わったとき（Step 7 で API に差し替えても、ここはそのまま）
 // - keepAlive を付けていないので、詳細の画面を閉じて誰も読まなくなると捨てられ、
-//   もう一度開くと取り直す（前は画面の State と一緒に捨てていたので、動きは T4 の前と同じ）
+//   もう一度開くと取り直す（前は画面の State と一緒に捨てていたので、動きは issue #35 の T4 の前と同じ）
 //
 // retry は既定のまま（Exception で失敗したら自動でやり直す）。偽のリポジトリの findJobPosting は失敗しない。
+// やり直している間、値は AsyncLoading のままなので、画面は読み込み中（くるくる）を出し続ける。
+// エラーの表示が出るのは、やり直しをやめた後（既定では最大 10 回。T4 の前の FutureBuilder はすぐエラーを出していた）。
 // 見つからないのは失敗ではなく null なので、やり直しの対象にならない。
 // Step 7 で API につなぐとき、jobListProvider と一緒にやり直しの方針を決め直す。
 @riverpod

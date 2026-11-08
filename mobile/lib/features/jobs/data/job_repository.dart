@@ -1,7 +1,7 @@
 // 募集を取ってくるリポジトリの「約束（型）」。
 // どの実装を使うかは application/job_repository_provider.dart の jobRepositoryProvider が決める（issue #35 の T5）。
-// このファイル（と data/ 全体）は Riverpod を知らない、ふつうの Dart にする（docs/01 の 7A.1）。
-// 相手が偽物（FakeJobRepository）か本物の API（Step 7 の ApiJobRepository）かは、使う側（Provider）は知らない。
+// このファイル（と data/ 全体）は Riverpod を import しない（docs/01 の 7A.1。偽物が assets を読む Flutter の rootBundle は使ってよい）。
+// 相手が偽物（FakeJobRepository）か本物の API（Step 7 の ApiJobRepository）かは、使う側（jobListProvider・jobDetailProvider）は知らない。
 // Next.js で言うと、web/ の lib/api.ts の関数の型（シグネチャ）だけを公開しているのに近い。
 // Rails で言うと、サービスのインターフェース（PORO）。どの実装を使うかの設定は別の 1 か所に置く。
 //

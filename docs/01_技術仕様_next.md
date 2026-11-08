@@ -846,7 +846,7 @@ mobile/
         └── account/              マイページ・ログイン・初回登録（Step 6）
 ```
 
-- `data/` のリポジトリは抽象（`JobRepository`）と実装（Step 3〜5 は `FakeJobRepository`、Step 7 から `ApiJobRepository`）に分ける。`data/` は Riverpod を import しない純粋な Dart にする。どの実装を使うかは `application/` の `jobRepositoryProvider` が決める（Step 4。差し替えはその Provider の 1 行だけ）
+- `data/` のリポジトリは抽象（`JobRepository`）と実装（Step 3〜5 は `FakeJobRepository`、Step 7 から `ApiJobRepository`）に分ける。`data/` は Riverpod を import しない（Flutter の `rootBundle` などの読み込みには使ってよい）。どの実装を使うかは `application/` の `jobRepositoryProvider` が決める（Step 4。差し替えはその Provider の 1 行だけ）
 - `domain/` はモデル（`JobPosting`）と、画面に依存しない値の定義（`DateFilter`・`ApplyStatus` などの enum）。Flutter（`package:flutter`）を import しない
 - `application/` は Riverpod の Provider（`@riverpod` の関数と Notifier）と、その生成物（`*.g.dart`）。画面の状態を持ち、`data/` のリポジトリを `jobRepositoryProvider` 経由で使う。Flutter 公式の構成ガイドの ViewModel に当たる
 - `presentation/` は画面と Widget だけ。`application/` の Provider を `ref.watch` / `ref.read` で読む。リポジトリを直接読まない（1 件の取得も `jobDetailProvider(id)` のような引数つきの Provider を通す）
