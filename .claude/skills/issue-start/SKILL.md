@@ -91,10 +91,11 @@ make -C <WT> fresh
 3. 最初の指示を決める: `gh issue view <番号> --json body` で本文を**読み直し**（1 で計画を書いたときは書いた後の本文）、未チェックのタスク（`- [ ] **`）が 2 件以上なら `/epic-flow <番号>`、それ以外（1 件、またはチェックリストのない小さな issue）なら `/issue-flow <番号>`
 4. その worktree で Claude を起動する（リードのモデルの既定は `opus`。`fable` は必要なときだけ人が `/model` で切り替える。CLAUDE.md）
    ```bash
-   orca agent launch --agent claude --worktree path:<WT> --model claude-opus-5-5 --prompt "<3 の指示>" --focus --json
+   orca agent launch --agent claude --worktree path:<WT> --surface terminal --model claude-opus-5-5 --prompt "<3 の指示>" --focus --json
    ```
-   - モデルの指定でエラーになったら、`--model` を外してもう一度（起動した Claude で人が `/model` を切り替える）
-   - 結果の `outcome.kind`（chat / terminal）と `receipt.detail` を報告に書く
+   - `--surface terminal`: worktree の Claude はターミナル（CLI）で開く。チャットの画面は使わない
+   - モデルの指定でエラーになったら、`--model` を外してもう一度（起動した Claude で人が `/model` を切り替える）。そのときも `--surface terminal` は残す
+   - 結果の `outcome.kind` を報告に書く。`terminal` でなければ、`receipt.detail` も報告に書く（ターミナルで開けなかった理由）
    - Claude は worktree の直下で起動するので、その worktree のフックが効く（SessionStart に issue 番号が出る）
 
 ### 8. 報告
