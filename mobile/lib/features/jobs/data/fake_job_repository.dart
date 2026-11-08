@@ -1,6 +1,7 @@
 // 偽のリポジトリ。アプリに同梱した assets/jobs.json（API の一覧の応答と同じ形）を読んで募集を返す。
 // リポジトリ = 「データをどこから取るか」を画面から隠す層。画面は「募集の一覧をちょうだい」と頼むだけで、
 // 相手が偽物か本物の API かを知らない。Step 7 で ApiJobRepository（API を呼ぶ）に差し替える。
+// 差し替えは job_repository.dart の jobRepositoryProvider の 1 行だけ。
 // Rails で言うと、コントローラが ActiveRecord を直接呼ばずにサービスを通すのに近い。
 // Next.js で言うと web/ の lib/api.ts（画面は fetch を直接書かない）に当たる。
 //
@@ -16,9 +17,18 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 
 import '../domain/job_posting.dart';
+import 'job_repository.dart';
 
-class FakeJobRepository {
-  const FakeJobRepository();
+// implements JobRepository: 「JobRepository の約束（メソッド）を全部持つ」と宣言する（TypeScript の implements）。
+// 1 つでも書き漏らすとコンパイルエラーになる。
+class FakeJobRepository implements JobRepository {
+  // 呼ばれた回数を数えて中身が変わるので、const（中身が変わらない値）にはできない。
+  // jobRepositoryProvider が keepAlive で 1 つだけ作って使い回すので、回数はアプリが動いている間続く。
+  FakeJobRepository();
+
+  // 一覧を取った回数。3 回に 1 回わざと失敗させ、エラーの表示と「再読み込み」を試せるようにする（T6）。
+  // _ で始まる名前は、このファイルの外から見えない（TypeScript の private に近い）。
+  int _fetchCount = 0;
 
   // jobs.json の日付は、この日を「今日」として書いてある。
   // 固定の日付のままだと日がたつと全部過去の募集になるので、読み込むときに今日までずらす。
@@ -29,7 +39,38 @@ class FakeJobRepository {
   // Future<T>: 「あとで T が届く」という約束の値（JavaScript の Promise<T>）。
   // async を付けた関数の中では await で Future の中身を待てる。戻り値は自動で Future に包まれる。
   // ファイルの読み込みも API の呼び出しも時間がかかるので、どちらも Future を返す形にそろえておく。
-  Future<List<JobPosting>> fetchJobPostings() async {
+  // @override: JobRepository の約束を、ここで中身を書いて果たしている印。
+  @override
+  Future<List<JobPosting>> fetchJobPostings({DateTime? from, DateTime? to}) async {
+    // 本物の API は返事に時間がかかるので、偽物でも 1 秒待たせて、読み込み中の表示が見えるようにする。
+    // Future.delayed: 指定した時間がたったら終わる Future（JavaScript の await new Promise(r => setTimeout(r, 1000))）。
+    // <void> は「終わったことだけを知らせ、値は返さない」という型。
+    await Future<void>.delayed(const Duration(seconds: 1));
+
+    // 3 回目・6 回目…はわざと失敗させる（通信が切れた、サーバーが落ちた、の代わり）。
+    // throw した例外は、この Future の失敗になり、jobListProvider の値が AsyncError になる。
+    // % は割った余り（JavaScript と同じ）。
+    _fetchCount++;
+    if (_fetchCount % 3 == 0) {
+      throw Exception('偽のエラーです（$_fetchCount 回目。3 回に 1 回失敗します）');
+    }
+    final jobs = await _loadAll();
+
+    // 日付の範囲で絞り込む。本物では API が絞り込む（date_from / date_to）ので、偽物でも同じ所（リポジトリ）でやる。
+    // T6 までは一覧の画面が絞り込んでいた。画面に置くと、Step 7 で API に任せるときに画面も書き換えることになる。
+    // where: 条件に合うものだけを残す（JavaScript の filter）。toList() でリストに戻す。
+    // !isBefore / !isAfter で「from 以上・to 以下」を書く（DateTime には >= がない）。
+    return jobs
+        .where(
+          (job) =>
+              (from == null || !job.workDate.isBefore(from)) &&
+              (to == null || !job.workDate.isAfter(to)),
+        )
+        .toList();
+  }
+
+  // 募集を全部読む。詳細（findJobPosting）は失敗させたくないので、数える前のこちらを使う。
+  Future<List<JobPosting>> _loadAll() async {
     // 同梱したファイルを文字列で読む（JavaScript の await (await fetch(url)).text()）。
     final body = await rootBundle.loadString('assets/jobs.json');
     // 文字列を Map / List にする（JSON.parse）。返り値は dynamic なので、as で形を確かめる。
@@ -58,10 +99,12 @@ class FakeJobRepository {
 
   // id で 1 件を探す。見つからなければ null（API なら 404 に当たる）。
   // 戻り値の型の ? は「JobPosting か null」（TypeScript の JobPosting | null）。
+  @override
   Future<JobPosting?> findJobPosting(int id) async {
-    // await で一覧が届くのを待ってから探す。
+    // 一覧と同じく 1 秒待たせる。失敗させるのは一覧だけなので、fetchJobPostings ではなく _loadAll を呼ぶ。
     // where で条件に合うものだけにし、firstOrNull で最初の 1 件（なければ null）を取る（Ruby の find）。
-    final jobs = await fetchJobPostings();
+    await Future<void>.delayed(const Duration(seconds: 1));
+    final jobs = await _loadAll();
     return jobs.where((job) => job.id == id).firstOrNull;
   }
 
