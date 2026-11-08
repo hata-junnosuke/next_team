@@ -14,7 +14,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/format.dart';
 import '../domain/job_posting.dart';
 import 'applied_jobs_provider.dart';
-import 'apply_status.dart';
+import '../domain/apply_status.dart';
 
 // 自分では状態を持たないが、「応募済みか」を Provider から読むので ConsumerWidget にする。
 // ConsumerWidget = Provider を読める StatelessWidget。build の 2 つめの引数で ref を受け取る

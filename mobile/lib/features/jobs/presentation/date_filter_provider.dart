@@ -7,7 +7,7 @@
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'date_filter.dart';
+import '../domain/date_filter.dart';
 
 part 'date_filter_provider.g.dart';
 
