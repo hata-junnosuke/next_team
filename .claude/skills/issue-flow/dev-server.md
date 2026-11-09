@@ -41,6 +41,7 @@ worktree（`issue/<番号>`）のコードを、開発（8002 / 3002。main の�
 ```bash
 make dev-stop WT=<WT> N=<番号>
 ```
+- `cd` や `echo` とつなげず、このコマンドだけを 1 回の Bash で打つ（`.claude/settings.json` の `Bash(make dev-stop:*)` の許可に当てはまるように）。`WT` は `git worktree list` に出る worktree の場所そのもの（main と、親のフォルダは受け付けない）。`N` は先頭が 0 でない数字
 - API `8100 + N` と web `3100 + N` で listen している pid を、cwd が `<WT>` の中のときだけ止める。web は `next dev` の子が listen しているので、親の `next dev` / `npm run dev` が残っていれば、同じ確認をして止める
 - 何も listen していなければ「空き」と出して成功で終わる
 - 場所が違うもの（別の worktree・別のプロジェクト）は止めずに pid と cwd を出して失敗で終わる（レシピは 1 で終わり、make 自体の終了コードは 2）。そのときは止めずに人に報告する
