@@ -51,4 +51,18 @@ trait ActsAsWorker
     {
         $this->app['auth']->forgetGuards();
     }
+
+    /**
+     * 同じテストの中でワーカーから管理者に切り替える（ワーカーの操作が管理画面にどう出るかを確かめるとき）。
+     * Sanctum::actingAs(..., 'worker') は既定の guard を worker にする（shouldUse）ので、そのまま actingAsAdmin() すると
+     * 管理者が worker の guard に入って 401 になる。guard を忘れさせ、既定を web に戻してから管理者でログインする
+     */
+    protected function switchToAdmin(): static
+    {
+        $this->forgetAuthenticatedUsers();
+        // config('auth.defaults.guard') は actingAsWorker() の shouldUse で worker に書き換わっているので読めない。web を直接書く
+        $this->app['auth']->shouldUse('web');
+
+        return $this->actingAsAdmin();
+    }
 }
