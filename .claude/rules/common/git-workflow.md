@@ -4,6 +4,7 @@
 - コミットは小さく: タスクごと。メッセージは日本語で `feat(api): F-05 募集の作成・編集` / `feat(web): 募集一覧画面` / `fix:` / `docs:` / `chore:` / `test:`
 - コミット前に `/verify pre-commit` を通す。赤のままコミットしない
 - `git push --force` `git reset --hard` `git clean -f` は禁止（PreToolUse フックが止める）
+- issue・PR・コミットの本文は Write ツールでファイルに書き、`--body-file` / `-F <ファイル>` で渡す。`guard-bash.sh` はヒアドキュメントや引用符の中の文字も判定するので、本文に `git push --force` などと書くと止まる（本文を判定から外す仕組みは抜け道が続いたのでやめた。issue #23）
 - ブランチ: 1 issue = 1 ブランチ `issue/<番号>`（例: `issue/3`）。PR の本文に `Closes #<番号>`。`main` へのマージは人が行う
 - issue を並列に進めるときは issue ごとに worktree を分ける。main の作業ツリーは issue の作成・計画・マージの確認に使う。worktree は `/issue-start <番号>` で作り、PR がマージされたら main で `/dev-refresh` で片付ける（main で起動すると SessionStart フックが片付け候補を出す）。main の取り込み（`git merge origin/main`）は各 worktree の Claude が、タスクの始めと PR を作る前に行う（`.claude/skills/issue-flow/sync-main.md`）。main のセッションは他の worktree に merge しない。`/epic-flow`・`/issue-flow`・`/pr-create` は worktree の中でしか使えない（main の作業ツリーでは UserPromptSubmit フック `guard-prompt.sh` が止める。判定はブランチ名ではなく場所）
 - `.env` `composer.lock` `package-lock.json` `vendor/` `node_modules/` `storage/` `.next/` は編集しない（フックが止める）
