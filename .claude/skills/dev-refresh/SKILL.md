@@ -38,7 +38,7 @@ gh pr list --state merged --limit 100 --json number,headRefName
 | `git -C <WT> status --short` が空 | 飛ばして「未コミットあり」と変更の一覧を報告（勝手に捨てない） |
 | `git -C <WT> log origin/main..HEAD --oneline` が空（マージ後に足したコミットがない） | 飛ばして、そのコミットを報告して人に聞く |
 
-すべて満たしたら、まず画面のサーバー（API `8100 + 番号` / web `3100 + 番号`）が動いていれば止める（`.claude/skills/issue-flow/dev-server.md` の「止める」。場所が `<WT>` の中のものだけ）。次に worktree を消す。
+すべて満たしたら、まず画面のサーバー（API `8100 + 番号` / web `3100 + 番号`）を `make dev-stop WT=<WT> N=<番号>` で止める（`.claude/skills/issue-flow/dev-server.md` の「止める」。場所が `<WT>` の中のものだけを止め、動いていなければ「空き」で成功する）。生の `kill` は使わない。失敗したら（場所が違うものが listen している）、その worktree は消さずに、出た pid と cwd を報告して人に聞く。次に worktree を消す。
 
 - **Orca を使用している場合**（環境変数 `ORCA_WORKTREE_ID` が空でない）: Orca から消す。その worktree のターミナル（起動した Claude）も閉じる。CLI は `ORCA_CLI_COMMAND` があればその値、なければ `orca`
   ```bash
