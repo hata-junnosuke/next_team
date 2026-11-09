@@ -43,7 +43,8 @@ printf '%s' "$CMD" | grep -Eq 'npm\s+(install|i|uninstall|remove)\s+[^-]|compose
 CMD="${CMD//\\$'\n'/ }"
 # 判定用に表記をそろえた形を 2 つ作り、どちらかで止まれば止める（消すのは記号だけで、判定から外す文字はない）
 # - FLAT : 引用符と \ を消し、< > を空白にする。引用符の中の空白は残る（bash -c 'git push --force' の中の git を読むため）
-# - FLATQ: 引用符の中の空白を \001 にしてから引用符を消す（-c "user.name=A B" や -C "/a b" を 1 つの値として読むため）
+# - FLATQ: 引用符の中の空白を \001 にしてから引用符を消す（-c "user.name=A B" や -C "/a b" を 1 つの値として読むため。
+#          FLAT ではこの値が割れてサブコマンドを取り違えるので、push かどうかは FLATQ の判定で決まる）
 FLAT="$(printf '%s' "$CMD" | tr -d "\"'\\\\" | tr '<>' '  ')"
 FLATQ="$(printf '%s\n' "$CMD" | awk '
   { out = ""
@@ -97,12 +98,22 @@ check() { # $1 = 表記をそろえたコマンド（FLAT か FLATQ）
     # 作業を失う操作。長いオプションは略せる（--ha = --hard、--f = --force）ので前方一致で見る
     [[ $seg =~ ${G}reset([[:space:]].*)?[[:space:]]--ha ]] && deny "git reset --hard は作業を失います。git stash か git checkout <file> を使ってください。${BODY_HINT}"
     [[ $seg =~ ${G}clean([[:space:]].*)?[[:space:]](-[a-zA-Z]*f|--f) ]] && deny "git clean -f は未追跡ファイルを消します。禁止です。${BODY_HINT}"
-    [[ $seg =~ ${G}(checkout|restore)([[:space:]].*)?[[:space:]](\.|:/)([[:space:]]|$) ]] && deny "git checkout . / git restore . は全変更を破棄します。ファイルを限定してください。${BODY_HINT}"
+    [[ $seg =~ ${G}checkout([[:space:]].*)?[[:space:]](\./?|:/)([[:space:]]|$) ]] && deny "git checkout . は全変更を破棄します。ファイルを限定してください。${BODY_HINT}"
+    # restore --staged（-S）だけならステージを外すだけで作業ツリーは失われないので通す（--worktree / -W があれば止める）
+    if [[ $seg =~ ${G}restore([[:space:]].*)?[[:space:]](\./?|:/)([[:space:]]|$) ]] \
+      && ! { [[ " $seg " =~ [[:space:]](--staged|-S)[[:space:]] ]] && ! [[ " $seg " =~ [[:space:]](--worktree|-W)[[:space:]] ]]; }; then
+      deny "git restore . は全変更を破棄します。ファイルを限定してください。${BODY_HINT}"
+    fi
     [[ $seg =~ ${G}(checkout|switch)([[:space:]].*)?[[:space:]](-[a-zA-Z]*f|--f|--disc) ]] && deny "git checkout -f / git switch -f は未コミットの変更を捨てます。git stash を使ってください。${BODY_HINT}"
 
     if ! [[ $seg =~ $PUSH_RE ]]; then
-      # git をコマンドとして呼び、push という語があるのに形を読めない → 止める側に倒す
+      # git をコマンドとして呼び、push という語があるのに、サブコマンドを読めない → 止める側に倒す。
+      # サブコマンドが push 以外と読めたら（git stash push、git help push、git log --grep push など）通す。
+      # 値が割れて push 以外に見える形（FLAT の git -c a=b c push）は、FLATQ の check で push として判定される
       if [[ $seg =~ $GIT_CMD_RE ]] && [[ " $seg " =~ [[:space:]]push[[:space:]] ]]; then
+        if [[ $seg =~ ${G}([^[:space:]]+) ]] && [ "${BASH_REMATCH[$(( ${#BASH_REMATCH[@]} - 1 ))]}" != "push" ]; then
+          continue
+        fi
         deny "git push の形を読めないので止めました。git [-C <場所>] push <リモート> <ブランチ> の形で、値は直接書いてください。${BODY_HINT}"
       fi
       continue
