@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Models\Worker;
 
 return [
 
@@ -42,6 +43,22 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+
+        // 管理者の API（auth:sanctum）。provider を users に絞ると、ワーカー（Worker）のトークンは Sanctum の
+        // hasValidProvider() で拒否される（ワーカーのトークンで管理者の API に入れない。docs/01 の 5.3・13 章の 7）。
+        // 書かないと Sanctum が provider: null で足し、どのモデルのトークンでも通してしまう
+        'sanctum' => [
+            'driver' => 'sanctum',
+            'provider' => 'users',
+        ],
+
+        // ワーカーアプリの API（auth:worker。Bearer トークン）。Rails で言えば Devise の別スコープ（:worker）に当たる。
+        // stateful なリクエストでは Sanctum が web ガードの管理者を返すことがあるので、worker ミドルウェアでも型を確かめる（5.3）
+        // https://readouble.com/laravel/13.x/ja/authentication.html#adding-custom-guards
+        'worker' => [
+            'driver' => 'sanctum',
+            'provider' => 'workers',
+        ],
     ],
 
     /*
@@ -65,6 +82,12 @@ return [
         'users' => [
             'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', User::class),
+        ],
+
+        // ワーカー（guard worker の持ち主。docs/01 の 5.3）
+        'workers' => [
+            'driver' => 'eloquent',
+            'model' => Worker::class,
         ],
 
         // 'users' => [

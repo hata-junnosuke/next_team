@@ -8,20 +8,26 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Laravel\Sanctum\HasApiTokens;
 
 /**
  * ワーカー（F-02〜F-04）。削除せず is_active で無効化する（要件の非機能要件）。
  * company_id は #[Fillable] に入れない（BelongsToCompany が CurrentCompany::id() で埋める）。
  * ログイン用の列（password・login_email・registered_at。ワーカー Step 5、docs/01 の 3.1・5.3）も #[Fillable] に入れない。
  * 入れるのは初回登録のサービス（WorkerAuthService）だけで、forceFill() で入れる。password は #[Hidden] で JSON に出さない。
+ *
+ * ワーカーアプリ（mobile/）のログインの主体なので Authenticatable を継承し、Sanctum の API トークンを持つ（HasApiTokens。docs/01 の 5.3）。
+ * Rails で言えば has_secure_password を持つモデルに、API トークンの has_many を足した形。guard は worker（config/auth.php）。
+ * https://readouble.com/laravel/13.x/ja/sanctum.html#api-token-authentication
  */
 #[Fillable(['name', 'email', 'phone', 'is_active'])]
 #[Hidden(['password'])]
-class Worker extends Model
+class Worker extends Authenticatable
 {
     use BelongsToCompany;
+    use HasApiTokens;
 
     /** @use HasFactory<WorkerFactory> */
     use HasFactory;

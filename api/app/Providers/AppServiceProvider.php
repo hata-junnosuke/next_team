@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Models\Application;
 use App\Models\JobPosting;
 use App\Models\Location;
+use App\Models\PersonalAccessToken;
 use App\Models\ReportExport;
 use App\Models\User;
 use App\Models\Worker;
@@ -12,9 +13,11 @@ use App\Models\WorkerInvitation;
 use App\Observers\DashboardCacheObserver;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Http\Request;
 use Illuminate\Mail\Markdown;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Sanctum\Sanctum;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -60,6 +63,21 @@ class AppServiceProvider extends ServiceProvider
         // https://readouble.com/laravel/13.x/ja/queues.html#rate-limiting
         RateLimiter::for('mails', fn () => Limit::perMinute((int) config('myteam.mails_per_minute')));
 
+        // ワーカーの API トークンのモデル。持ち主（Worker）を読むときだけ企業のスコープを外す（PersonalAccessToken::tokenable()。docs/01 の 5.3）
+        // https://readouble.com/laravel/13.x/ja/sanctum.html#overriding-default-models
+        Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+
+        // ワーカーの初回登録とログインの試行回数（docs/01 の 5.3。1 分 5 回、超えたら 429）。Rails の rack-attack の throttle に当たる。
+        // キーは入力の値の表記ゆれ（大文字・小文字）で数え直されないようにそろえる。企業コードは大文字、メールは小文字
+        // https://readouble.com/laravel/13.x/ja/routing.html#rate-limiting
+        RateLimiter::for('worker-register', fn (Request $request) => Limit::perMinute(5)->by(
+            mb_strtolower(self::stringInput($request, 'email')).'|'.$request->ip()
+        ));
+        RateLimiter::for('worker-login', fn (Request $request) => Limit::perMinute(5)->by(
+            mb_strtoupper(self::stringInput($request, 'company_code')).'|'
+            .mb_strtolower(self::stringInput($request, 'email')).'|'.$request->ip()
+        ));
+
         // ダッシュボードのキャッシュの破棄（F-19）。応募・募集・拠点が保存・削除されたらコミット後に消す。
         // 拠点は location_name を表示しているため（名前を変えても最長 5 分古いままにしない。リードの決定）。
         // モデルに #[ObservedBy] を付けず、ここで登録する（どのモデルに付いているかをこの 1 箇所で見渡せるようにするため。
@@ -67,5 +85,15 @@ class AppServiceProvider extends ServiceProvider
         Application::observe(DashboardCacheObserver::class);
         JobPosting::observe(DashboardCacheObserver::class);
         Location::observe(DashboardCacheObserver::class);
+    }
+
+    /**
+     * レート制限のキーに使う入力の値。検証（FormRequest）より前に動くので、配列などの文字列でない値は空として扱う
+     */
+    private static function stringInput(Request $request, string $key): string
+    {
+        $value = $request->input($key);
+
+        return is_string($value) ? trim($value) : '';
     }
 }

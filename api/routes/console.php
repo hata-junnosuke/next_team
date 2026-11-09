@@ -44,3 +44,11 @@ if (app()->environment('local') && class_exists(Telescope::class)) {
  * https://readouble.com/laravel/13.x/ja/horizon.html#metrics
  */
 Schedule::command('horizon:snapshot')->everyFiveMinutes();
+
+/*
+ * ワーカーの API トークン（personal_access_tokens。docs/01 の 5.3）のうち、期限（config('myteam.worker_token_days')）が切れて
+ * 24 時間たった行を毎日消す。期限切れのトークンは使っても 401 になるが、行は自然には消えないため。
+ * Sanctum 本体のコマンドなので testing・本番にも存在する。環境の条件は付けない。
+ * https://readouble.com/laravel/13.x/ja/sanctum.html#token-expiration
+ */
+Schedule::command('sanctum:prune-expired', ['--hours' => 24])->daily();

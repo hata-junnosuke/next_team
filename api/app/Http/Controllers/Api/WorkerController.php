@@ -74,4 +74,13 @@ class WorkerController extends Controller
 
         return new WorkerResource($worker);
     }
+
+    /**
+     * POST /api/workers/{worker}/invitation。招待の送り直し（F-27。docs/01 の 6.3。issue #37 の T7 で実装する）。
+     * モデルを型宣言しているので、他社の ID は実装前でも 404 になる
+     */
+    public function invite(Worker $worker): JsonResponse
+    {
+        return $this->notImplemented();
+    }
 }

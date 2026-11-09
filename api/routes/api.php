@@ -10,11 +10,16 @@ use App\Http\Controllers\Api\NotificationLogController;
 use App\Http\Controllers\Api\ReportExportController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\WorkerController;
+use App\Http\Controllers\Worker\ApplicationController as WorkerApplicationController;
+use App\Http\Controllers\Worker\AuthController as WorkerAuthController;
+use App\Http\Controllers\Worker\JobPostingController as WorkerJobPostingController;
+use App\Http\Controllers\Worker\LocationController as WorkerLocationController;
 use Illuminate\Support\Facades\Route;
 
 /*
- * /api/* はすべて auth:sanctum（ログイン必須）+ company（CurrentCompany の設定）の中に置く。
+ * 管理者の /api/* はすべて auth:sanctum（ログイン必須）+ company（CurrentCompany の設定）の中に置く。
  * 例外は署名付きURL のダウンロードだけ（signed ミドルウェア必須）。
+ * ワーカーアプリの /api/worker/* は別のグループ（auth:worker + worker）。下の「ワーカー用 API」を参照。
  *
  * docs/01 の API 契約の全ルートを先に登録する（担当と所有ファイルの基盤）。未実装のアクションは 501 を返し、
  * 並列担当（A / B / C）は自分のコントローラの中身だけを書けばよい（このファイルは触らない）。
@@ -30,6 +35,8 @@ Route::middleware(['auth:sanctum', 'company'])->group(function () {
     // F-02〜F-04 ワーカー（担当 A）。削除はしない（無効化）
     Route::apiResource('workers', WorkerController::class)->except(['destroy']);
     Route::patch('/workers/{worker}/active', [WorkerController::class, 'toggleActive'])->name('workers.active');
+    // F-27 招待の送り直し（ワーカー Step 5。docs/01 の 6.3）
+    Route::post('/workers/{worker}/invitation', [WorkerController::class, 'invite'])->name('workers.invitation');
 
     // F-05〜F-08 募集（担当 B）。削除はしない（中止）。パラメータ名は {job_posting}
     Route::apiResource('job-postings', JobPostingController::class)->except(['destroy']);
@@ -78,3 +85,38 @@ Route::get('/report-exports/{report_export}/download', [ReportExportController::
     ->middleware('signed')
     ->whereNumber('report_export')
     ->name('report-exports.download');
+
+/*
+ * ワーカー用 API（F-26〜F-33。ワーカーアプリ mobile/ とだけ結ぶ契約。docs/01 の 5.3・6.11）。
+ * 認証は Sanctum の API トークン（Bearer）で、管理者の Cookie とは guard を分ける（auth:worker）。
+ * worker ミドルウェアがワーカーであること・有効であることを確かめ、ワーカーの企業を CurrentCompany に入れる。
+ * 例外は認証の外の register と login だけで、総当たりに備えて throttle（AppServiceProvider の RateLimiter::for）を付ける。
+ * https://readouble.com/laravel/13.x/ja/sanctum.html#protecting-routes
+ */
+Route::prefix('worker')->name('worker.')->group(function () {
+    Route::post('/register', [WorkerAuthController::class, 'register'])
+        ->middleware('throttle:worker-register')
+        ->name('register');
+    Route::post('/login', [WorkerAuthController::class, 'login'])
+        ->middleware('throttle:worker-login')
+        ->name('login');
+
+    Route::middleware(['auth:worker', 'worker'])->group(function () {
+        Route::post('/logout', [WorkerAuthController::class, 'logout'])->name('logout');
+        Route::get('/me', [WorkerAuthController::class, 'me'])->name('me');
+
+        // F-30・F-31 募集の検索・詳細。パラメータ名は管理者の API と同じ {job_posting}
+        Route::get('/job-postings', [WorkerJobPostingController::class, 'index'])->name('job-postings.index');
+        Route::get('/job-postings/{job_posting}', [WorkerJobPostingController::class, 'show'])->name('job-postings.show');
+
+        // F-32 ワーカー本人の応募
+        Route::post('/job-postings/{job_posting}/applications', [WorkerApplicationController::class, 'store'])
+            ->name('job-postings.applications.store');
+
+        // F-30 絞り込みの拠点の選択肢（ページなし）
+        Route::get('/locations', [WorkerLocationController::class, 'index'])->name('locations.index');
+
+        // F-33 自分の応募の一覧
+        Route::get('/applications', [WorkerApplicationController::class, 'index'])->name('applications.index');
+    });
+});
