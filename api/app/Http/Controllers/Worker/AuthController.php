@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Worker;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Worker\RegisterRequest;
 use App\Http\Resources\Worker\WorkerMeResource;
 use App\Models\Worker;
+use App\Services\WorkerAuthService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -15,12 +17,24 @@ use Illuminate\Http\Response;
  */
 class AuthController extends Controller
 {
+    public function __construct(private readonly WorkerAuthService $auth) {}
+
     /**
-     * POST /api/worker/register（F-28。issue #37 の T9 で実装する）
+     * POST /api/worker/register（F-28）。201 {"data": {"token", "worker": WorkerMeResource}}
      */
-    public function register(): JsonResponse
+    public function register(RegisterRequest $request): JsonResponse
     {
-        return $this->notImplemented();
+        $result = $this->auth->register(
+            $request->string('email')->toString(),
+            $request->string('code')->toString(),
+            $request->string('password')->toString(),
+            $request->string('device_name')->toString(),
+        );
+
+        return response()->json(['data' => [
+            'token' => $result['token'],
+            'worker' => new WorkerMeResource($result['worker']),
+        ]], 201);
     }
 
     /**
@@ -36,7 +50,7 @@ class AuthController extends Controller
      */
     public function logout(Request $request): Response
     {
-        $this->worker($request)->currentAccessToken()->delete();
+        $this->auth->logout($this->worker($request));
 
         return response()->noContent();
     }

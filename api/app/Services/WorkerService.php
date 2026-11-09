@@ -17,8 +17,6 @@ use Illuminate\Support\Facades\DB;
  */
 class WorkerService
 {
-    private const EMAIL_TAKEN = 'このメールアドレスは、この企業の別のワーカーのログインに使われています。';
-
     public function __construct(private readonly WorkerInvitationService $invitations) {}
 
     /**
@@ -75,7 +73,7 @@ class WorkerService
             } catch (UniqueConstraintViolationException) {
                 // 確認の後に、同じメールで別のワーカーが初回登録を済ませた。workers の UNIQUE は (company_id, login_email) だけである前提で、同じ文言の 422 にする。
                 // 投げ直すので外側ごとロールバックする。続けるならセーブポイント（入れ子の DB::transaction）で包む
-                throw new DomainException(self::EMAIL_TAKEN, 'email');
+                throw new DomainException(WorkerAuthService::EMAIL_TAKEN, 'email');
             }
 
             // 招待を扱うのは「メールが変わった未登録のワーカー」だけ
@@ -105,7 +103,7 @@ class WorkerService
             ->exists();
 
         if ($taken) {
-            throw new DomainException(self::EMAIL_TAKEN, 'email');
+            throw new DomainException(WorkerAuthService::EMAIL_TAKEN, 'email');
         }
     }
 }
