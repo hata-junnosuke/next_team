@@ -17,9 +17,10 @@ use Illuminate\Database\Seeder;
 /**
  * 開発用のデータ（make fresh）。Rails の db/seeds.rb に相当。
  *
- * - 自社: 管理者 admin@example.com / password、拠点 4、ワーカー 6（うち無効 1）、
+ * - 自社: 管理者 admin@example.com / password、拠点 4、ワーカー 7（うち無効 1、ワーカーアプリに登録済み 1: worker@example.com / password）、
  *   今日以降の募集（募集中・締切・中止）と応募（応募中・確定・却下・キャンセル）、先月と今日の勤怠（月次集計・深夜跨ぎの例）
  * - 他社: 管理者 other@example.com / password と拠点・ワーカー・募集・勤怠を少し（分離の手動確認用。自社の画面に出ないこと）
+ * - 企業コード（ワーカーのログインに使う）は Company の creating で自動で入る。値は make fresh のたびに変わるので、/api/user の company.code で確かめる
  *
  * BelongsToCompany が company_id を CurrentCompany::id() で埋めるので、企業ごとに runAs() の中で作る。
  * 状態はファクトリの state で直接作る（シードは「その状態のデータ」を置くだけ。アプリの操作では必ずサービスを通る）。
@@ -79,6 +80,9 @@ class DatabaseSeeder extends Seeder
             $workers[] = Worker::factory()->create($attributes);
         }
         [$sato, $suzuki, $takahashi, $tanaka, $ito] = $workers;
+        // 初回登録を済ませたワーカー（worker@example.com / password。ワーカーアプリのログインを curl と mobile/ ですぐ試せるように。
+        // ログイン用の列は #[Fillable] の外だが、ファクトリは一括代入の保護を外して作るので registered() の state で入る）
+        Worker::factory()->registered()->create(['name' => '山本 アプリ', 'email' => 'worker@example.com', 'phone' => '090-7777-7777']);
         // 無効のワーカー（F-03。応募の候補に出ない）
         Worker::factory()->inactive()->create(['name' => '渡辺 休止', 'email' => 'watanabe@example.com']);
 
