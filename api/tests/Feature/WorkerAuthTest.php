@@ -277,9 +277,11 @@ class WorkerAuthTest extends TestCase
             ->assertExactJson(['message' => '見つかりませんでした。', 'errors' => []]);
         $this->forgetAuthenticatedUsers();
 
-        // 自社の募集中・今日以降の募集はバインディングを通る（T3 では 501、T11 で詳細を実装したら 200）
-        $status = $this->withToken($token)->getJson("/api/worker/job-postings/{$ownPosting->id}")->status();
-        $this->assertContains($status, [200, 501], "自社の募集がバインディングを通らない（{$status}）");
+        // 自社の募集中・今日以降の募集はバインディングを通り、詳細が返る
+        $this->withToken($token)
+            ->getJson("/api/worker/job-postings/{$ownPosting->id}")
+            ->assertOk()
+            ->assertJsonPath('data.id', $ownPosting->id);
     }
 
     public function test_ワーカーのトークンでは管理者のapiのどのルートにも入れない(): void

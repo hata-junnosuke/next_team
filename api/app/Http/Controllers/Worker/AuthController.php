@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Worker;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Worker\Concerns\ResolvesWorker;
 use App\Http\Requests\Worker\LoginRequest;
 use App\Http\Requests\Worker\RegisterRequest;
 use App\Http\Resources\Worker\WorkerMeResource;
@@ -18,6 +19,8 @@ use Illuminate\Http\Response;
  */
 class AuthController extends Controller
 {
+    use ResolvesWorker;
+
     public function __construct(private readonly WorkerAuthService $auth) {}
 
     /**
@@ -72,16 +75,5 @@ class AuthController extends Controller
     public function me(Request $request): WorkerMeResource
     {
         return new WorkerMeResource($this->worker($request)->load('company'));
-    }
-
-    /**
-     * worker ミドルウェアが Worker であることを確かめた後なので、ここでは型を絞るだけ
-     */
-    private function worker(Request $request): Worker
-    {
-        /** @var Worker $worker */
-        $worker = $request->user('worker');
-
-        return $worker;
     }
 }
