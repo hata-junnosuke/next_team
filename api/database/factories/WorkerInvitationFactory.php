@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Models\Company;
 use App\Models\Worker;
 use App\Models\WorkerInvitation;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -35,7 +34,7 @@ class WorkerInvitationFactory extends Factory
      */
     private static function randomCode(): string
     {
-        return fake()->unique()->regexify('['.Company::CODE_CHARACTERS.']{8}');
+        return fake()->unique()->regexify('['.WorkerInvitation::CODE_CHARACTERS.']{'.WorkerInvitation::CODE_LENGTH.'}');
     }
 
     /**

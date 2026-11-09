@@ -28,6 +28,15 @@ class WorkerInvitation extends Model
     use HasFactory;
 
     /**
+     * 招待コードに使う文字。紛らわしい 0 O 1 I L を除いた英大文字と数字（docs/01 の 3.2）。
+     * 企業コード（Company::CODE_CHARACTERS）と今は同じ文字だが、長さと用途が違うので招待の側に持つ
+     */
+    public const CODE_CHARACTERS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+    /** 招待コードの長さ（約 8.5×10^11 通り） */
+    public const CODE_LENGTH = 8;
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
