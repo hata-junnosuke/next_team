@@ -3,6 +3,7 @@
 - リポジトリは `next_team/` 直下の 1 つ（`api/` と `web/` をまとめて管理する）
 - コミットは小さく: タスクごと。メッセージは日本語で `feat(api): F-05 募集の作成・編集` / `feat(web): 募集一覧画面` / `fix:` / `docs:` / `chore:` / `test:`
 - コミット前に `/verify pre-commit` を通す。赤のままコミットしない
+- `.claude/`（フック・スキル・規約・`settings.json`）の変更も、PR の前に `/code-review` を通して重大 0 件にする。「文面だけの変更」を理由に省かない（`/pr-create` の手順 2）
 - `git push --force` `git reset --hard` `git clean -f` は禁止（PreToolUse フックが止める）
 - issue・PR・コミットの本文は Write ツールでファイルに書き、`--body-file` / `-F <ファイル>` で渡す。`guard-bash.sh` はヒアドキュメントや引用符の中の文字も判定するので、本文に `git push --force` などと書くと止まる（本文を判定から外す仕組みは抜け道が続いたのでやめた。issue #23）
 - ブランチ: 1 issue = 1 ブランチ `issue/<番号>`（例: `issue/3`）。PR の本文に `Closes #<番号>`。`main` へのマージは人が行う

@@ -20,6 +20,7 @@ PR の **形** は `.github/pull_request_template.md` が決め、このスキ�
    - api: Pint 緑/赤、PHPUnit の件数（assertions）と失敗名
    - web: tsc・ESLint 緑/赤
    - **赤なら PR を作らない**。`build-error-resolver` に渡して直してから 2 に戻る
+   - **`.claude/` に変更があれば**（`git diff --name-only main...HEAD -- .claude/` が空でない）、`/code-review` を通して重大 0 件にする。「文面だけの変更」を理由に省かない（フック・スキル・規約は全部の作業の動きを変える。issue #23）。重大が残れば PR を作らずに直し、2 周で消えなければ issue に `requires-human` を付けて止まる
 3. 本文を埋める（スクラッチパッドに一時ファイルとして書く）。テンプレートを読み、見出しはそのまま残し、`<!-- -->` は消す
    - `Closes #<番号>`
    - 変更: `git log main..HEAD --oneline` と issue のタスク ID から、タスクごとに 1〜3 行
