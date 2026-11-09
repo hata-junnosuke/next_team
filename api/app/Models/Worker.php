@@ -17,7 +17,7 @@ use Laravel\Sanctum\HasApiTokens;
  * ワーカー（F-02〜F-04）。削除せず is_active で無効化する（要件の非機能要件）。
  * company_id は #[Fillable] に入れない（BelongsToCompany が CurrentCompany::id() で埋める）。
  * ログイン用の列（password・login_email・registered_at。ワーカー Step 5、docs/01 の 3.1・5.3）も #[Fillable] に入れない。
- * 入れるのは初回登録のサービス（WorkerAuthService）と、登録済みのワーカーのメールを直したときに login_email を追従させる WorkerService::update() だけで、forceFill() で入れる。password は #[Hidden] で JSON に出さない。
+ * 入れるのは WorkerAuthService（初回登録と、ログインの成功時に古い設定の password を今の設定で作り直すとき）と、登録済みのワーカーのメールを直したときに login_email を追従させる WorkerService::update() だけで、forceFill() で入れる。password は #[Hidden] で JSON に出さない。
  *
  * ワーカーアプリ（mobile/）のログインの主体なので Authenticatable を継承し、Sanctum の API トークンを持つ（HasApiTokens。docs/01 の 5.3）。
  * Rails で言えば has_secure_password を持つモデルに、API トークンの has_many を足した形。guard は worker（config/auth.php）。

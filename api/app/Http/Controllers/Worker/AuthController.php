@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Worker;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Worker\LoginRequest;
 use App\Http\Requests\Worker\RegisterRequest;
 use App\Http\Resources\Worker\WorkerMeResource;
 use App\Models\Worker;
@@ -38,11 +39,21 @@ class AuthController extends Controller
     }
 
     /**
-     * POST /api/worker/login（F-29。issue #37 の T10 で実装する）
+     * POST /api/worker/login（F-29）。200 {"data": {"token", "worker": WorkerMeResource}}
      */
-    public function login(): JsonResponse
+    public function login(LoginRequest $request): JsonResponse
     {
-        return $this->notImplemented();
+        $result = $this->auth->login(
+            $request->string('company_code')->toString(),
+            $request->string('email')->toString(),
+            $request->string('password')->toString(),
+            $request->string('device_name')->toString(),
+        );
+
+        return response()->json(['data' => [
+            'token' => $result['token'],
+            'worker' => new WorkerMeResource($result['worker']),
+        ]]);
     }
 
     /**

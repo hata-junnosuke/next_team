@@ -10,13 +10,20 @@ use App\Models\WorkerInvitation;
 use App\Providers\TelescopeServiceProvider;
 use App\Services\WorkerAuthService;
 use App\Support\CurrentCompany;
+use Illuminate\Hashing\HashManager;
 use Illuminate\Routing\Route as RoutingRoute;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Context;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Sleep;
 use Laravel\Sanctum\PersonalAccessToken;
 use Laravel\Sanctum\Sanctum;
 use Laravel\Telescope\Telescope;
+use Mockery;
+use RuntimeException;
 use Tests\Concerns\ActsAsWorker;
 use Tests\TestCase;
 
@@ -35,8 +42,13 @@ class WorkerAuthTest extends TestCase
 
     private const EMAIL_TAKEN_MESSAGE = 'このメールアドレスは、この企業の別のワーカーのログインに使われています。';
 
+    private const INVALID_CREDENTIALS_MESSAGE = '企業コード・メールアドレス・パスワードのいずれかが正しくありません。';
+
     /** 招待コードの文字（紛らわしい文字を除いた英大文字と数字）だけで作った、テストで使う招待コード */
     private const CODE = 'ABCD2345';
+
+    /** expectOnePasswordCheck() が包む本物のハッシャー */
+    private ?HashManager $realHasher = null;
 
     // ---- 初回登録（F-28。POST /api/worker/register。docs/01 の 4.5・5.3・6.11） ----
 
@@ -876,6 +888,484 @@ class WorkerAuthTest extends TestCase
         }
 
         $this->assertRegisterRolledBack($worker);
+    }
+
+    // ---- ログイン（F-29。POST /api/worker/login。docs/01 の 4.5・5.3・6.11） ----
+    // 判定は Timebox で包むので、失敗のたびに Sleep で残りの時間を待つ。テストでは Sleep::fake() で実際には待たず、待ったかどうかを確かめる
+
+    public function test_企業コードとメールとパスワードでログインでき端末名と期限つきのトークンが返る(): void
+    {
+        $this->freezeSecond();
+        $worker = $this->prepareLogin();
+
+        $response = $this->postJson('/api/worker/login', $this->loginPayload())
+            ->assertOk()
+            ->assertJsonPath('data.worker', [
+                'id' => $worker->id,
+                'name' => '山田 太郎',
+                'email' => 'taro@example.com',
+                'company' => ['id' => $this->company->id, 'name' => '株式会社サンプル', 'code' => 'SMPK23'],
+            ]);
+        $this->assertSame(['data'], array_keys($response->json()));
+        $this->assertEqualsCanonicalizing(['token', 'worker'], array_keys($response->json('data')));
+
+        // トークンは端末名・能力 ['worker'] ちょうど・設定の日数後に切れる
+        $token = $worker->tokens()->sole();
+        $this->assertSame('iPhone 16', $token->name);
+        $this->assertSame(['worker'], $token->abilities);
+        $this->assertNotNull($token->expires_at);
+        $this->assertTrue(now()->addDays((int) config('myteam.worker_token_days'))->equalTo($token->expires_at));
+        $this->assertSame($token->id, (int) explode('|', $response->json('data.token'))[0]);
+
+        // 成功は待たずに返す（Timebox の returnEarly）。企業はリクエストの後に残らない
+        Sleep::assertNeverSlept();
+        $this->assertFalse(CurrentCompany::check());
+
+        // 受け取ったトークンでワーカーの API に入れる
+        $this->withToken($response->json('data.token'))->getJson('/api/worker/me')->assertOk()->assertJsonPath('data.id', $worker->id);
+    }
+
+    public function test_企業コードとメールは大文字小文字を問わない(): void
+    {
+        $worker = $this->prepareLogin();
+
+        $this->postJson('/api/worker/login', $this->loginPayload(['company_code' => 'smPk23', 'email' => 'TARO@Example.COM']))
+            ->assertOk()
+            ->assertJsonPath('data.worker.id', $worker->id)
+            ->assertJsonPath('data.worker.email', 'taro@example.com');
+    }
+
+    public function test_企業コードとメールとパスワードのどれが誤りでも同じ422でerrors_email(): void
+    {
+        $this->prepareLogin();
+        // 他社の企業コード（その企業に taro はいない）も、存在しない企業コードと同じ
+        Company::factory()->create()->forceFill(['code' => 'ZXCV23'])->save();
+
+        $cases = [
+            '存在しない企業コード' => ['company_code' => 'QQQQ99'],
+            '他社の企業コード' => ['company_code' => 'ZXCV23'],
+            '存在しないメール' => ['email' => 'hanako@example.com'],
+            'パスワードの誤り' => ['password' => 'wrong-pass'],
+        ];
+        foreach ($cases as $label => $overrides) {
+            // 見つからないときもダミーのハッシュでパスワードを 1 回照合する（照合の有無で応答時間が変わらないように）
+            $this->expectOnePasswordCheck($overrides['password'] ?? 'secret-pass');
+
+            $this->postJson('/api/worker/login', $this->loginPayload($overrides))
+                ->assertUnprocessable()
+                ->assertExactJson(['message' => self::INVALID_CREDENTIALS_MESSAGE, 'errors' => ['email' => [self::INVALID_CREDENTIALS_MESSAGE]]]);
+        }
+
+        // 失敗はどれも Timebox の残りを待つ（早く返さない）
+        Sleep::assertSleptTimes(count($cases));
+        $this->assertDatabaseCount('personal_access_tokens', 0);
+    }
+
+    public function test_未登録のワーカーはログインできず誤りと同じ文言(): void
+    {
+        $worker = $this->prepareLogin(registered: false);
+
+        // password が NULL でも、ダミーのハッシュで照合して時間をそろえる
+        $this->expectOnePasswordCheck('secret-pass');
+
+        $this->postJson('/api/worker/login', $this->loginPayload())
+            ->assertUnprocessable()
+            ->assertExactJson(['message' => self::INVALID_CREDENTIALS_MESSAGE, 'errors' => ['email' => [self::INVALID_CREDENTIALS_MESSAGE]]]);
+
+        Sleep::assertSleptTimes(1);
+        $this->assertSame(0, $worker->tokens()->count());
+    }
+
+    public function test_無効ワーカーは正しいパスワードでもログインできない(): void
+    {
+        $worker = $this->prepareLogin(['is_active' => false]);
+
+        $this->postJson('/api/worker/login', $this->loginPayload())
+            ->assertUnprocessable()
+            ->assertExactJson(['message' => self::DISABLED_MESSAGE, 'errors' => ['email' => [self::DISABLED_MESSAGE]]]);
+
+        Sleep::assertSleptTimes(1);
+        $this->assertSame(0, $worker->tokens()->count());
+    }
+
+    public function test_無効ワーカーでもパスワードが誤りなら誤りの文言(): void
+    {
+        $this->prepareLogin(['is_active' => false]);
+
+        // パスワードを知らない人に、無効かどうか（アカウントがあること）を明かさない
+        $this->expectOnePasswordCheck('wrong-pass');
+
+        $this->postJson('/api/worker/login', $this->loginPayload(['password' => 'wrong-pass']))
+            ->assertUnprocessable()
+            ->assertExactJson(['message' => self::INVALID_CREDENTIALS_MESSAGE, 'errors' => ['email' => [self::INVALID_CREDENTIALS_MESSAGE]]]);
+
+        Sleep::assertSleptTimes(1);
+        $this->assertDatabaseCount('personal_access_tokens', 0);
+    }
+
+    public function test_同じメールの2社のアカウントは企業コードでログイン先が決まる(): void
+    {
+        $mine = $this->prepareLogin();
+        $other = Company::factory()->create(['name' => '株式会社ほか']);
+        $other->forceFill(['code' => 'ZXCV23'])->save();
+        $theirs = CurrentCompany::runAs($other->id, fn () => $this->registeredWorker(['email' => 'taro@example.com', 'password' => 'other-pass']));
+
+        $this->postJson('/api/worker/login', $this->loginPayload(['company_code' => 'ZXCV23', 'password' => 'other-pass']))
+            ->assertOk()
+            ->assertJsonPath('data.worker.id', $theirs->id)
+            ->assertJsonPath('data.worker.company', ['id' => $other->id, 'name' => '株式会社ほか', 'code' => 'ZXCV23']);
+
+        // パスワードは企業ごとのアカウントのもの。自社のパスワードでは他社にログインできない
+        $this->postJson('/api/worker/login', $this->loginPayload(['company_code' => 'ZXCV23']))
+            ->assertUnprocessable()
+            ->assertJsonPath('message', self::INVALID_CREDENTIALS_MESSAGE);
+
+        $this->postJson('/api/worker/login', $this->loginPayload())
+            ->assertOk()
+            ->assertJsonPath('data.worker.id', $mine->id)
+            ->assertJsonPath('data.worker.company.code', 'SMPK23');
+
+        $this->assertSame(1, $mine->tokens()->count());
+        $this->assertSame(1, $theirs->tokens()->count());
+    }
+
+    public function test_ログインは6回目から429で企業コードとメールごとに数える(): void
+    {
+        $this->prepareLogin();
+
+        // 企業コードは大文字、メールは小文字にして数える（表記を変えて枠をすり抜けない）
+        foreach (['SMPK23', 'smpk23', 'Smpk23', 'SMPK23', 'smpk23'] as $i => $code) {
+            $this->postJson('/api/worker/login', $this->loginPayload([
+                'company_code' => $code,
+                'email' => $i % 2 === 0 ? 'taro@example.com' : 'Taro@Example.com',
+                'password' => 'wrong-pass',
+            ]))->assertUnprocessable();
+        }
+
+        // 正しいパスワードでも 6 回目は 429（共通の文言はログインの試行回数のもの）
+        $response = $this->postJson('/api/worker/login', $this->loginPayload())
+            ->assertTooManyRequests()
+            ->assertHeader('Retry-After')
+            ->assertJsonPath('message', fn (string $message) => preg_match('/^ログインの試行回数が多すぎます。\d+ 秒後にお試しください。$/u', $message) === 1);
+        // errors は空の配列 [] ではなく空のオブジェクト {}（assertJsonPath('errors', []) はどちらでも通るので本文の文字列で見る）
+        $this->assertStringContainsString('"errors":{}', $response->getContent());
+
+        // 同じ IP でも、メールが違えば・企業コードが違えば別に数える
+        $this->postJson('/api/worker/login', $this->loginPayload(['email' => 'hanako@example.com']))->assertUnprocessable();
+        $this->postJson('/api/worker/login', $this->loginPayload(['company_code' => 'QQQQ99']))->assertUnprocessable();
+        $this->assertDatabaseCount('personal_access_tokens', 0);
+    }
+
+    public function test_ログインの入力が足りないと422で日本語のerrors(): void
+    {
+        Context::forget('company_id');
+
+        $this->postJson('/api/worker/login', [])
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.company_code', ['企業コードは必須項目です。'])
+            ->assertJsonPath('errors.email', ['メールアドレスは必須項目です。'])
+            ->assertJsonPath('errors.password', ['パスワードは必須項目です。'])
+            ->assertJsonPath('errors.device_name', ['端末名は必須項目です。']);
+    }
+
+    public function test_無効で未登録のワーカーは無効を明かさず誤りの文言(): void
+    {
+        $worker = $this->prepareLogin(['is_active' => false], registered: false);
+
+        // パスワードを持たないワーカーに「無効」と答えると、アカウントがあることが分かる。未登録と同じ扱いにする
+        $this->expectOnePasswordCheck('secret-pass');
+
+        $this->postJson('/api/worker/login', $this->loginPayload())
+            ->assertUnprocessable()
+            ->assertExactJson(['message' => self::INVALID_CREDENTIALS_MESSAGE, 'errors' => ['email' => [self::INVALID_CREDENTIALS_MESSAGE]]]);
+
+        Sleep::assertSleptTimes(1);
+        $this->assertSame(0, $worker->tokens()->count());
+    }
+
+    public function test_企業コードとメールの前後の空白は無視される(): void
+    {
+        $worker = $this->prepareLogin();
+
+        $this->postJson('/api/worker/login', $this->loginPayload(['company_code' => "  smpk23\t", 'email' => ' Taro@Example.com ']))
+            ->assertOk()
+            ->assertJsonPath('data.worker.id', $worker->id)
+            ->assertJsonPath('data.worker.company.code', 'SMPK23');
+    }
+
+    public function test_ログインで受け取ったトークンでは管理者のapiに入れない(): void
+    {
+        $this->prepareLogin();
+
+        $token = $this->postJson('/api/worker/login', $this->loginPayload())->assertOk()->json('data.token');
+        $this->forgetAuthenticatedUsers();
+
+        $this->withToken($token)->getJson('/api/user')->assertUnauthorized();
+        $this->assertGuest('sanctum');
+        $this->withToken($token)->getJson('/api/job-postings')->assertUnauthorized();
+    }
+
+    public function test_2つの端末でログインするとトークンが2本になりログアウトは今の1本だけ消す(): void
+    {
+        $worker = $this->prepareLogin();
+
+        $phone = $this->postJson('/api/worker/login', $this->loginPayload(['device_name' => 'iPhone 16']))->assertOk()->json('data.token');
+        $tablet = $this->postJson('/api/worker/login', $this->loginPayload(['device_name' => 'iPad']))->assertOk()->json('data.token');
+        $this->assertNotSame($phone, $tablet);
+        $this->assertEqualsCanonicalizing(['iPhone 16', 'iPad'], $worker->tokens()->pluck('name')->all());
+
+        $this->withToken($phone)->postJson('/api/worker/logout')->assertNoContent();
+        $this->forgetAuthenticatedUsers();
+
+        $this->withToken($phone)->getJson('/api/worker/me')->assertUnauthorized();
+        $this->forgetAuthenticatedUsers();
+        $this->withToken($tablet)->getJson('/api/worker/me')->assertOk()->assertJsonPath('data.id', $worker->id);
+        $this->assertSame(['iPad'], $worker->tokens()->pluck('name')->all());
+    }
+
+    public function test_サービスのログインは成功しても失敗しても呼び出し前の企業に戻す(): void
+    {
+        Sleep::fake();
+        $other = Company::factory()->create();
+        $other->forceFill(['code' => 'ZXCV23'])->save();
+        CurrentCompany::runAs($other->id, function () {
+            $this->registeredWorker(['email' => 'taro@example.com', 'password' => 'secret-pass']);
+            $this->registeredWorker(['email' => 'jiro@example.com', 'password' => 'secret-pass', 'is_active' => false]);
+        });
+        CurrentCompany::set($this->company->id);
+        $service = app(WorkerAuthService::class);
+
+        $result = $service->login('ZXCV23', 'taro@example.com', 'secret-pass', 'iPhone 16');
+        $this->assertSame($other->id, $result['worker']->company_id);
+        $this->assertSame($this->company->id, CurrentCompany::id());
+
+        foreach ([
+            ['jiro@example.com', 'secret-pass', self::DISABLED_MESSAGE],
+            ['taro@example.com', 'wrong-pass', self::INVALID_CREDENTIALS_MESSAGE],
+        ] as [$email, $password, $message]) {
+            try {
+                $service->login('ZXCV23', $email, $password, 'iPhone 16');
+                $this->fail("{$email} のログインが通った");
+            } catch (DomainException $e) {
+                $this->assertSame($message, $e->getMessage());
+                $this->assertSame('email', $e->field);
+            }
+            $this->assertSame($this->company->id, CurrentCompany::id());
+        }
+
+        // 企業が決まっていない状態から呼べば、成功しても失敗しても決まっていない状態に戻る
+        Context::forget('company_id');
+        $service->login('ZXCV23', 'taro@example.com', 'secret-pass', 'iPad');
+        $this->assertFalse(CurrentCompany::check());
+        try {
+            $service->login('ZXCV23', 'taro@example.com', 'wrong-pass', 'iPad');
+            $this->fail('誤ったパスワードのログインが通った');
+        } catch (DomainException) {
+        }
+        $this->assertFalse(CurrentCompany::check());
+    }
+
+    public function test_ログインの_timeboxは成功では待たず失敗では残りを待ち成功の後の失敗も待つ(): void
+    {
+        $this->prepareLogin();
+        // 同じインスタンスで続けて呼ぶ（Timebox を使い回すと、前の成功の returnEarly が残って失敗でも待たなくなる）
+        $service = app(WorkerAuthService::class);
+
+        $service->login('SMPK23', 'taro@example.com', 'secret-pass', 'iPhone 16');
+        Sleep::assertNeverSlept();
+
+        try {
+            $service->login('SMPK23', 'taro@example.com', 'wrong-pass', 'iPhone 16');
+            $this->fail('誤ったパスワードのログインが通った');
+        } catch (DomainException) {
+        }
+
+        // 待つのは 200 ミリ秒から判定にかかった時間を引いた残り（0 より長く 200 ミリ秒以下）
+        Sleep::assertSleptTimes(1);
+        Sleep::assertSlept(fn ($duration) => $duration->totalMicroseconds > 0 && $duration->totalMicroseconds <= 200_000);
+    }
+
+    public function test_ダミーのハッシュはキャッシュから読み見つからない道でも未登録の道でも作らない(): void
+    {
+        // 本番（PHP-FPM）はリクエストごとにプロセスの static が消える。キャッシュに入っていれば、どのリクエストでも作らずに読むことを確かめる
+        $this->prepareLogin(['email' => 'hanako@example.com'], registered: false);
+        $dummy = Hash::make('どの入力とも合わないダミー');
+        Cache::forever(WorkerAuthService::dummyHashCacheKey(), $dummy);
+
+        foreach ([
+            '存在しない企業コード' => ['company_code' => 'QQQQ99'],
+            '存在しないメール' => ['email' => 'nobody@example.com'],
+            '未登録のワーカー' => ['email' => 'hanako@example.com'],
+        ] as $label => $overrides) {
+            $mock = Mockery::mock($real = $this->realHasher ??= $this->app->make('hash'));
+            $mock->shouldReceive('make')->never();
+            $mock->shouldReceive('check')->once()->with('secret-pass', $dummy)->andReturnUsing(fn (...$args) => $real->check(...$args));
+            Hash::swap($mock);
+
+            $this->postJson('/api/worker/login', $this->loginPayload($overrides))
+                ->assertUnprocessable()
+                ->assertJsonPath('message', self::INVALID_CREDENTIALS_MESSAGE);
+        }
+    }
+
+    public function test_ダミーのハッシュはパスワード誤りの道でも成功の道でもキャッシュから1回読む(): void
+    {
+        // キャッシュの読み取りを見つからない道だけにすると、キャッシュが遅い・落ちているときにその道だけ遅くなって分かる。どの道も 1 回にそろえる
+        $this->prepareLogin();
+        $real = $this->app->make('cache');
+
+        foreach ([
+            'パスワードの誤り' => [['password' => 'wrong-pass'], 422],
+            '成功' => [[], 200],
+            '見つからない' => [['email' => 'nobody@example.com'], 422],
+        ] as $label => [$overrides, $status]) {
+            $cache = Mockery::mock($real);
+            $cache->shouldReceive('rememberForever')
+                ->once()
+                ->with(WorkerAuthService::dummyHashCacheKey(), Mockery::type('Closure'))
+                ->andReturnUsing(fn (...$args) => $real->rememberForever(...$args));
+            Cache::swap($cache);
+
+            $this->postJson('/api/worker/login', $this->loginPayload($overrides))->assertStatus($status);
+        }
+    }
+
+    public function test_ダミーのハッシュはキャッシュが空なら作って入れ次からはそれを使う(): void
+    {
+        $this->prepareLogin();
+        $this->assertFalse(Cache::has(WorkerAuthService::dummyHashCacheKey()));
+
+        $this->postJson('/api/worker/login', $this->loginPayload(['email' => 'nobody@example.com']))->assertUnprocessable();
+
+        // 今のハッシャーの設定で作ったハッシュが入る（照合が本物と同じだけかかるように）
+        $dummy = Cache::get(WorkerAuthService::dummyHashCacheKey());
+        $this->assertIsString($dummy);
+        $this->assertTrue(Hash::isHashed($dummy));
+        $this->assertFalse(Hash::needsRehash($dummy));
+    }
+
+    public function test_ダミーのハッシュのキャッシュのキーはハッシュのドライバとコストで変わる(): void
+    {
+        $key = WorkerAuthService::dummyHashCacheKey();
+        $this->assertStringStartsWith('worker-login:dummy-hash:bcrypt:', $key);
+
+        // コストを上げたら、古いコストのダミーを使わない（照合の時間が本物とずれるため）
+        config(['hashing.bcrypt.rounds' => (int) config('hashing.bcrypt.rounds') + 1]);
+        $this->assertNotSame($key, WorkerAuthService::dummyHashCacheKey());
+
+        config(['hashing.driver' => 'argon2id']);
+        $this->assertStringStartsWith('worker-login:dummy-hash:argon2id:', WorkerAuthService::dummyHashCacheKey());
+    }
+
+    public function test_キャッシュが使えなくてもログインはその場でダミーのハッシュを作って同じ422にし例外を報告する(): void
+    {
+        $this->prepareLogin();
+        Exceptions::fake();
+        $cache = Mockery::mock($this->app->make('cache'));
+        $cache->shouldReceive('rememberForever')->andThrow(new RuntimeException('キャッシュに接続できない'));
+        Cache::swap($cache);
+        $this->expectOnePasswordCheck('secret-pass');
+
+        $this->postJson('/api/worker/login', $this->loginPayload(['email' => 'nobody@example.com']))
+            ->assertUnprocessable()
+            ->assertExactJson(['message' => self::INVALID_CREDENTIALS_MESSAGE, 'errors' => ['email' => [self::INVALID_CREDENTIALS_MESSAGE]]]);
+
+        Exceptions::assertReported(fn (RuntimeException $e) => $e->getMessage() === 'キャッシュに接続できない');
+    }
+
+    public function test_ログインに成功すると古い設定のハッシュを今の設定で作り直す(): void
+    {
+        $worker = $this->prepareLogin();
+        // 今の設定（テストはコスト 4）と違うコストで作ったハッシュ（コストを上げる前に登録したワーカー）
+        $old = password_hash('secret-pass', PASSWORD_BCRYPT, ['cost' => (int) config('hashing.bcrypt.rounds') + 1]);
+        DB::table('workers')->where('id', $worker->id)->update(['password' => $old]);
+        $this->assertTrue(Hash::needsRehash($old));
+
+        $this->postJson('/api/worker/login', $this->loginPayload())->assertOk();
+
+        $rehashed = CurrentCompany::runAs($this->company->id, fn () => $worker->fresh()->password);
+        $this->assertNotSame($old, $rehashed);
+        $this->assertFalse(Hash::needsRehash($rehashed));
+        $this->assertTrue(Hash::check('secret-pass', $rehashed));
+
+        // 失敗では作り直さない
+        DB::table('workers')->where('id', $worker->id)->update(['password' => $old]);
+        $this->postJson('/api/worker/login', $this->loginPayload(['password' => 'wrong-pass']))->assertUnprocessable();
+        $this->assertSame($old, DB::table('workers')->where('id', $worker->id)->value('password'));
+    }
+
+    public function test_ログインの入力は255文字までで文字列でないと422(): void
+    {
+        Sleep::fake();
+        Context::forget('company_id');
+
+        $this->postJson('/api/worker/login', $this->loginPayload([
+            'company_code' => str_repeat('A', 256),
+            'email' => str_repeat('a', 244).'@example.com',
+            'password' => str_repeat('p', 256),
+            'device_name' => str_repeat('d', 256),
+        ]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['company_code', 'email', 'password', 'device_name']);
+
+        $this->postJson('/api/worker/login', $this->loginPayload(['company_code' => ['SMPK23'], 'email' => ['taro@example.com']]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['company_code', 'email']);
+
+        // 検証で弾いたものはサービスまで届かない（Timebox で待たない）
+        Sleep::assertNeverSlept();
+        $this->assertDatabaseCount('personal_access_tokens', 0);
+    }
+
+    /**
+     * 次のログインで、パスワードの照合（Hash::check）がちょうど 1 回、入力のパスワードと本物の形のハッシュで行われることを期待する。
+     * ワーカーが見つからない・未登録でも照合を飛ばさない（飛ばすと応答が速くなり、アカウントの有無が時間で分かる）ことを、時間を測らずに確かめる。
+     * 照合そのものは本物のハッシャーに任せる（Mockery の proxied partial。ほかのメソッドも本物へ）。
+     * 1 つのテストで何度呼んでも、包むのは最初の本物のハッシャー（モックをモックで包まない）。期待はモックごとに検証される
+     */
+    private function expectOnePasswordCheck(string $password): void
+    {
+        $real = $this->realHasher ??= $this->app->make('hash');
+        $mock = Mockery::mock($real);
+        $mock->shouldReceive('check')
+            ->once()
+            ->withArgs(fn ($value, $hashed) => $value === $password && is_string($hashed) && password_get_info($hashed)['algoName'] !== 'unknown')
+            ->andReturnUsing(fn (...$args) => $real->check(...$args));
+        Hash::swap($mock);
+    }
+
+    /**
+     * ログインのテストの準備: Timebox の待ちを Sleep::fake() で止め、自社を「株式会社サンプル / SMPK23」にし、
+     * taro@example.com（山田 太郎）のワーカーを作って、企業が空の状態（本番のリクエストの始まり）にする。
+     * 登録済みならパスワードは secret-pass。registered: false なら未登録（招待だけ）のワーカー
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    private function prepareLogin(array $attributes = [], bool $registered = true): Worker
+    {
+        Sleep::fake();
+        $this->company->forceFill(['name' => '株式会社サンプル', 'code' => 'SMPK23'])->save();
+        $email = $attributes['email'] ?? 'taro@example.com';
+        $worker = $registered
+            ? $this->registeredWorker(['name' => '山田 太郎', 'email' => $email, 'password' => 'secret-pass'] + $attributes)
+            : $this->invitedWorker($email, attributes: $attributes);
+        Context::forget('company_id');
+
+        return $worker;
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    private function loginPayload(array $overrides = []): array
+    {
+        return array_merge([
+            'company_code' => 'SMPK23',
+            'email' => 'taro@example.com',
+            'password' => 'secret-pass',
+            'device_name' => 'iPhone 16',
+        ], $overrides);
     }
 
     /**

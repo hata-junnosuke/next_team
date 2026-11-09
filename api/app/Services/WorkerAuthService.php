@@ -4,11 +4,18 @@ namespace App\Services;
 
 use App\Exceptions\DomainException;
 use App\Http\Middleware\AuthenticateWorker;
+use App\Models\Company;
 use App\Models\Worker;
 use App\Models\WorkerInvitation;
 use App\Support\CurrentCompany;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+use Illuminate\Support\Timebox;
+use Throwable;
 
 /**
  * ワーカーの認証（F-28・F-29。docs/01 の 4.5・5.3）。Fortify を通さず、Sanctum の公式手順（モバイルアプリケーション認証）で書く。
@@ -26,6 +33,17 @@ class WorkerAuthService
      * （WorkerService::update() の重なりの 422 もこの定数を使う。文言はこの 1 か所）
      */
     public const EMAIL_TAKEN = 'このメールアドレスは、この企業の別のワーカーのログインに使われています。';
+
+    /** ログインの失敗（企業コード・メール・パスワードのどれが誤りか、未登録かを区別しない。アカウントの有無を明かさない） */
+    public const INVALID_CREDENTIALS = '企業コード・メールアドレス・パスワードのいずれかが正しくありません。';
+
+    /**
+     * ログインの判定にかける最短の時間（マイクロ秒）。管理者のログイン（SessionGuard の Timebox）と同じ 200 ミリ秒。
+     * 本番のコスト（BCRYPT_ROUNDS=12）では照合だけで 200 ミリ秒を超えるので、Timebox は待たない。
+     * 時間をそろえているのは、どの道（見つからない・未登録・パスワード誤り・無効・成功）も「パスワードの照合 1 回」と
+     * 「ダミーのハッシュのキャッシュの読み取り 1 回」にしていること。Timebox は照合が速い設定（テストのコスト 4 など）での下限
+     */
+    private const LOGIN_TIMEBOX_MICROSECONDS = 200_000;
 
     /**
      * 初回登録（F-28）。判定の順と文言は docs/01 の 4.5 のとおり:
@@ -58,6 +76,59 @@ class WorkerAuthService
                 fn () => $this->registerInCompany($found, $email, $password, $deviceName),
             );
         });
+    }
+
+    /**
+     * ログイン（F-29。docs/01 の 4.5）。企業コードを大文字に直して Company を引き（企業にはスコープがない）、
+     * CurrentCompany::runAs() でその企業のワーカーを login_email（小文字）で引いて Hash::check() → createToken()。
+     * 判定の順: 企業・ワーカー・登録済み・パスワードのどれかが合わない → INVALID_CREDENTIALS。合ったうえで無効 → 無効の文言
+     * （無効かどうかはパスワードを知っている人にだけ答える）。
+     *
+     * 応答時間でアカウントの有無が分からないように、全体を Timebox で包み（Fortify の attempt() と同じ守り）、
+     * 見つからない・未登録のときもダミーのハッシュで Hash::check() を 1 回呼ぶ。早く返すのは成功のときだけ。
+     * Timebox は早く返すかの状態（earlyReturn）を持つので、呼ぶたびに作る（使い回すと前の成功の状態が残る）。
+     * https://readouble.com/laravel/13.x/ja/helpers.html#timebox
+     *
+     * @return array{worker: Worker, token: string}
+     */
+    public function login(string $companyCode, string $email, string $password, string $deviceName): array
+    {
+        return (new Timebox)->call(function (Timebox $timebox) use ($companyCode, $email, $password, $deviceName) {
+            $company = Company::query()->where('code', mb_strtoupper($companyCode))->first();
+
+            // ワーカーのスコープは外さない。企業コードで決めた企業として引く
+            $worker = $company === null ? null : CurrentCompany::runAs(
+                $company->id,
+                fn () => Worker::query()
+                    ->where('login_email', Worker::normalizeLoginEmail($email))
+                    ->whereNotNull('registered_at')
+                    ->first(),
+            );
+
+            // 見つからない・未登録（password が NULL）でも照合を飛ばさない（飛ばすと速く返り、時間でアカウントの有無が分かる）。
+            // ダミーのハッシュは使うかどうかに関係なく毎回キャッシュから読む（読み取りを見つからない道だけにすると、
+            // キャッシュが遅い・落ちているときにその道だけ遅くなって分かる）。この道で Hash::make() は呼ばない（作る時間の分だけ遅くなる）
+            $dummy = $this->dummyHash();
+            $hash = $worker?->password ?? $dummy;
+            if (! Hash::check($password, $hash) || $worker === null || $worker->password === null) {
+                throw new DomainException(self::INVALID_CREDENTIALS, 'email');
+            }
+
+            if (! $worker->is_active) {
+                throw new DomainException(AuthenticateWorker::DISABLED_MESSAGE, 'email');
+            }
+
+            // コストを上げた後も、古いハッシュの照合の時間がダミー（今の設定）とずれないよう、成功したら今の設定で作り直す
+            // （管理者のログインの SessionGuard::rehashPasswordIfRequired() と同じ。password は hashed cast がハッシュにする）
+            if (Hash::needsRehash($worker->password)) {
+                $worker->forceFill(['password' => $password])->save();
+            }
+
+            $token = $this->issueToken($worker, $deviceName);
+            $timebox->returnEarly();
+
+            return ['worker' => $worker->load('company'), 'token' => $token];
+        }, self::LOGIN_TIMEBOX_MICROSECONDS);
     }
 
     /**
@@ -122,13 +193,55 @@ class WorkerAuthService
             throw new DomainException(self::EMAIL_TAKEN, 'email');
         }
 
-        // 能力は worker ちょうど（worker ミドルウェアが tokenCan('worker') を確かめる）。期限は設定の日数後（期限なしを出さない）
-        $token = $worker->createToken(
+        $token = $this->issueToken($worker, $deviceName);
+
+        return ['worker' => $worker->load('company'), 'token' => $token];
+    }
+
+    /**
+     * トークンを発行して平文を返す（初回登録とログインの 2 か所から。発行はこのサービスだけ）。
+     * 能力は worker ちょうど（worker ミドルウェアが tokenCan('worker') を確かめる）。期限は設定の日数後（期限なしを出さない）
+     */
+    private function issueToken(Worker $worker, string $deviceName): string
+    {
+        return $worker->createToken(
             $deviceName,
             ['worker'],
             now()->addDays((int) config('myteam.worker_token_days')),
         )->plainTextToken;
+    }
 
-        return ['worker' => $worker->load('company'), 'token' => $token];
+    /**
+     * ダミーのハッシュを置くキャッシュのキー。ハッシュのドライバと設定（bcrypt はコスト、argon はメモリ・時間・スレッド）を含める。
+     * 設定を変えたら別のキーになり、古い設定のダミー（照合の時間が本物とずれる）を使わない。
+     * 企業のデータではない（全社で共通の照合用の値）ので企業ID は含めない
+     */
+    public static function dummyHashCacheKey(): string
+    {
+        $driver = (string) config('hashing.driver');
+        $options = Arr::only((array) config("hashing.{$driver}", []), ['rounds', 'memory', 'time', 'threads']);
+
+        return 'worker-login:dummy-hash:'.$driver.':'.implode('-', $options);
+    }
+
+    /**
+     * 照合用のダミーのハッシュ。今のハッシャーの設定（アルゴリズム・コスト）で作るので、本物の照合と同じだけ時間がかかる。
+     * 元の文字列は捨てるので、どの入力とも合わない。
+     * 本番（PHP-FPM）はリクエストごとにプロセスの static が消えるので、キャッシュに置いて作るのは最初の 1 回だけにする。
+     * キャッシュが使えないとき（接続の失敗など）は、その場で作ってログインを続け、例外は報告する（ログインを 500 で止めない）。
+     * login() はどの道でもこれを 1 回呼ぶので、障害の間も読み取りの待ちとその場の作成はすべての道で同じだけかかる（障害は報告で気づける）
+     * https://readouble.com/laravel/13.x/ja/cache.html#retrieve-store
+     */
+    private function dummyHash(): string
+    {
+        $make = fn (): string => Hash::make(Str::random(40));
+
+        try {
+            return Cache::rememberForever(self::dummyHashCacheKey(), $make);
+        } catch (Throwable $e) {
+            report($e);
+
+            return $make();
+        }
     }
 }
