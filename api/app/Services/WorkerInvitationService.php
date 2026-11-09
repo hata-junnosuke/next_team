@@ -30,6 +30,7 @@ class WorkerInvitationService
             // ルートモデルバインディングで読んだ値は古いことがある（直前に無効化・初回登録された等）ので、ロックして読み直す
             $worker = Worker::query()->lockForUpdate()->findOrFail($worker->id);
 
+            // Worker::canBeInvited()（WorkerResource の can.invite）と同じ条件。理由ごとに文言を分けるので if で書く。条件を変えるときは両方を直す
             if (! $worker->is_active) {
                 throw new DomainException('無効のワーカーには招待を送れません。');
             }

@@ -36,7 +36,11 @@ Route::middleware(['auth:sanctum', 'company'])->group(function () {
     Route::apiResource('workers', WorkerController::class)->except(['destroy']);
     Route::patch('/workers/{worker}/active', [WorkerController::class, 'toggleActive'])->name('workers.active');
     // F-27 招待の送り直し（ワーカー Step 5。docs/01 の 6.3）
-    Route::post('/workers/{worker}/invitation', [WorkerController::class, 'invite'])->name('workers.invitation');
+    // 送り直しは同じワーカーに 1 分 1 回（AppServiceProvider の RateLimiter::for('worker-invitation')。issue #37 の決定 Q5）
+    Route::post('/workers/{worker}/invitation', [WorkerController::class, 'invite'])
+        ->middleware('throttle:worker-invitation')
+        ->whereNumber('worker') // 回数の枠のキーを ID の数字にそろえる（007 と 7 を別の枠にしない）
+        ->name('workers.invitation');
 
     // F-05〜F-08 募集（担当 B）。削除はしない（中止）。パラメータ名は {job_posting}
     Route::apiResource('job-postings', JobPostingController::class)->except(['destroy']);

@@ -9,6 +9,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Routing\Exceptions\InvalidSignatureException;
 use Illuminate\Routing\Middleware\SubstituteBindings;
+use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Session\TokenMismatchException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -36,7 +37,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // 「認証の後・バインディングの前」になる。これがないと他社 ID が 404 にならず LogicException の 500 になる
         // https://readouble.com/laravel/13.x/ja/middleware.html#sorting-middleware
         // worker（AuthenticateWorker）も同じ理由で、auth:worker の後・SubstituteBindings の前に置く
-        $middleware->prependToPriorityList(before: SubstituteBindings::class, prepend: SetCurrentCompany::class);
+        // さらに throttle のキーが CurrentCompany を使う（worker-invitation）ので、企業は throttle（ThrottleRequests）より前に決める。
+        // 既定の優先順位で ThrottleRequests は認証と SubstituteBindings の間にあるので、認証の後・バインディングの前なのは変わらない
+        $middleware->prependToPriorityList(before: ThrottleRequests::class, prepend: SetCurrentCompany::class);
         $middleware->prependToPriorityList(before: SubstituteBindings::class, prepend: AuthenticateWorker::class);
 
         // 未ログイン時にリダイレクト先を作らない（JSON API 専用。ログイン画面は web 側にある）。

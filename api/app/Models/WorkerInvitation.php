@@ -6,6 +6,7 @@ use App\Models\Concerns\BelongsToCompany;
 use Database\Factories\WorkerInvitationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -60,13 +61,28 @@ class WorkerInvitation extends Model
     }
 
     /**
-     * 使える招待か（未使用・未取消・期限が未来）。判定はこの 1 箇所に置く（docs/01 の 3.2）
+     * 使える招待か（未使用・未取消・期限が未来。docs/01 の 3.2）。1 件のモデルを PHP で判定する側。
+     * SQL 側は scopeUsable()。条件を変えるときは両方を直す
      */
     public function isUsable(): bool
     {
         return $this->used_at === null
             && $this->revoked_at === null
             && $this->expires_at->isFuture();
+    }
+
+    /**
+     * 使える招待に絞る（未使用・未取消・期限が未来）。isUsable() と同じ条件を SQL で書いたもの。条件を変えるときは両方を直す。
+     * Rails の scope :usable に相当し、WorkerInvitation::query()->usable() や Worker::usableInvitation() の ofMany から使う。
+     * https://readouble.com/laravel/13.x/ja/eloquent.html#local-scopes
+     *
+     * @param  Builder<WorkerInvitation>  $query
+     */
+    public function scopeUsable(Builder $query): void
+    {
+        $query->whereNull($query->qualifyColumn('used_at'))
+            ->whereNull($query->qualifyColumn('revoked_at'))
+            ->where($query->qualifyColumn('expires_at'), '>', now());
     }
 
     /**

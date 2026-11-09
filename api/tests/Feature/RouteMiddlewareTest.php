@@ -44,6 +44,33 @@ class RouteMiddlewareTest extends TestCase
         }
     }
 
+    public function test_管理者のapiで試行回数の制限が付くのは招待の送り直しだけ(): void
+    {
+        // 送り直しは同じワーカーに 1 分 1 回（issue #37 の決定 Q5）。ほかの管理者のルートには付けない
+        $limited = ['POST api/workers/{worker}/invitation' => 'throttle:worker-invitation'];
+        $seen = [];
+
+        $apiRoutes = collect(Route::getRoutes()->getRoutes())
+            ->filter(fn (RoutingRoute $route) => str_starts_with($route->uri(), 'api/'))
+            ->reject(fn (RoutingRoute $route) => str_starts_with($route->uri(), 'api/worker/'));
+
+        foreach ($apiRoutes as $route) {
+            $label = collect($route->methods())->reject(fn (string $method) => $method === 'HEAD')->first().' '.$route->uri();
+            $throttles = array_values(array_filter($route->gatherMiddleware(), fn ($name) => is_string($name) && str_starts_with($name, 'throttle:')));
+
+            if (array_key_exists($label, $limited)) {
+                $seen[] = $label;
+                $this->assertSame([$limited[$label]], $throttles, "{$label} の試行回数の制限が違う");
+
+                continue;
+            }
+
+            $this->assertSame([], $throttles, "{$label} に試行回数の制限が付いている");
+        }
+
+        $this->assertSame(array_keys($limited), $seen, '招待の送り直しのルートがない');
+    }
+
     public function test_ワーカーのapiの全ルートにauth_workerとworkerが付き登録とログインだけが試行回数の制限つき(): void
     {
         $workerRoutes = collect(Route::getRoutes()->getRoutes())
@@ -61,7 +88,7 @@ class RouteMiddlewareTest extends TestCase
         foreach ($workerRoutes as $route) {
             $middleware = $route->gatherMiddleware();
             $label = collect($route->methods())->reject(fn (string $method) => $method === 'HEAD')->first().' '.$route->uri();
-            $throttles = array_values(array_filter($middleware, fn (string $name) => str_starts_with($name, 'throttle:')));
+            $throttles = array_values(array_filter($middleware, fn ($name) => is_string($name) && str_starts_with($name, 'throttle:')));
 
             if (array_key_exists($label, $public)) {
                 $seenPublic[] = $label;

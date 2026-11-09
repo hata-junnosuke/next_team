@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Models\Worker;
 use App\Models\WorkerInvitation;
 use App\Observers\DashboardCacheObserver;
+use App\Support\CurrentCompany;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
@@ -77,6 +78,21 @@ class AppServiceProvider extends ServiceProvider
             mb_strtoupper(self::stringInput($request, 'company_code')).'|'
             .mb_strtolower(self::stringInput($request, 'email')).'|'.$request->ip()
         ));
+
+        // 招待の送り直し（F-27。POST /api/workers/{worker}/invitation）の回数。同じワーカーに 1 分 1 回、超えたら 429。
+        // 管理者の連打や誤操作でワーカーにメールが何通も届かないようにする（issue #37 の決定 Q5）。
+        // キーは企業とワーカー（company_id:worker_id）。別のワーカーなら続けて送れる。
+        // 優先順により、いつも company の後・ルートモデルバインディングの前に動く（bootstrap/app.php）ので、{worker} は URL の文字列。
+        // ルートの whereNumber('worker') で数字だけにし、(int) で 007 と 7 を同じ枠にそろえる。
+        // 429 の本文は共通（bootstrap/app.php の ThrottleRequestsException。ログインの文言）ではなく送り直し用にする。
+        // Retry-After などのヘッダは渡されたものをそのまま付ける
+        // https://readouble.com/laravel/13.x/ja/routing.html#defining-rate-limiters
+        RateLimiter::for('worker-invitation', fn (Request $request) => Limit::perMinute(1)
+            ->by(CurrentCompany::id().':'.(int) $request->route('worker'))
+            ->response(fn (Request $request, array $headers) => response()->json([
+                'message' => '招待は同じワーカーに 1 分に 1 回まで送れます。しばらくしてからお試しください。',
+                'errors' => (object) [],
+            ], 429, $headers)));
 
         // ダッシュボードのキャッシュの破棄（F-19）。応募・募集・拠点が保存・削除されたらコミット後に消す。
         // 拠点は location_name を表示しているため（名前を変えても最長 5 分古いままにしない。リードの決定）。

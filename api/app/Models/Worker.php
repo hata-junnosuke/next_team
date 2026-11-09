@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 
@@ -69,6 +70,31 @@ class Worker extends Authenticatable
     public function invitations(): HasMany
     {
         return $this->hasMany(WorkerInvitation::class);
+    }
+
+    /**
+     * 今使える招待（未使用・未取消・期限が未来。条件は WorkerInvitation::scopeUsable()）。
+     * 発行のたびに前の招待を取り消すので普通は 0 か 1 件。念のため一番新しいもの（id の最大）を 1 件にする。
+     * 一覧では with('usableInvitation') で先読みする（N+1 にしない）。Rails の has_one + scope の先読み（includes）に相当。
+     * https://readouble.com/laravel/13.x/ja/eloquent-relationships.html#advanced-has-one-of-many-relationships
+     *
+     * @return HasOne<WorkerInvitation, $this>
+     */
+    public function usableInvitation(): HasOne
+    {
+        return $this->hasOne(WorkerInvitation::class)->ofMany(['id' => 'max'], function (Builder $query) {
+            $query->usable();
+        });
+    }
+
+    /**
+     * 招待を送れるか（未登録かつ有効）。WorkerResource の can.invite が使う。
+     * WorkerInvitationService::issue() のガードと同じ条件（サービスは理由ごとに文言を分けて投げるので if のまま）。
+     * 条件を変えるときは両方を直す
+     */
+    public function canBeInvited(): bool
+    {
+        return $this->registered_at === null && $this->is_active;
     }
 
     /**

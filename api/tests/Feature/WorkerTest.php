@@ -6,6 +6,7 @@ use App\Enums\ApplicationStatus;
 use App\Models\Application;
 use App\Models\Company;
 use App\Models\Worker;
+use App\Models\WorkerInvitation;
 use App\Support\CurrentCompany;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\DB;
@@ -13,7 +14,7 @@ use Tests\TestCase;
 
 /**
  * F-02〜F-04 ワーカーの登録・編集・有効/無効・一覧と検索（docs/01 のワーカーの API）。
- * WorkerResource: {id, name, email, phone, is_active}
+ * WorkerResource: {id, name, email, phone, is_active, registered_at, invitation_expires_at, can: {invite}}
  */
 class WorkerTest extends TestCase
 {
@@ -30,6 +31,9 @@ class WorkerTest extends TestCase
             'email' => 'yamada@example.com',
             'phone' => '090-1234-5678',
             'is_active' => true,
+            'registered_at' => null,
+            'invitation_expires_at' => WorkerInvitation::query()->sole()->expires_at->toIso8601String(),
+            'can' => ['invite' => true],
         ]]);
 
         $this->assertDatabaseHas('workers', ['id' => $id, 'company_id' => $this->company->id, 'is_active' => true]);
@@ -97,6 +101,9 @@ class WorkerTest extends TestCase
                 'email' => $worker->email,
                 'phone' => null,
                 'is_active' => true,
+                'registered_at' => null,
+                'invitation_expires_at' => null,
+                'can' => ['invite' => true],
             ]]);
     }
 
@@ -180,7 +187,7 @@ class WorkerTest extends TestCase
             ->assertJsonPath('meta.total', 5)
             ->assertJsonPath('meta.last_page', 3)
             ->assertJsonPath('meta.per_page', 2)
-            ->assertJsonStructure(['data' => [['id', 'name', 'email', 'phone', 'is_active']], 'links']);
+            ->assertJsonStructure(['data' => [['id', 'name', 'email', 'phone', 'is_active', 'registered_at', 'invitation_expires_at', 'can' => ['invite']]], 'links']);
 
         $this->assertSame(array_slice($ids, 0, 2), array_column($response->json('data'), 'id'));
     }
@@ -347,21 +354,190 @@ class WorkerTest extends TestCase
 
     public function test_更新と切り替えの応答はworker_resourceの形そのもの(): void
     {
+        $this->freezeSecond(); // datetime 列は秒までなので、期待値の日時も秒にそろえる
         // 電話番号は Faker の optional で入ったり入らなかったりするので、期待値の null に固定する
         $worker = Worker::factory()->create(['phone' => null]);
+        $invitation = WorkerInvitation::factory()->create(['worker_id' => $worker->id, 'expires_at' => now()->addDays(3)]);
+        $expiresAt = $invitation->expires_at->toIso8601String();
 
         $this->actingAsAdmin()
             ->putJson("/api/workers/{$worker->id}", ['name' => '新氏名', 'email' => 'new@example.com'])
             ->assertOk()
             ->assertExactJson(['data' => [
                 'id' => $worker->id, 'name' => '新氏名', 'email' => 'new@example.com', 'phone' => null, 'is_active' => true,
+                'registered_at' => null, 'invitation_expires_at' => $expiresAt, 'can' => ['invite' => true],
             ]]);
 
+        // 無効にすると招待はできなくなる（使える招待の期限はそのまま出す）
         $this->patchJson("/api/workers/{$worker->id}/active", ['is_active' => false])
             ->assertOk()
             ->assertExactJson(['data' => [
                 'id' => $worker->id, 'name' => '新氏名', 'email' => 'new@example.com', 'phone' => null, 'is_active' => false,
+                'registered_at' => null, 'invitation_expires_at' => $expiresAt, 'can' => ['invite' => false],
             ]]);
+    }
+
+    public function test_ワーカーの応答に登録日時と招待の期限と招待できるかが入る(): void
+    {
+        $this->freezeSecond();
+
+        // 未登録・有効・使える招待あり（前の取り消し済み・期限切れの招待は期限に出さない）
+        $invited = Worker::factory()->create(['phone' => null]);
+        WorkerInvitation::factory()->revoked()->create(['worker_id' => $invited->id, 'expires_at' => now()->addDays(9)]);
+        WorkerInvitation::factory()->expired()->create(['worker_id' => $invited->id]);
+        $usable = WorkerInvitation::factory()->create(['worker_id' => $invited->id, 'expires_at' => now()->addDays(5)]);
+
+        // 未登録・有効・使える招待なし（期限切れだけ）
+        $expired = Worker::factory()->create();
+        WorkerInvitation::factory()->expired()->create(['worker_id' => $expired->id]);
+
+        // 登録済み（招待は使用済み）
+        $registered = Worker::factory()->registered()->create(['registered_at' => now()->subDay()]);
+        WorkerInvitation::factory()->used()->create(['worker_id' => $registered->id]);
+
+        // 未登録・無効
+        $inactive = Worker::factory()->inactive()->create();
+
+        $this->actingAsAdmin();
+
+        $this->getJson("/api/workers/{$invited->id}")
+            ->assertOk()
+            ->assertJsonPath('data.registered_at', null)
+            ->assertJsonPath('data.invitation_expires_at', $usable->expires_at->toIso8601String())
+            ->assertJsonPath('data.can.invite', true);
+
+        $this->getJson("/api/workers/{$expired->id}")
+            ->assertOk()
+            ->assertJsonPath('data.invitation_expires_at', null)
+            ->assertJsonPath('data.can.invite', true);
+
+        $this->getJson("/api/workers/{$registered->id}")
+            ->assertOk()
+            ->assertJsonPath('data.registered_at', now()->subDay()->toIso8601String())
+            ->assertJsonPath('data.invitation_expires_at', null)
+            ->assertJsonPath('data.can.invite', false);
+
+        $this->getJson("/api/workers/{$inactive->id}")
+            ->assertOk()
+            ->assertJsonPath('data.registered_at', null)
+            ->assertJsonPath('data.can.invite', false);
+
+        // 一覧も同じ形
+        $rows = collect($this->getJson('/api/workers')->assertOk()->json('data'))->keyBy('id');
+        $this->assertSame($usable->expires_at->toIso8601String(), $rows[$invited->id]['invitation_expires_at']);
+        $this->assertNull($rows[$expired->id]['invitation_expires_at']);
+        $this->assertSame(['invite' => false], $rows[$registered->id]['can']);
+        $this->assertSame(['invite' => false], $rows[$inactive->id]['can']);
+    }
+
+    public function test_can_inviteは未登録かつ有効のときだけtrue(): void
+    {
+        $cases = [
+            'unregistered_active' => [Worker::factory()->create(), true],
+            'unregistered_inactive' => [Worker::factory()->inactive()->create(), false],
+            'registered_active' => [Worker::factory()->registered()->create(), false],
+            'registered_inactive' => [Worker::factory()->registered()->inactive()->create(), false],
+        ];
+
+        $this->actingAsAdmin();
+        $rows = collect($this->getJson('/api/workers')->assertOk()->json('data'))->keyBy('id');
+
+        foreach ($cases as $label => [$worker, $expected]) {
+            $this->getJson("/api/workers/{$worker->id}")
+                ->assertOk()
+                ->assertJsonPath('data.can.invite', $expected);
+            $this->assertSame(['invite' => $expected], $rows[$worker->id]['can'], $label);
+        }
+    }
+
+    public function test_招待の期限ちょうどの招待は使えないものとして期限に出さない(): void
+    {
+        $this->freezeSecond();
+        $atLimit = Worker::factory()->create();
+        WorkerInvitation::factory()->create(['worker_id' => $atLimit->id, 'expires_at' => now()]);
+        $oneSecondLeft = Worker::factory()->create();
+        WorkerInvitation::factory()->create(['worker_id' => $oneSecondLeft->id, 'expires_at' => now()->addSecond()]);
+
+        $this->actingAsAdmin();
+        $this->getJson("/api/workers/{$atLimit->id}")->assertOk()->assertJsonPath('data.invitation_expires_at', null);
+        $this->getJson("/api/workers/{$oneSecondLeft->id}")
+            ->assertOk()
+            ->assertJsonPath('data.invitation_expires_at', now()->addSecond()->toIso8601String());
+
+        $rows = collect($this->getJson('/api/workers')->assertOk()->json('data'))->keyBy('id');
+        $this->assertNull($rows[$atLimit->id]['invitation_expires_at']);
+        $this->assertSame(now()->addSecond()->toIso8601String(), $rows[$oneSecondLeft->id]['invitation_expires_at']);
+    }
+
+    public function test_使用済みの招待だけの未登録ワーカーは期限がnullで招待できる(): void
+    {
+        $worker = Worker::factory()->create();
+        WorkerInvitation::factory()->used()->create(['worker_id' => $worker->id, 'expires_at' => now()->addDays(5)]);
+
+        $this->actingAsAdmin()->getJson("/api/workers/{$worker->id}")
+            ->assertOk()
+            ->assertJsonPath('data.invitation_expires_at', null)
+            ->assertJsonPath('data.can.invite', true);
+    }
+
+    public function test_使える招待が複数あれば一番新しい招待の期限を出す(): void
+    {
+        $this->freezeSecond();
+        // サービスを通せば 1 件にそろうが、念のため id の最大を選ぶ。古い方の期限を遅くして「期限の最大」ではないことも確かめる
+        $worker = Worker::factory()->create();
+        WorkerInvitation::factory()->create(['worker_id' => $worker->id, 'expires_at' => now()->addDays(9)]);
+        $latest = WorkerInvitation::factory()->create(['worker_id' => $worker->id, 'expires_at' => now()->addDays(2)]);
+        // 一番新しい行が使えないなら、その前の使える招待（ここでは $latest）を選ぶ
+        WorkerInvitation::factory()->revoked()->create(['worker_id' => $worker->id, 'expires_at' => now()->addDays(7)]);
+        $expected = $latest->expires_at->toIso8601String();
+
+        $this->actingAsAdmin();
+        $this->getJson("/api/workers/{$worker->id}")->assertOk()->assertJsonPath('data.invitation_expires_at', $expected);
+        $this->getJson('/api/workers')->assertOk()->assertJsonPath('data.0.invitation_expires_at', $expected);
+    }
+
+    public function test_他社のワーカーの招待の状態は詳細にも一覧にも出ない(): void
+    {
+        $this->freezeSecond();
+        $other = Company::factory()->create();
+        $theirs = CurrentCompany::runAs($other->id, function () {
+            $worker = Worker::factory()->create();
+            WorkerInvitation::factory()->create(['worker_id' => $worker->id, 'expires_at' => now()->addDays(4)]);
+
+            return $worker;
+        });
+        $mine = Worker::factory()->create();
+        Context::forget('company_id');
+
+        $this->actingAsAdmin()->getJson("/api/workers/{$theirs->id}")
+            ->assertNotFound()
+            ->assertExactJson(['message' => '見つかりませんでした。', 'errors' => []]);
+
+        $this->getJson('/api/workers')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $mine->id)
+            ->assertJsonPath('data.0.invitation_expires_at', null);
+    }
+
+    public function test_ワーカー一覧のクエリ数は件数に比例しない(): void
+    {
+        $makeInvited = fn () => WorkerInvitation::factory()->count(3)->create();
+        $makeInvited();
+        $this->actingAsAdmin()->getJson('/api/workers')->assertOk();   // 認証などの初回分を済ませる
+
+        DB::enableQueryLog();
+        $this->getJson('/api/workers')->assertOk()->assertJsonCount(3, 'data');
+        $few = count(DB::getQueryLog());
+
+        $makeInvited();
+        Worker::factory()->count(2)->create(); // 招待のないワーカーも混ぜる
+        DB::flushQueryLog();
+        $this->getJson('/api/workers')->assertOk()->assertJsonCount(8, 'data');
+        $many = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        $this->assertSame($few, $many);
     }
 
     public function test_無効にしても既存の確定と応募は変わらない(): void
@@ -540,26 +716,5 @@ class WorkerTest extends TestCase
             ->assertJsonPath('meta.total', 1);
 
         $this->getJson('/api/workers?is_active=1')->assertOk()->assertJsonCount(0, 'data');
-    }
-
-    public function test_ワーカー一覧のクエリ数は件数に比例しない(): void
-    {
-        $this->actingAsAdmin();
-        $count = function (): int {
-            DB::flushQueryLog();
-            DB::enableQueryLog();
-            $this->getJson('/api/workers')->assertOk();
-            $n = count(DB::getQueryLog());
-            DB::disableQueryLog();
-
-            return $n;
-        };
-
-        Worker::factory()->count(2)->create();
-        $few = $count();
-        Worker::factory()->count(10)->create();
-        $many = $count();
-
-        $this->assertSame($few, $many);
     }
 }

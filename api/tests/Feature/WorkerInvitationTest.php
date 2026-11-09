@@ -10,6 +10,7 @@ use App\Jobs\SendWorkerInvitationMail;
 use App\Mail\WorkerInvitationMail;
 use App\Models\Company;
 use App\Models\NotificationLog;
+use App\Models\User;
 use App\Models\Worker;
 use App\Models\WorkerInvitation;
 use App\Services\NotificationLogService;
@@ -27,6 +28,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Testing\TestResponse;
 use Symfony\Component\Mailer\Exception\TransportException;
 use Tests\TestCase;
 
@@ -739,6 +741,269 @@ class WorkerInvitationTest extends TestCase
         $b = (new SendWorkerInvitationMail(2))->middleware()[1];
 
         $this->assertNotSame($a->key, $b->key);
+    }
+
+    // ---- HTTP の入口（POST /api/workers・POST /api/workers/{worker}/invitation。T7） ----
+
+    public function test_ワーカーを登録すると招待のジョブが積まれ応答は送信を待たない(): void
+    {
+        Queue::fake();
+        Mail::fake();
+
+        $response = $this->actingAsAdmin()
+            ->postJson('/api/workers', ['name' => '山田太郎', 'email' => 'yamada@example.com', 'phone' => null])
+            ->assertCreated()
+            ->assertJsonPath('data.registered_at', null)
+            ->assertJsonPath('data.can.invite', true);
+
+        $worker = Worker::query()->sole();
+        $invitation = WorkerInvitation::query()->sole();
+        $this->assertSame($worker->id, $invitation->worker_id);
+        $this->assertTrue($invitation->isUsable());
+        $response->assertJsonPath('data.invitation_expires_at', $invitation->expires_at->toIso8601String());
+
+        // 積んだだけで、応答の時点ではまだ送っていない（送信はワーカーが mails キューで行う）
+        Queue::assertPushedOn('mails', SendWorkerInvitationMail::class, fn (SendWorkerInvitationMail $job) => $job->invitationId === $invitation->id);
+        Queue::assertCount(1);
+        Mail::assertNothingSent();
+        $this->assertSame(0, NotificationLog::query()->count());
+    }
+
+    public function test_登録が検証で落ちると招待は作られず積まれない(): void
+    {
+        Queue::fake();
+
+        $this->actingAsAdmin()
+            ->postJson('/api/workers', ['name' => '山田太郎', 'email' => ''])
+            ->assertUnprocessable();
+
+        $this->assertSame(0, WorkerInvitation::query()->count());
+        Queue::assertNothingPushed();
+    }
+
+    public function test_送り直しのapiで新しい招待が積まれ前のコードは使えなくなる(): void
+    {
+        Queue::fake();
+        $this->freezeSecond();
+        $worker = Worker::factory()->create(['name' => '山田太郎', 'email' => 'yamada@example.com', 'phone' => null]);
+        $first = $this->service()->issue($worker);
+        $firstCode = $first->fresh()->code;
+
+        $response = $this->actingAsAdmin()
+            ->postJson("/api/workers/{$worker->id}/invitation")
+            ->assertOk();
+
+        $second = WorkerInvitation::query()->where('id', '!=', $first->id)->sole();
+        $response->assertExactJson(['data' => [
+            'id' => $worker->id,
+            'name' => '山田太郎',
+            'email' => 'yamada@example.com',
+            'phone' => null,
+            'is_active' => true,
+            'registered_at' => null,
+            'invitation_expires_at' => $second->expires_at->toIso8601String(),
+            'can' => ['invite' => true],
+        ]]);
+
+        // 前のコードでは引けても使えない（取り消し・code は NULL）。使えるのは新しい招待だけ
+        $previous = WorkerInvitation::query()->where('code_hash', WorkerInvitation::hashCode($firstCode))->sole();
+        $this->assertSame($first->id, $previous->id);
+        $this->assertFalse($previous->isUsable());
+        $this->assertNull($previous->code);
+        $this->assertTrue($second->isUsable());
+
+        Queue::assertPushed(SendWorkerInvitationMail::class, fn (SendWorkerInvitationMail $job) => $job->invitationId === $second->id);
+        Queue::assertPushed(SendWorkerInvitationMail::class, 2);
+    }
+
+    public function test_無効のワーカーへの送り直しは422(): void
+    {
+        Queue::fake();
+        $worker = Worker::factory()->inactive()->create();
+
+        $this->actingAsAdmin()
+            ->postJson("/api/workers/{$worker->id}/invitation")
+            ->assertUnprocessable()
+            ->assertExactJson(['message' => '無効のワーカーには招待を送れません。', 'errors' => []]);
+
+        $this->assertSame(0, WorkerInvitation::query()->count());
+        Queue::assertNothingPushed();
+    }
+
+    public function test_登録済みのワーカーへの送り直しは422(): void
+    {
+        Queue::fake();
+        $worker = Worker::factory()->registered()->create();
+
+        $this->actingAsAdmin()
+            ->postJson("/api/workers/{$worker->id}/invitation")
+            ->assertUnprocessable()
+            ->assertExactJson(['message' => 'このワーカーはすでに初回登録を済ませています。', 'errors' => []]);
+
+        $this->assertSame(0, WorkerInvitation::query()->count());
+        Queue::assertNothingPushed();
+    }
+
+    public function test_他社のワーカーへの送り直しは404(): void
+    {
+        Queue::fake();
+        $other = Company::factory()->create();
+        $theirs = CurrentCompany::runAs($other->id, fn () => Worker::factory()->create());
+
+        // 本番のリクエストは CurrentCompany が空の状態で始まる。setUp で入れた値に助けられないよう消してから叩く
+        Context::forget('company_id');
+
+        $this->actingAsAdmin()
+            ->postJson("/api/workers/{$theirs->id}/invitation")
+            ->assertNotFound()
+            ->assertExactJson(['message' => '見つかりませんでした。', 'errors' => []]);
+
+        $this->assertSame(0, DB::table('worker_invitations')->count());
+        Queue::assertNothingPushed();
+    }
+
+    public function test_未ログインだと送り直しは401(): void
+    {
+        Queue::fake();
+        $worker = Worker::factory()->create();
+        Context::forget('company_id');
+
+        $this->postJson("/api/workers/{$worker->id}/invitation")->assertUnauthorized();
+
+        $this->assertSame(0, DB::table('worker_invitations')->count());
+        Queue::assertNothingPushed();
+    }
+
+    public function test_登録で招待の発行が失敗するとワーカーも招待も残らずジョブも積まれない(): void
+    {
+        Queue::fake();
+        // 招待コードが毎回重なるようにして、登録と同じトランザクションの中の発行を失敗させる
+        $counter = $this->collideNextInserts(PHP_INT_MAX);
+        $before = DB::table('worker_invitations')->count(); // 重なりを作るために置いた他社の招待 1 件
+
+        $this->actingAsAdmin()
+            ->postJson('/api/workers', ['name' => '山田太郎', 'email' => 'yamada@example.com'])
+            ->assertStatus(500);
+
+        $this->assertSame(5, $counter['attempts']);
+        $this->assertSame(0, DB::table('workers')->where('company_id', $this->company->id)->count());
+        $this->assertSame($before, DB::table('worker_invitations')->count());
+        Queue::assertNothingPushed();
+    }
+
+    public function test_期限切れの招待だけのワーカーにも送り直せて応答に新しい期限が出る(): void
+    {
+        Queue::fake();
+        $this->freezeSecond();
+        $worker = Worker::factory()->create();
+        $expired = WorkerInvitation::factory()->expired()->create(['worker_id' => $worker->id]);
+
+        $this->actingAsAdmin()
+            ->postJson("/api/workers/{$worker->id}/invitation")
+            ->assertOk()
+            ->assertJsonPath('data.invitation_expires_at', now()->addDays((int) config('myteam.worker_invitation_days'))->toIso8601String())
+            ->assertJsonPath('data.can.invite', true);
+
+        $this->assertNotNull($expired->fresh()->revoked_at);
+        Queue::assertPushed(SendWorkerInvitationMail::class, 1);
+    }
+
+    public function test_送り直しは同じワーカーに1分に1回までで2回目は429(): void
+    {
+        Queue::fake();
+        $this->freezeSecond();
+        $worker = Worker::factory()->create();
+
+        $this->resend($worker)->assertOk();
+        $this->assertSame(1, WorkerInvitation::query()->count());
+
+        // 1 分以内の 2 回目は 429。招待もジョブも増えない（前の招待も取り消されない）
+        $this->travel(59)->seconds();
+        $this->resend($worker)
+            ->assertTooManyRequests()
+            ->assertExactJson(['message' => '招待は同じワーカーに 1 分に 1 回まで送れます。しばらくしてからお試しください。', 'errors' => []])
+            ->assertHeader('Retry-After', '1');
+        $this->assertSame(1, WorkerInvitation::query()->count());
+        $this->assertTrue(WorkerInvitation::query()->sole()->isUsable());
+        Queue::assertPushed(SendWorkerInvitationMail::class, 1);
+
+        // 1 分たてばまた送れる
+        $this->travel(1)->seconds();
+        $this->resend($worker)->assertOk();
+        $this->assertSame(2, WorkerInvitation::query()->count());
+        Queue::assertPushed(SendWorkerInvitationMail::class, 2);
+    }
+
+    public function test_送り直しの回数はワーカーごとに数える(): void
+    {
+        Queue::fake();
+        $this->freezeSecond();
+        $first = Worker::factory()->create();
+        $second = Worker::factory()->create();
+
+        $this->resend($first)->assertOk();
+        $this->resend($second)->assertOk();
+        $this->resend($first)->assertTooManyRequests();
+
+        $this->assertSame(1, WorkerInvitation::query()->where('worker_id', $first->id)->count());
+        $this->assertSame(1, WorkerInvitation::query()->where('worker_id', $second->id)->count());
+        Queue::assertPushed(SendWorkerInvitationMail::class, 2);
+    }
+
+    public function test_送り直しのidの先頭に0を付けても同じワーカーとして数える(): void
+    {
+        Queue::fake();
+        $this->freezeSecond();
+        $worker = Worker::factory()->create();
+
+        $this->resend($worker)->assertOk();
+        $this->resend($worker, '00'.$worker->id)->assertTooManyRequests();
+
+        $this->assertSame(1, WorkerInvitation::query()->count());
+        Queue::assertPushed(SendWorkerInvitationMail::class, 1);
+    }
+
+    public function test_送り直しのidが数字でなければ404で回数を数えない(): void
+    {
+        Queue::fake();
+        $worker = Worker::factory()->create();
+
+        $this->resend($worker, $worker->id.'abc')->assertNotFound();
+        $this->resend($worker)->assertOk();
+    }
+
+    public function test_他社の管理者が同じidを叩いても自社の送り直しの回数を使わない(): void
+    {
+        Queue::fake();
+        $this->freezeSecond();
+        $worker = Worker::factory()->create();
+        $other = Company::factory()->create();
+        $otherAdmin = User::factory()->for($other)->create();
+
+        // 他社の管理者からは見えないので 404。throttle はバインディングの前に動くが、キーの先頭が他社の企業 ID なので自社の枠は使わない
+        Context::forget('company_id');
+        $this->actingAs($otherAdmin)->postJson("/api/workers/{$worker->id}/invitation")->assertNotFound();
+        CurrentCompany::set($this->company->id);
+
+        // キーに企業 ID が入っているので、自社の枠はまだ空いている
+        $this->resend($worker)->assertOk();
+        $this->assertSame(1, WorkerInvitation::query()->count());
+    }
+
+    /**
+     * 送り直しの API を叩く。本番のリクエストは CurrentCompany が空で始まるので、setUp で入れた値を消してから叩き
+     * （レート制限のキーが company ミドルウェアの後に企業を読めることを確かめる）、終わったらテストの検証のために戻す
+     */
+    private function resend(Worker $worker, ?string $id = null): TestResponse
+    {
+        Context::forget('company_id');
+        $id ??= (string) $worker->id;
+
+        try {
+            return $this->actingAsAdmin()->postJson("/api/workers/{$id}/invitation");
+        } finally {
+            CurrentCompany::set($this->company->id);
+        }
     }
 
     private function usableInvitation(): WorkerInvitation
