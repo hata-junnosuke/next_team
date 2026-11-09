@@ -360,6 +360,8 @@ class WorkerInvitationTest extends TestCase
     public function test_ジョブは招待コードと有効期限と企業コードを書いたメールを送り通知の記録が送信済みになる(): void
     {
         Mail::fake();
+        // 企業名はファクトリの乱数（& や ' を含むことがある）なので、期待値に使うため明示する
+        $this->company->update(['name' => '山田商事']);
         $invitation = $this->usableInvitation();
 
         $this->runJob($invitation->id);
@@ -376,7 +378,7 @@ class WorkerInvitationTest extends TestCase
                 && str_contains($html, 'ABCD2345')
                 && str_contains($html, '2036年10月10日（金） 18:30')
                 && str_contains($html, $companyCode)
-                && str_contains($html, e($this->company->name))
+                && str_contains($html, '山田商事')
                 // 管理画面の URL を外部に配らない（ほかのワーカー宛てのメールと同じ）
                 && ! str_contains($html, '<a ');
         });

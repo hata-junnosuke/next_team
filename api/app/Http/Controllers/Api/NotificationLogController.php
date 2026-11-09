@@ -8,6 +8,7 @@ use App\Http\Resources\NotificationLogResource;
 use App\Models\Application;
 use App\Models\NotificationLog;
 use App\Models\User;
+use App\Models\WorkerInvitation;
 use App\Support\CurrentCompany;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -23,7 +24,7 @@ class NotificationLogController extends Controller
      * GET /api/notification-logs?kind=&status=&page=&per_page=（新しい順）
      *
      * 宛先・対象はポリモーフィックなので、with() で種類ごとに 1 クエリずつまとめて読み、
-     * 対象が応募のときだけ、ラベルに使う募集とワーカーを morphWith で続けて読む（N+1 にしない）。
+     * ラベルに使うので、対象が応募なら募集とワーカー、招待ならワーカーを morphWith で続けて読む（N+1 にしない）。
      * Rails の includes(:recipient, subject: ...) に近い。
      * https://readouble.com/laravel/13.x/ja/eloquent-relationships.html#nested-eager-loading-morphto-relationships
      */
@@ -42,6 +43,7 @@ class NotificationLogController extends Controller
                 ]),
                 'subject' => fn (MorphTo $morphTo) => $morphTo->morphWith([
                     Application::class => ['jobPosting', 'worker'],
+                    WorkerInvitation::class => ['worker'],
                 ]),
             ])
             ->when($kind !== null, fn ($query) => $query->where('kind', $kind))
