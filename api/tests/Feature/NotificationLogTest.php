@@ -499,7 +499,8 @@ class NotificationLogTest extends TestCase
         foreach (NotificationKind::cases() as $kind) {
             foreach (NotificationStatus::cases() as $status) {
                 $response = $this->getJson("/api/notification-logs?kind={$kind->value}&status={$status->value}")->assertOk();
-                $expectedIds = $statusOf[$kind->value] === $status->value ? [$logs[$kind->value]->id] : [];
+                // 記録を作っていない種類（招待。T6 で足す）は、どの状態でも 0 件
+                $expectedIds = ($statusOf[$kind->value] ?? null) === $status->value ? [$logs[$kind->value]->id] : [];
                 $this->assertSame($expectedIds, array_column($response->json('data'), 'id'), "{$kind->value} × {$status->value}");
                 foreach ($response->json('data') as $row) {
                     $this->assertSame($kind->value, $row['kind']['value']);

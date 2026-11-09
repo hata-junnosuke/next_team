@@ -13,6 +13,7 @@ use App\Models\NotificationLog;
 use App\Models\ReportExport;
 use App\Models\User;
 use App\Models\Worker;
+use App\Models\WorkerInvitation;
 use App\Support\CurrentCompany;
 use Illuminate\Database\ClassMorphViolationException;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -144,7 +145,7 @@ class AsyncFoundationTest extends TestCase
 
     // --- morph map ----------------------------------------------------------
 
-    public function test_morph_mapはdocs01の4_3の4モデルで強制されている(): void
+    public function test_morph_mapはdocs01の4_3のモデルで強制されている(): void
     {
         $this->assertTrue(Relation::requiresMorphMap());
         $this->assertEqualsCanonicalizing([
@@ -152,6 +153,7 @@ class AsyncFoundationTest extends TestCase
             'user' => User::class,
             'application' => Application::class,
             'report_export' => ReportExport::class,
+            'worker_invitation' => WorkerInvitation::class,
         ], Relation::morphMap());
     }
 

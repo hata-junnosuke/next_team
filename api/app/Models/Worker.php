@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\BelongsToCompany;
 use Database\Factories\WorkerFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,8 +14,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * ワーカー（F-02〜F-04）。削除せず is_active で無効化する（要件の非機能要件）。
  * company_id は #[Fillable] に入れない（BelongsToCompany が CurrentCompany::id() で埋める）。
+ * ログイン用の列（password・login_email・registered_at。ワーカー Step 5、docs/01 の 3.1・5.3）も #[Fillable] に入れない。
+ * 入れるのは初回登録のサービス（WorkerAuthService）だけで、forceFill() で入れる。password は #[Hidden] で JSON に出さない。
  */
 #[Fillable(['name', 'email', 'phone', 'is_active'])]
+#[Hidden(['password'])]
 class Worker extends Model
 {
     use BelongsToCompany;
@@ -38,6 +42,8 @@ class Worker extends Model
     {
         return [
             'is_active' => 'boolean',
+            'password' => 'hashed',
+            'registered_at' => 'immutable_datetime',
         ];
     }
 
@@ -47,6 +53,16 @@ class Worker extends Model
     public function applications(): HasMany
     {
         return $this->hasMany(Application::class);
+    }
+
+    /**
+     * 招待（送り直すたびに増える。使えるのは WorkerInvitation::isUsable() のものだけ）
+     *
+     * @return HasMany<WorkerInvitation, $this>
+     */
+    public function invitations(): HasMany
+    {
+        return $this->hasMany(WorkerInvitation::class);
     }
 
     /**

@@ -8,6 +8,7 @@ use App\Models\Location;
 use App\Models\ReportExport;
 use App\Models\User;
 use App\Models\Worker;
+use App\Models\WorkerInvitation;
 use App\Observers\DashboardCacheObserver;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -46,6 +47,7 @@ class AppServiceProvider extends ServiceProvider
             'user' => User::class,
             'application' => Application::class,
             'report_export' => ReportExport::class,
+            'worker_invitation' => WorkerInvitation::class,
         ]);
 
         // Markdown のメールに差し込む値（ワーカー名・拠点名など、利用者が入力した文字列）の Markdown 記号もエスケープする。
