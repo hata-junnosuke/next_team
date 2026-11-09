@@ -2,9 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ApplicationStatus;
+use App\Enums\CancelReason;
 use App\Enums\JobPostingStatus;
 use App\Http\Middleware\AuthenticateWorker;
 use App\Models\Application;
+use App\Models\Attendance;
 use App\Models\Company;
 use App\Models\JobPosting;
 use App\Models\Location;
@@ -416,6 +419,347 @@ class WorkerApplicationTest extends TestCase
         $this->postJson("/api/job-postings/{$closed->id}/applications", ['worker_id' => $this->worker->id])
             ->assertUnprocessable()
             ->assertExactJson(['message' => '締め切られた募集には応募できません。', 'errors' => []]);
+    }
+
+    // ---- 自分の応募の一覧（F-33。GET /api/worker/applications） ----
+
+    public function test_自分の応募だけが勤務日の順に並ぶ(): void
+    {
+        // 作る順と並びの順をずらす。勤務日 → 開始時刻 → 応募の ID の昇順。勤務日が過ぎた応募も自分のものなら出る
+        $late = $this->application(['work_date' => '2026-10-07']);
+        $sameDayAfternoon = $this->application(['work_date' => '2026-10-05', 'start_time' => '13:00', 'end_time' => '18:00']);
+        $sameDayMorning = $this->application(['work_date' => '2026-10-05', 'start_time' => '09:00']);
+        $sameDayMorning2 = $this->application(['work_date' => '2026-10-05', 'start_time' => '09:00']);
+        $past = $this->application(['work_date' => '2026-09-20']);
+
+        // 同じ企業のほかのワーカーの応募（同じ募集にも）と、他社のワーカーの応募は出ない
+        $other = Worker::factory()->registered()->create(['name' => '佐藤花子']);
+        Application::factory()->create(['job_posting_id' => $late->job_posting_id, 'worker_id' => $other->id]);
+        Application::factory()->create(['job_posting_id' => $this->posting(['work_date' => '2026-10-01'])->id, 'worker_id' => $other->id]);
+        CurrentCompany::runAs(Company::factory()->create()->id, fn () => Application::factory()->create());
+
+        // 他社の分離は本物のトークンで、setUp の企業を消してから確かめる（本番のリクエストは企業が空で始まる）
+        $token = $this->workerToken($this->worker);
+        Context::forget('company_id');
+
+        $this->withToken($token)
+            ->getJson('/api/worker/applications')
+            ->assertOk()
+            ->assertJsonPath('data.*.id', [$past->id, $sameDayMorning->id, $sameDayMorning2->id, $sameDayAfternoon->id, $late->id])
+            ->assertJsonPath('meta.total', 5);
+    }
+
+    public function test_状態で絞り込める(): void
+    {
+        $applied = $this->application();
+        $confirmed = $this->application(state: ApplicationStatus::Confirmed);
+        $rejected = $this->application(state: ApplicationStatus::Rejected);
+        $cancelled = $this->application(state: ApplicationStatus::Cancelled);
+        // ほかのワーカーの確定は、確定で絞っても出ない
+        Application::factory()->confirmed()->create(['job_posting_id' => $confirmed->job_posting_id]);
+
+        $expected = [
+            ApplicationStatus::Applied->value => $applied->id,
+            ApplicationStatus::Confirmed->value => $confirmed->id,
+            ApplicationStatus::Rejected->value => $rejected->id,
+            ApplicationStatus::Cancelled->value => $cancelled->id,
+        ];
+
+        $this->actingAsWorker($this->worker);
+        foreach (ApplicationStatus::cases() as $status) {
+            $this->getJson("/api/worker/applications?status={$status->value}")
+                ->assertOk()
+                ->assertJsonPath('data.*.id', [$expected[$status->value]])
+                ->assertJsonPath('data.0.status', ['value' => $status->value, 'label' => $status->label()]);
+        }
+    }
+
+    public function test_状態が決められた値でなければ422で空なら絞り込まない(): void
+    {
+        $applied = $this->application(['work_date' => '2026-10-05']);
+        $confirmed = $this->application(['work_date' => '2026-10-06'], state: ApplicationStatus::Confirmed);
+
+        $this->actingAsWorker($this->worker);
+        // 決められた値（applied / confirmed / rejected / cancelled）以外。大文字は別の値として扱う。
+        // 配列（status[]=applied）も Enum の値ではないので 422（複数の状態での絞り込みは契約にない）
+        $queries = [
+            'status=unknown',
+            'status=withdrawn',
+            'status=Applied',
+            'status=APPLIED',
+            'status[]=applied',
+            'status[]=applied&status[]=confirmed',
+        ];
+        foreach ($queries as $query) {
+            $this->getJson("/api/worker/applications?{$query}")
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors(['status'])
+                ->assertJsonPath('errors.status.0', '選択した 状態は 無効です。');
+        }
+
+        $this->getJson('/api/worker/applications?status=')
+            ->assertOk()
+            ->assertJsonPath('data.*.id', [$applied->id, $confirmed->id]);
+    }
+
+    public function test_キャンセルは理由区分の企業都合が出る(): void
+    {
+        // 募集の中止による自動キャンセルは企業都合（myteam-domain-rules）。ワーカー都合と区別して返す
+        $byCompany = $this->application(['work_date' => '2026-10-05'], state: ApplicationStatus::Cancelled, reason: CancelReason::Company);
+        $byWorker = $this->application(['work_date' => '2026-10-06'], state: ApplicationStatus::Cancelled, reason: CancelReason::Worker);
+        $confirmed = $this->application(['work_date' => '2026-10-07'], state: ApplicationStatus::Confirmed);
+
+        $this->actingAsWorker($this->worker)
+            ->getJson('/api/worker/applications')
+            ->assertOk()
+            ->assertJsonPath('data.*.id', [$byCompany->id, $byWorker->id, $confirmed->id])
+            ->assertJsonPath('data.0.cancel_reason', ['value' => 'company', 'label' => '企業都合'])
+            ->assertJsonPath('data.0.cancelled_at', '2026-10-01T10:00:00+09:00')
+            ->assertJsonPath('data.1.cancel_reason', ['value' => 'worker', 'label' => 'ワーカー都合'])
+            ->assertJsonPath('data.2.cancel_reason', null)
+            ->assertJsonPath('data.2.cancelled_at', null);
+    }
+
+    public function test_応募の応答は契約の形で勤怠と報酬を含まない(): void
+    {
+        $confirmed = $this->application(state: ApplicationStatus::Confirmed);
+        Attendance::factory()->create(['application_id' => $confirmed->id]);
+
+        $response = $this->actingAsWorker($this->worker)
+            ->getJson('/api/worker/applications')
+            ->assertOk()
+            ->assertJsonStructure(['data', 'meta' => ['current_page', 'last_page', 'per_page', 'total'], 'links']);
+
+        $this->assertSame([[
+            'id' => $confirmed->id,
+            'job_posting' => [
+                'id' => $confirmed->job_posting_id,
+                'job_title' => 'ピッキング',
+                'work_date' => '2026-10-05',
+                'start_time' => '09:00',
+                'end_time' => '17:00',
+                'location' => ['id' => $this->tokyo->id, 'name' => '東京倉庫'],
+            ],
+            'status' => ['value' => 'confirmed', 'label' => '確定'],
+            'applied_at' => '2026-10-01T10:00:00+09:00',
+            'confirmed_at' => '2026-10-01T10:00:00+09:00',
+            'confirmed_hourly_wage' => 1300,
+            'confirmed_transport_allowance' => 500,
+            'cancel_reason' => null,
+            'cancelled_at' => null,
+        ]], $response->json('data'));
+        // 勤怠と報酬（勤怠の行の金額 9,600 円）・ワーカーの氏名は出ない
+        $body = json_encode($response->json(), JSON_UNESCAPED_UNICODE);
+        $this->assertStringNotContainsString('山田太郎', $body);
+        $this->assertStringNotContainsString('9600', $body);
+    }
+
+    public function test_応募一覧のクエリ数は件数に比例しない(): void
+    {
+        // 募集・拠点を応募ごとに別に作る（N+1 があれば件数に比例して増える）
+        $make = fn (string $date) => $this->application([
+            'work_date' => $date,
+            'location_id' => Location::factory()->create()->id,
+        ], state: ApplicationStatus::Confirmed);
+
+        $make('2026-10-02');
+        $this->actingAsWorker($this->worker);
+        $this->getJson('/api/worker/applications')->assertOk();   // 認証などの初回分を済ませる
+
+        $one = $this->countQueries(fn () => $this->getJson('/api/worker/applications')->assertOk()->assertJsonCount(1, 'data'));
+
+        foreach (['2026-10-03', '2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07'] as $date) {
+            $make($date);
+        }
+
+        $six = $this->countQueries(fn () => $this->getJson('/api/worker/applications')->assertOk()->assertJsonCount(6, 'data'));
+
+        $this->assertSame($one, $six);
+    }
+
+    public function test_応募一覧のper_pageは1から100に丸め最後より後のページは空(): void
+    {
+        // 6.1 の共通のページング（Controller::perPage()）。ワーカーの一覧でも同じ丸めになること。
+        // 数字でない値は 0 として 1 に丸める（WorkerJobPostingTest の per_page のテストと同じ）
+        $this->application(['work_date' => '2026-10-02']);
+        $this->application(['work_date' => '2026-10-03']);
+
+        $this->actingAsWorker($this->worker);
+        foreach (['0' => 1, '-5' => 1, '1' => 1, '100' => 100, '101' => 100, 'abc' => 1] as $input => $expected) {
+            $this->getJson("/api/worker/applications?per_page={$input}")
+                ->assertOk()
+                ->assertJsonPath('meta.per_page', $expected)
+                ->assertJsonPath('meta.total', 2);
+        }
+
+        // 2 ページ目は 2 件目（勤務日の順）だけ
+        $this->getJson('/api/worker/applications?per_page=1&page=2')
+            ->assertOk()
+            ->assertJsonPath('data.*.job_posting.work_date', ['2026-10-03'])
+            ->assertJsonPath('meta.current_page', 2)
+            ->assertJsonPath('meta.per_page', 1)
+            ->assertJsonPath('meta.total', 2);
+
+        $this->getJson('/api/worker/applications?per_page=1&page=3')
+            ->assertOk()
+            ->assertJsonPath('data', [])
+            ->assertJsonPath('meta.current_page', 3)
+            ->assertJsonPath('meta.last_page', 2)
+            ->assertJsonPath('meta.total', 2);
+    }
+
+    public function test_同じ勤務日と開始時刻の応募は作った順ではなく応募の番号の昇順(): void
+    {
+        // 作る順と ID の順を逆にする（ID を明示）。作成日時やページの境目で並びが揺れないこと
+        $large = Application::factory()->create([
+            'id' => 900,
+            'job_posting_id' => $this->posting()->id,
+            'worker_id' => $this->worker->id,
+        ]);
+        $small = Application::factory()->create([
+            'id' => 100,
+            'job_posting_id' => $this->posting()->id,
+            'worker_id' => $this->worker->id,
+        ]);
+
+        $this->actingAsWorker($this->worker);
+        $this->getJson('/api/worker/applications')
+            ->assertOk()
+            ->assertJsonPath('data.*.id', [$small->id, $large->id]);
+
+        // ページを分けても重ならず漏れない
+        $this->getJson('/api/worker/applications?per_page=1&page=1')->assertJsonPath('data.*.id', [$small->id]);
+        $this->getJson('/api/worker/applications?per_page=1&page=2')->assertJsonPath('data.*.id', [$large->id]);
+    }
+
+    public function test_深夜跨ぎの勤務は勤務日と開始時刻で並び終了時刻はそのまま返る(): void
+    {
+        // 10/05 22:00〜翌 05:00 の勤務は 10/05 の勤務。終了時刻（翌日の 05:00）ではなく勤務日と開始時刻で並ぶ
+        $overnight = $this->application(['work_date' => '2026-10-05', 'start_time' => '22:00', 'end_time' => '05:00']);
+        $nextMorning = $this->application(['work_date' => '2026-10-06', 'start_time' => '04:00', 'end_time' => '08:00']);
+        $sameDayMorning = $this->application(['work_date' => '2026-10-05', 'start_time' => '06:00', 'end_time' => '10:00']);
+
+        $this->actingAsWorker($this->worker)
+            ->getJson('/api/worker/applications')
+            ->assertOk()
+            ->assertJsonPath('data.*.id', [$sameDayMorning->id, $overnight->id, $nextMorning->id])
+            ->assertJsonPath('data.1.job_posting.work_date', '2026-10-05')
+            ->assertJsonPath('data.1.job_posting.start_time', '22:00')
+            ->assertJsonPath('data.1.job_posting.end_time', '05:00');
+    }
+
+    public function test_状態の絞り込みは前後の空白を除き空白だけなら絞り込まない(): void
+    {
+        $applied = $this->application(['work_date' => '2026-10-05']);
+        $confirmed = $this->application(['work_date' => '2026-10-06'], state: ApplicationStatus::Confirmed);
+
+        $this->actingAsWorker($this->worker);
+        // 前後の空白は TrimStrings で除かれる（ほかの入力と同じ）。空白だけは空と同じで絞り込まない
+        $this->getJson('/api/worker/applications?status=%20confirmed%20')
+            ->assertOk()
+            ->assertJsonPath('data.*.id', [$confirmed->id]);
+        $this->getJson('/api/worker/applications?status=%20%20')
+            ->assertOk()
+            ->assertJsonPath('data.*.id', [$applied->id, $confirmed->id]);
+    }
+
+    public function test_該当する応募がなければ空の一覧(): void
+    {
+        $this->application();
+
+        $this->actingAsWorker($this->worker);
+        $this->getJson('/api/worker/applications?status=rejected')
+            ->assertOk()
+            ->assertJsonPath('data', [])
+            ->assertJsonPath('meta.total', 0);
+
+        // 応募が 1 件もないワーカー
+        $this->actingAsWorker(Worker::factory()->registered()->create())
+            ->getJson('/api/worker/applications')
+            ->assertOk()
+            ->assertJsonPath('data', [])
+            ->assertJsonPath('meta.total', 0);
+    }
+
+    public function test_締切や中止の募集への応募も一覧に出て募集の状態は返さない(): void
+    {
+        // 募集の中止で企業都合のキャンセルになった応募（要件 4.8 の動線 6）と、締め切られた募集への確定の応募。
+        // ワーカーの一覧は「募集中かつ今日以降」の募集の絞り込み（scopeListedForWorkers）を使わない
+        $closed = $this->application(['work_date' => '2026-10-05', 'status' => JobPostingStatus::Closed], state: ApplicationStatus::Confirmed);
+        $cancelled = $this->application(
+            ['work_date' => '2026-10-06', 'status' => JobPostingStatus::Cancelled],
+            state: ApplicationStatus::Cancelled,
+            reason: CancelReason::Company,
+        );
+
+        $response = $this->actingAsWorker($this->worker)
+            ->getJson('/api/worker/applications')
+            ->assertOk()
+            ->assertJsonPath('data.*.id', [$closed->id, $cancelled->id])
+            ->assertJsonPath('data.0.status', ['value' => 'confirmed', 'label' => '確定'])
+            ->assertJsonPath('data.1.status', ['value' => 'cancelled', 'label' => 'キャンセル'])
+            ->assertJsonPath('data.1.cancel_reason', ['value' => 'company', 'label' => '企業都合']);
+
+        $this->assertArrayNotHasKey('status', $response->json('data.0.job_posting'));
+    }
+
+    public function test_確定の後にキャンセルされた応募は確定時の値を残し却下は確定の値が空(): void
+    {
+        // 確定時にコピーした時給・交通費は、キャンセルの後も残る（報酬は確定時の値だけを見る。myteam-domain-rules）
+        $cancelled = $this->application(['work_date' => '2026-10-05'], state: ApplicationStatus::Cancelled);
+        $rejected = $this->application(['work_date' => '2026-10-06'], state: ApplicationStatus::Rejected);
+        // 確定の後に募集の時給を上げても、応募の確定時の値は変わらない
+        $confirmed = $this->application(['work_date' => '2026-10-07'], state: ApplicationStatus::Confirmed);
+        $confirmed->jobPosting->update(['hourly_wage' => 2000, 'transport_allowance' => 800]);
+
+        $this->actingAsWorker($this->worker)
+            ->getJson('/api/worker/applications')
+            ->assertOk()
+            ->assertJsonPath('data.*.id', [$cancelled->id, $rejected->id, $confirmed->id])
+            ->assertJsonPath('data.0.confirmed_at', '2026-09-30T10:00:00+09:00')
+            ->assertJsonPath('data.0.confirmed_hourly_wage', 1300)
+            ->assertJsonPath('data.0.confirmed_transport_allowance', 500)
+            ->assertJsonPath('data.1.status', ['value' => 'rejected', 'label' => '却下'])
+            ->assertJsonPath('data.1.confirmed_at', null)
+            ->assertJsonPath('data.1.confirmed_hourly_wage', null)
+            ->assertJsonPath('data.1.confirmed_transport_allowance', null)
+            ->assertJsonPath('data.1.cancel_reason', null)
+            ->assertJsonPath('data.2.confirmed_hourly_wage', 1300)
+            ->assertJsonPath('data.2.confirmed_transport_allowance', 500);
+    }
+
+    /**
+     * 自分（$this->worker）の応募を、明示した募集に作る。$state をファクトリの状態に振り分ける（$reason はキャンセルのときだけ使う）
+     *
+     * @param  array<string, mixed>  $postingAttributes
+     */
+    private function application(
+        array $postingAttributes = [],
+        ApplicationStatus $state = ApplicationStatus::Applied,
+        CancelReason $reason = CancelReason::Worker,
+    ): Application {
+        $factory = match ($state) {
+            ApplicationStatus::Applied => Application::factory(),
+            ApplicationStatus::Confirmed => Application::factory()->confirmed(),
+            ApplicationStatus::Rejected => Application::factory()->rejected(),
+            ApplicationStatus::Cancelled => Application::factory()->cancelled($reason),
+        };
+
+        return $factory->create([
+            'job_posting_id' => $this->posting($postingAttributes)->id,
+            'worker_id' => $this->worker->id,
+        ]);
+    }
+
+    private function countQueries(callable $callback): int
+    {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $callback();
+        $count = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        return $count;
     }
 
     /**

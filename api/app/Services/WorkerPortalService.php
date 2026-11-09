@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Enums\ApplicationStatus;
+use App\Models\Application;
 use App\Models\JobPosting;
 use App\Models\Worker;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -9,7 +11,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 /**
- * ワーカーアプリが見る募集（F-30・F-31。docs/01 の 4.5・4.6・6.11）。
+ * ワーカーアプリが見る募集と自分の応募（F-30・F-31・F-33。docs/01 の 4.5・4.6・6.11）。
  *
  * 企業の絞り込みは JobPosting のグローバルスコープ（worker ミドルウェアが CurrentCompany にワーカーの企業を入れる）に任せる。
  * 「募集中かつ勤務日が今日以降」・残り枠・応募できるかの判定は JobPosting の 1 か所（scopeListedForWorkers() /
@@ -41,7 +43,7 @@ class WorkerPortalService
             ->when($filters['location_id'] ?? null, fn (Builder $q, $locationId) => $q->where('location_id', (int) $locationId))
             ->orderBy('work_date')
             ->orderBy('start_time')
-            ->orderBy('id')
+            ->orderBy('job_postings.id')
             ->paginate($perPage);
 
         $postings->getCollection()->each(fn (JobPosting $posting) => $this->moveMyApplication($posting));
@@ -64,6 +66,33 @@ class WorkerPortalService
         }
 
         return $posting;
+    }
+
+    /**
+     * F-33 自分の応募の一覧。勤務日 → 開始時刻 → 応募の ID の昇順（同じ勤務の時刻なら ID で並びを固定する）。
+     * $status が null なら絞り込まない。勤務日が過ぎた応募・却下・キャンセルも自分のものなら出す。
+     *
+     * 企業はグローバルスコープ（applications と、並びの副問い合わせの job_postings の両方に効く）、
+     * ワーカーは worker_id で絞る。並びは join ではなく JobPosting の副問い合わせにして、
+     * 「join した側のテーブルにスコープが効かない」穴を作らない（security.md）。
+     * WorkerApplicationResource が使う jobPosting.location は eager load する（N+1 にしない）
+     *
+     * @return LengthAwarePaginator<int, Application>
+     */
+    public function applications(Worker $worker, ?ApplicationStatus $status, int $perPage): LengthAwarePaginator
+    {
+        $postingColumn = fn (string $column) => JobPosting::query()
+            ->select($column)
+            ->whereColumn('job_postings.id', 'applications.job_posting_id');
+
+        return Application::query()
+            ->where('applications.worker_id', $worker->id)
+            ->when($status, fn (Builder $q, ApplicationStatus $s) => $q->where('applications.status', $s))
+            ->with('jobPosting.location')
+            ->orderBy($postingColumn('work_date'))
+            ->orderBy($postingColumn('start_time'))
+            ->orderBy('applications.id')
+            ->paginate($perPage);
     }
 
     /**
