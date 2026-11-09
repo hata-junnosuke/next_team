@@ -2,27 +2,39 @@
 
 namespace Tests\Feature;
 
+use App\Enums\NotificationKind;
+use App\Enums\NotificationStatus;
 use App\Events\WorkerInvited;
 use App\Exceptions\DomainException;
 use App\Jobs\SendWorkerInvitationMail;
+use App\Mail\WorkerInvitationMail;
 use App\Models\Company;
+use App\Models\NotificationLog;
 use App\Models\Worker;
 use App\Models\WorkerInvitation;
+use App\Services\NotificationLogService;
 use App\Services\WorkerInvitationService;
 use App\Support\CurrentCompany;
 use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Queue\Middleware\RateLimited;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
+use Symfony\Component\Mailer\Exception\TransportException;
 use Tests\TestCase;
 
 /**
  * F-26・F-27 招待の発行（docs/01 の 3.2・4.5・非同期の契約、async-rules）。
  *
  * - 発行（WorkerInvitationService::issue()）は直接呼ぶ。HTTP の入口（POST /api/workers/{worker}/invitation）は別のタスク
- * - 「積まれたか」は Queue::fake() で確かめる。「実行したらどうなるか」（メールの送信）は T5 で handle() を直接呼んで確かめる
+ * - 「積まれたか」は Queue::fake() で確かめる。「実行したらどうなるか」（メールの送信）は handle() を直接呼んで確かめる（Mail::fake()）
  */
 class WorkerInvitationTest extends TestCase
 {
@@ -341,5 +353,438 @@ class WorkerInvitationTest extends TestCase
         $this->assertNotNull($previous->fresh()->code);
         $this->assertSame(1, WorkerInvitation::query()->where('worker_id', $worker->id)->count());
         Queue::assertNothingPushed();
+    }
+
+    // ---- 実行したらどうなるか（SendWorkerInvitationMail の handle() を直接呼ぶ） ----
+
+    public function test_ジョブは招待コードと有効期限と企業コードを書いたメールを送り通知の記録が送信済みになる(): void
+    {
+        Mail::fake();
+        $invitation = $this->usableInvitation();
+
+        $this->runJob($invitation->id);
+
+        $companyCode = $this->company->fresh()->code;
+        $this->assertNotNull($companyCode);
+        Mail::assertSent(WorkerInvitationMail::class, 1);
+        Mail::assertSent(WorkerInvitationMail::class, function (WorkerInvitationMail $mail) use ($companyCode) {
+            $html = $mail->render();
+
+            return count($mail->to) === 1 && $mail->hasTo('hanako@example.com')
+                && $mail->cc === [] && $mail->bcc === []
+                && str_contains($html, '山田花子 様')
+                && str_contains($html, 'ABCD2345')
+                && str_contains($html, '2036年10月10日（金） 18:30')
+                && str_contains($html, $companyCode)
+                && str_contains($html, e($this->company->name))
+                // 管理画面の URL を外部に配らない（ほかのワーカー宛てのメールと同じ）
+                && ! str_contains($html, '<a ');
+        });
+
+        $log = NotificationLog::query()->sole();
+        $this->assertSame(NotificationKind::WorkerInvitation, $log->kind);
+        $this->assertSame(NotificationStatus::Sent, $log->status);
+        $this->assertNotNull($log->sent_at);
+        $this->assertSame('hanako@example.com', $log->recipient_email);
+        $this->assertSame('worker', $log->recipient_type);
+        $this->assertSame($invitation->worker_id, $log->recipient_id);
+        $this->assertSame('worker_invitation', $log->subject_type);
+        $this->assertSame($invitation->id, $log->subject_id);
+        $this->assertSame("worker_invitation:worker_invitation:{$invitation->id}", $log->dedupe_key);
+    }
+
+    public function test_ジョブを2回実行してもメールは1通(): void
+    {
+        Mail::fake();
+        $invitation = $this->usableInvitation();
+
+        $this->runJob($invitation->id);
+        $this->runJob($invitation->id);
+
+        Mail::assertSent(WorkerInvitationMail::class, 1);
+        $this->assertSame(NotificationStatus::Sent, NotificationLog::query()->sole()->status);
+    }
+
+    public function test_送信に失敗するとfailedで記録が失敗になり再実行で送信済みになる(): void
+    {
+        $invitation = $this->usableInvitation();
+        Mail::shouldReceive('to')->andThrow(new TransportException('Connection refused (code=ABCD2345)'));
+
+        try {
+            $this->runJob($invitation->id);
+            $this->fail('送信の例外が握りつぶされた（再試行されなくなる）');
+        } catch (TransportException $e) {
+            // 例外 3 回か期限切れで打ち切られた後に、ワーカーが failed() を 1 回呼ぶ
+            (new SendWorkerInvitationMail($invitation->id))->failed($e);
+        }
+
+        $log = NotificationLog::query()->sole();
+        $this->assertSame(NotificationStatus::Failed, $log->status);
+        $this->assertSame('TransportException: メールの送信に失敗しました。', $log->error);
+        $this->assertStringNotContainsString('ABCD2345', (string) $log->error); // 画面に出る列に招待コードを残さない
+
+        // メールサーバーが直った → 再実行（queue:retry と同じく、もう一度 handle() が呼ばれる）
+        $this->stopFailingMailer();
+        Mail::fake();
+        $this->runJob($invitation->id);
+
+        Mail::assertSent(WorkerInvitationMail::class, 1);
+        $log = NotificationLog::query()->sole();
+        $this->assertSame(NotificationStatus::Sent, $log->status);
+        $this->assertNotNull($log->sent_at);
+    }
+
+    public function test_使用済みと取り消しと期限切れの招待には送らない(): void
+    {
+        Mail::fake();
+        $used = WorkerInvitation::factory()->used()->create();
+        $revoked = WorkerInvitation::factory()->revoked()->create();
+        $expired = WorkerInvitation::factory()->expired()->create();
+
+        foreach ([$used, $revoked, $expired] as $invitation) {
+            $this->runJob($invitation->id);
+            // 打ち切られた後の failed() でも「届いていない」記録を作らない（送るべき通知がない）
+            (new SendWorkerInvitationMail($invitation->id))->failed(new \RuntimeException('boom'));
+        }
+        $this->runJob(999_999); // 見つからない招待
+
+        Mail::assertNothingSent();
+        $this->assertSame(0, NotificationLog::query()->count());
+    }
+
+    public function test_無効になったワーカーには送らない(): void
+    {
+        Mail::fake();
+        $invitation = $this->usableInvitation();
+        $invitation->worker->update(['is_active' => false]);
+
+        $this->runJob($invitation->id);
+        (new SendWorkerInvitationMail($invitation->id))->failed(new \RuntimeException('boom'));
+
+        Mail::assertNothingSent();
+        $this->assertSame(0, NotificationLog::query()->count());
+    }
+
+    public function test_招待のメールはキューに積む形にしない(): void
+    {
+        // Mailable を ShouldQueue にすると、Mail::to()->send() でもキューに積まれ、ペイロードに招待コードが入る
+        $this->assertNotContains(ShouldQueue::class, class_implements(WorkerInvitationMail::class));
+
+        Mail::fake();
+        $invitation = $this->usableInvitation();
+        $this->runJob($invitation->id);
+
+        Mail::assertSent(WorkerInvitationMail::class, 1);
+        Mail::assertNothingQueued();
+    }
+
+    // ---- ジョブの形（async-rules の型） ----
+
+    public function test_招待のジョブはmailsキューで例外3回か積んでから60分で打ち切りbackoffは10秒と60秒(): void
+    {
+        $this->freezeSecond();
+        $job = new SendWorkerInvitationMail(7);
+
+        $this->assertSame('mails', $job->queue);
+        $this->assertSame(0, $job->tries);
+        $this->assertSame(3, $job->maxExceptions);
+        $this->assertEquals(now()->addMinutes(60), $job->retryUntil());
+        $this->assertSame([10, 60], $job->backoff());
+
+        $middleware = $job->middleware();
+        $this->assertCount(2, $middleware);
+        $this->assertInstanceOf(RateLimited::class, $middleware[0]);
+        $this->assertInstanceOf(WithoutOverlapping::class, $middleware[1]);
+        $this->assertSame('worker_invitation:worker_invitation:7', $middleware[1]->key);
+        $this->assertNull($middleware[1]->releaseAfter);
+        $this->assertSame(120, $middleware[1]->expiresAfter);
+    }
+
+    public function test_claimの前に打ち切られてもまだ使える招待ならfailedが届いていない記録を作る(): void
+    {
+        // 例: 流量制限で戻され続けて retryUntil を過ぎた（handle() に 1 度も入っていない）
+        $invitation = $this->usableInvitation();
+
+        (new SendWorkerInvitationMail($invitation->id))->failed(new \RuntimeException('期限切れ'));
+
+        $log = NotificationLog::query()->sole();
+        $this->assertSame(NotificationStatus::Failed, $log->status);
+        $this->assertSame('hanako@example.com', $log->recipient_email);
+    }
+
+    public function test_他社の招待のジョブは送らない(): void
+    {
+        Mail::fake();
+        $otherId = CurrentCompany::runAs(Company::factory()->create()->id, fn () => WorkerInvitation::factory()->create()->id);
+
+        // 企業を取り違えたジョブ（自社の Context で他社の招待ID）。グローバルスコープで見えないので送らない
+        $this->runJob($otherId);
+
+        Mail::assertNothingSent();
+        $this->assertSame(0, NotificationLog::withoutGlobalScopes()->count()); // 全社の行を数えるため（他社の行も作られていないこと）
+    }
+
+    // ---- 実行したらどうなるか（追加の観点。tester） ----
+
+    public function test_送信で例外が出ると記録はpendingのまま例外を投げ直し再試行に回る(): void
+    {
+        $invitation = $this->usableInvitation();
+        Mail::shouldReceive('to')->andThrow(new TransportException('Connection refused'));
+
+        try {
+            $this->runJob($invitation->id);
+            $this->fail('送信の例外が握りつぶされた（再試行されなくなる）');
+        } catch (TransportException) {
+            // 例外がワーカーまで届くので、maxExceptions と backoff に従って再試行される
+        }
+
+        $log = NotificationLog::query()->sole();
+        $this->assertSame(NotificationStatus::Pending, $log->status);
+        $this->assertNull($log->sent_at);
+    }
+
+    public function test_送信済みの後にfailedが呼ばれても失敗に戻さない(): void
+    {
+        Mail::fake();
+        $invitation = $this->usableInvitation();
+        $this->runJob($invitation->id);
+
+        (new SendWorkerInvitationMail($invitation->id))->failed(new TransportException('late'));
+
+        $this->assertSame(NotificationStatus::Sent, NotificationLog::query()->sole()->status);
+    }
+
+    public function test_送信に失敗した後に有効期限が切れたら再実行しても送らず記録は失敗のまま(): void
+    {
+        $invitation = $this->usableInvitation();
+        $this->failOnce($invitation->id);
+
+        // 期限（2036-10-10 18:30）を過ぎてから queue:retry された
+        $this->travelTo('2036-10-10 18:31:00');
+        Mail::fake();
+        $this->runJob($invitation->id);
+
+        Mail::assertNothingSent();
+        $log = NotificationLog::query()->sole();
+        $this->assertSame(NotificationStatus::Failed, $log->status);
+        $this->assertNull($log->sent_at);
+    }
+
+    public function test_送信に失敗した後にワーカーが初回登録を済ませたら再実行しても送らない(): void
+    {
+        $invitation = $this->usableInvitation();
+        $this->failOnce($invitation->id);
+
+        // 初回登録（WorkerAuthService::register）と同じ状態にする: 招待は使用済みでコードが消え、ワーカーは登録済み
+        $invitation->forceFill(['used_at' => now(), 'code' => null])->save();
+        $invitation->worker->forceFill(['login_email' => 'hanako@example.com', 'registered_at' => now()])->save();
+        Mail::fake();
+        $this->runJob($invitation->id);
+
+        Mail::assertNothingSent();
+        $this->assertSame(NotificationStatus::Failed, NotificationLog::query()->sole()->status);
+    }
+
+    public function test_積んだ後に送り直された前の招待のジョブは送らず新しい招待のジョブだけが送る(): void
+    {
+        Mail::fake();
+        $worker = Worker::factory()->create(['name' => '山田花子', 'email' => 'hanako@example.com', 'is_active' => true]);
+        Queue::fake(); // 発行で積まれたジョブはここでは走らせず、下で handle() を直接呼ぶ
+        $first = $this->service()->issue($worker);
+        $second = $this->service()->issue($worker); // 送り直し（前の招待は取り消されコードが消える）
+        $newCode = $second->fresh()->code;
+
+        $this->runJob($first->id);
+        $this->runJob($second->id);
+
+        Mail::assertSent(WorkerInvitationMail::class, 1);
+        Mail::assertSent(WorkerInvitationMail::class, fn (WorkerInvitationMail $mail) => str_contains($mail->render(), $newCode));
+        $log = NotificationLog::query()->sole();
+        $this->assertSame($second->id, $log->subject_id);
+    }
+
+    public function test_ワーカー名のmarkdown記号はリンクにならない(): void
+    {
+        Mail::fake();
+        $invitation = $this->usableInvitation();
+        $invitation->worker->update(['name' => '[花子](https://evil.example)']);
+
+        $this->runJob($invitation->id);
+
+        Mail::assertSent(WorkerInvitationMail::class, function (WorkerInvitationMail $mail) {
+            $html = $mail->render();
+
+            return ! str_contains($html, '<a ')
+                && ! str_contains($html, 'href="https://evil.example"')
+                && str_contains($html, 'evil.example');
+        });
+    }
+
+    public function test_ワーカー名の改行は空白になり見出しや段落を作らない(): void
+    {
+        Mail::fake();
+        $invitation = $this->usableInvitation();
+        $invitation->worker->update(['name' => "山田\n# 偽の見出し"]);
+
+        $this->runJob($invitation->id);
+
+        Mail::assertSent(WorkerInvitationMail::class, function (WorkerInvitationMail $mail) {
+            $html = $mail->render();
+
+            return str_contains($html, '山田 # 偽の見出し 様') && substr_count($html, '<h1') === 1;
+        });
+    }
+
+    public function test_企業が戻っていなければジョブは送らずに例外になる(): void
+    {
+        // 閉じた側に倒れる: スコープを外して全社から招待を引いたりしない
+        Mail::fake();
+        $invitation = $this->usableInvitation();
+        Context::forget('company_id');
+
+        try {
+            $this->runJob($invitation->id);
+            $this->fail('企業が決まらないまま招待を読んだ');
+        } catch (\LogicException) {
+            // CurrentCompany::id() が未設定で例外
+        } finally {
+            CurrentCompany::set($this->company->id);
+        }
+
+        Mail::assertNothingSent();
+        $this->assertSame(0, NotificationLog::query()->count());
+    }
+
+    // ---- ワーカーで実行する（Context の引き継ぎ・失敗の記録・再実行・重なり） ----
+
+    public function test_ジョブはcontextから企業を引き継ぎワーカーで実行すると送られる(): void
+    {
+        Mail::fake();
+        $invitation = $this->usableInvitation();
+
+        SendWorkerInvitationMail::dispatch($invitation->id)->onConnection('database');
+        // ペイロード（jobs テーブル）に招待コードが入っていない
+        $this->assertStringNotContainsString('ABCD2345', (string) DB::table('jobs')->value('payload'));
+        Context::forget('company_id'); // setUp の企業を消す。ここから先はペイロードの Context だけが頼り
+        $this->assertFalse(CurrentCompany::check());
+
+        $this->work();
+
+        Mail::assertSent(WorkerInvitationMail::class, 1);
+        // ワーカーが戻した Context に頼らないよう、記録はスコープを通さずに読む（ApplicationConfirmedMailTest と同じ理由）
+        $log = DB::table('notification_logs')->sole();
+        $this->assertSame(NotificationStatus::Sent->value, $log->status);
+        $this->assertSame($this->company->id, (int) $log->company_id);
+        $this->assertSame(0, DB::table('jobs')->count());
+    }
+
+    public function test_ワーカーで3回失敗すると積んだcontextで失敗が記録されqueue_retryで送信済みになる(): void
+    {
+        $invitation = $this->usableInvitation();
+        Mail::shouldReceive('to')->andThrow(new TransportException('Connection refused (user=secret)'));
+        SendWorkerInvitationMail::dispatch($invitation->id)->onConnection('database');
+
+        foreach ([0, 11, 61] as $seconds) {
+            $this->travel($seconds)->seconds();
+            Context::forget('company_id');
+            $this->work();
+        }
+
+        $this->assertSame(0, DB::table('jobs')->count());
+        $this->assertSame(1, DB::table('failed_jobs')->count());
+        $failed = DB::table('failed_jobs')->sole();
+        $this->assertStringNotContainsString('ABCD2345', $failed->payload.$failed->exception); // 失敗の記録にもコードを残さない
+        $log = DB::table('notification_logs')->sole();
+        $this->assertSame(NotificationStatus::Failed->value, $log->status);
+        $this->assertSame('TransportException: メールの送信に失敗しました。', $log->error);
+        $this->assertSame($this->company->id, (int) $log->company_id);
+
+        $this->stopFailingMailer();
+        Mail::fake();
+        $this->artisan('queue:retry', ['id' => ['all']])->assertExitCode(0);
+        Context::forget('company_id');
+        $this->work();
+
+        Mail::assertSent(WorkerInvitationMail::class, fn (WorkerInvitationMail $mail) => str_contains($mail->render(), 'ABCD2345'));
+        $this->assertSame(0, DB::table('failed_jobs')->count());
+        $log = DB::table('notification_logs')->sole();
+        $this->assertSame(NotificationStatus::Sent->value, $log->status);
+        $this->assertNotNull($log->sent_at);
+    }
+
+    public function test_同じ招待のジョブが走っている間の2本目は送らずfailedにもならない(): void
+    {
+        Mail::fake();
+        $invitation = $this->usableInvitation();
+        $job = new SendWorkerInvitationMail($invitation->id);
+        $lock = Cache::lock($job->middleware()[1]->getLockKey($job), 120);
+        $this->assertTrue($lock->get());
+
+        SendWorkerInvitationMail::dispatch($invitation->id)->onConnection('database');
+        $this->work();
+
+        Mail::assertNothingSent();
+        $this->assertSame(0, DB::table('jobs')->count());
+        $this->assertSame(0, DB::table('failed_jobs')->count());
+        $this->assertSame(0, DB::table('notification_logs')->count());
+
+        $lock->release();
+    }
+
+    public function test_重なり防止のロックのキーは招待ごとに別(): void
+    {
+        $a = (new SendWorkerInvitationMail(1))->middleware()[1];
+        $b = (new SendWorkerInvitationMail(2))->middleware()[1];
+
+        $this->assertNotSame($a->key, $b->key);
+    }
+
+    private function usableInvitation(): WorkerInvitation
+    {
+        $worker = Worker::factory()->create(['name' => '山田花子', 'email' => 'hanako@example.com', 'is_active' => true]);
+
+        return WorkerInvitation::factory()->create([
+            'worker_id' => $worker->id,
+            'code' => 'ABCD2345',
+            'expires_at' => '2036-10-10 18:30:00', // 期待値に関わるので明示する（今日より先の日時）
+        ]);
+    }
+
+    private function runJob(int $invitationId): void
+    {
+        (new SendWorkerInvitationMail($invitationId))->handle(app(NotificationLogService::class));
+    }
+
+    /**
+     * 送信に 1 回失敗し、打ち切られて failed() が呼ばれた状態にする（記録は failed）。モックは外して返す
+     */
+    private function failOnce(int $invitationId): void
+    {
+        Mail::shouldReceive('to')->andThrow(new TransportException('Connection refused'));
+        try {
+            $this->runJob($invitationId);
+            $this->fail('送信の例外が握りつぶされた');
+        } catch (TransportException $e) {
+            (new SendWorkerInvitationMail($invitationId))->failed($e);
+        }
+        $this->stopFailingMailer();
+        $this->assertSame(NotificationStatus::Failed, NotificationLog::query()->sole()->status);
+    }
+
+    /**
+     * ワーカーを 1 回だけ回す（make horizon の代わり）。--sleep=0 で取り出せるジョブがなくても待たずに終わる
+     */
+    private function work(): void
+    {
+        $this->artisan('queue:work', ['connection' => 'database', '--queue' => 'mails', '--once' => true, '--sleep' => 0])->assertExitCode(0);
+    }
+
+    /**
+     * Mail::shouldReceive() のモックを外し、本物の MailManager に戻す（MailFake は今のマネージャを包むので、モックのままだと fake できない）
+     */
+    private function stopFailingMailer(): void
+    {
+        Mail::clearResolvedInstance('mail.manager');
+        $this->app->forgetInstance('mail.manager');
     }
 }
