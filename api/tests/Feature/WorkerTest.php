@@ -10,6 +10,7 @@ use App\Models\WorkerInvitation;
 use App\Support\CurrentCompany;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 /**
@@ -354,11 +355,14 @@ class WorkerTest extends TestCase
 
     public function test_更新と切り替えの応答はworker_resourceの形そのもの(): void
     {
+        Queue::fake();
         $this->freezeSecond(); // datetime 列は秒までなので、期待値の日時も秒にそろえる
         // 電話番号は Faker の optional で入ったり入らなかったりするので、期待値の null に固定する
-        $worker = Worker::factory()->create(['phone' => null]);
-        $invitation = WorkerInvitation::factory()->create(['worker_id' => $worker->id, 'expires_at' => now()->addDays(3)]);
-        $expiresAt = $invitation->expires_at->toIso8601String();
+        $worker = Worker::factory()->create(['email' => 'old@example.com', 'phone' => null]);
+        WorkerInvitation::factory()->create(['worker_id' => $worker->id, 'expires_at' => now()->addDays(3)]);
+        // 未登録のワーカーのメールを変えると、前の招待は取り消され新しいメール宛に招待を発行し直す（docs/01 の 3.1・4.5）。
+        // 応答の期限は新しい招待のもの
+        $expiresAt = now()->addDays((int) config('myteam.worker_invitation_days'))->toIso8601String();
 
         $this->actingAsAdmin()
             ->putJson("/api/workers/{$worker->id}", ['name' => '新氏名', 'email' => 'new@example.com'])
@@ -367,6 +371,8 @@ class WorkerTest extends TestCase
                 'id' => $worker->id, 'name' => '新氏名', 'email' => 'new@example.com', 'phone' => null, 'is_active' => true,
                 'registered_at' => null, 'invitation_expires_at' => $expiresAt, 'can' => ['invite' => true],
             ]]);
+
+        $this->assertSame(1, WorkerInvitation::query()->usable()->count());
 
         // 無効にすると招待はできなくなる（使える招待の期限はそのまま出す）
         $this->patchJson("/api/workers/{$worker->id}/active", ['is_active' => false])
@@ -716,5 +722,265 @@ class WorkerTest extends TestCase
             ->assertJsonPath('meta.total', 1);
 
         $this->getJson('/api/workers?is_active=1')->assertOk()->assertJsonCount(0, 'data');
+    }
+
+    // ---- メールの変更（docs/01 の 3.1・4.5。T8） ----
+
+    public function test_登録済みのワーカーのメールを直すとログイン用メールが小文字で追従する(): void
+    {
+        Queue::fake();
+        $worker = Worker::factory()->registered()->create(['name' => '山田太郎', 'email' => 'old@example.com']);
+
+        $this->actingAsAdmin()
+            ->putJson("/api/workers/{$worker->id}", ['name' => '山田太郎', 'email' => 'New.Yamada@Example.COM'])
+            ->assertOk()
+            ->assertJsonPath('data.email', 'New.Yamada@Example.COM');
+
+        $fresh = $worker->fresh();
+        $this->assertSame('New.Yamada@Example.COM', $fresh->email);
+        $this->assertSame('new.yamada@example.com', $fresh->login_email);
+        $this->assertNotNull($fresh->registered_at);
+        // 登録済みのワーカーには招待を出さない
+        $this->assertSame(0, WorkerInvitation::query()->count());
+        Queue::assertNothingPushed();
+    }
+
+    public function test_日本語を含むメールでもログイン用メールはウムラウトまで小文字になる(): void
+    {
+        Queue::fake();
+        $worker = Worker::factory()->registered()->create(['name' => '山田太郎', 'email' => 'old@example.com']);
+
+        // 国際化メールアドレス（ローカル部に非 ASCII）。strtolower では Ä・Ö が小文字にならない
+        $this->actingAsAdmin()
+            ->putJson("/api/workers/{$worker->id}", ['name' => '山田太郎', 'email' => 'ÄÖ山田@Example.COM'])
+            ->assertOk()
+            ->assertJsonPath('data.email', 'ÄÖ山田@Example.COM');
+
+        $this->assertSame('äö山田@example.com', $worker->fresh()->login_email);
+    }
+
+    public function test_同じ企業の登録済みワーカーとメールが重なると422でerrors_email(): void
+    {
+        Queue::fake();
+        Worker::factory()->registered()->create(['email' => 'taken@example.com']);
+        $worker = Worker::factory()->registered()->create(['name' => '山田太郎', 'email' => 'yamada@example.com']);
+
+        // 大文字小文字を変えても同じメールとして重なる
+        $this->actingAsAdmin()
+            ->putJson("/api/workers/{$worker->id}", ['name' => '新氏名', 'email' => 'Taken@Example.com'])
+            ->assertUnprocessable()
+            ->assertExactJson([
+                'message' => 'このメールアドレスは、この企業の別のワーカーのログインに使われています。',
+                'errors' => ['email' => ['このメールアドレスは、この企業の別のワーカーのログインに使われています。']],
+            ]);
+
+        // 何も変わらない（氏名も巻き戻る）
+        $fresh = $worker->fresh();
+        $this->assertSame('山田太郎', $fresh->name);
+        $this->assertSame('yamada@example.com', $fresh->email);
+        $this->assertSame('yamada@example.com', $fresh->login_email);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_未登録のワーカーでも同じ企業の登録済みワーカーのメールにすると422(): void
+    {
+        Queue::fake();
+        Worker::factory()->registered()->create(['email' => 'taken@example.com']);
+        $worker = Worker::factory()->create(['name' => '山田太郎', 'email' => 'yamada@example.com']);
+        $invitation = WorkerInvitation::factory()->create(['worker_id' => $worker->id]);
+
+        $this->actingAsAdmin()
+            ->putJson("/api/workers/{$worker->id}", ['name' => '山田太郎', 'email' => 'TAKEN@example.com'])
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'このメールアドレスは、この企業の別のワーカーのログインに使われています。')
+            ->assertJsonPath('errors.email.0', 'このメールアドレスは、この企業の別のワーカーのログインに使われています。');
+
+        // メールも招待も変わらない（前の招待は使えるまま。新しい招待は積まれない）
+        $this->assertSame('yamada@example.com', $worker->fresh()->email);
+        $this->assertTrue($invitation->fresh()->isUsable());
+        $this->assertSame(1, WorkerInvitation::query()->count());
+        Queue::assertNothingPushed();
+    }
+
+    public function test_別の企業の登録済みワーカーと同じメールにしても422にならない(): void
+    {
+        Queue::fake();
+        $other = Company::factory()->create();
+        CurrentCompany::runAs($other->id, function () {
+            Worker::factory()->registered()->create(['email' => 'shared-a@example.com']);
+            Worker::factory()->registered()->create(['email' => 'shared-b@example.com']);
+        });
+        $registered = Worker::factory()->registered()->create(['email' => 'registered@example.com']);
+        $unregistered = Worker::factory()->create(['email' => 'unregistered@example.com']);
+
+        // 重複の確認は自社の中だけ（他社の登録状況は分からない）
+        $this->actingAsAdmin()
+            ->putJson("/api/workers/{$registered->id}", ['name' => '山田太郎', 'email' => 'Shared-A@example.com'])
+            ->assertOk()
+            ->assertJsonPath('data.email', 'Shared-A@example.com');
+        $this->assertSame('shared-a@example.com', $registered->fresh()->login_email);
+
+        $this->putJson("/api/workers/{$unregistered->id}", ['name' => '鈴木花子', 'email' => 'shared-b@example.com'])
+            ->assertOk()
+            ->assertJsonPath('data.email', 'shared-b@example.com');
+        $this->assertSame('shared-b@example.com', $unregistered->fresh()->email);
+    }
+
+    public function test_登録済みのワーカーのメールを大文字小文字だけ直すとログイン用メールは小文字のまま招待は出ない(): void
+    {
+        Queue::fake();
+        $worker = Worker::factory()->registered()->create(['name' => '山田太郎', 'email' => 'yamada@example.com']);
+
+        $this->actingAsAdmin()
+            ->putJson("/api/workers/{$worker->id}", ['name' => '山田太郎', 'email' => 'YAMADA@Example.com'])
+            ->assertOk()
+            ->assertJsonPath('data.email', 'YAMADA@Example.com');
+
+        // email の列は入力どおり、login_email は小文字のまま（ログインの照合は小文字）
+        $fresh = $worker->fresh();
+        $this->assertSame('YAMADA@Example.com', $fresh->email);
+        $this->assertSame('yamada@example.com', $fresh->login_email);
+        $this->assertSame(0, WorkerInvitation::query()->count());
+        Queue::assertNothingPushed();
+    }
+
+    public function test_無効で登録済みのワーカーのメールを直してもログイン用メールが追従し招待は出ない(): void
+    {
+        Queue::fake();
+        $worker = Worker::factory()->inactive()->registered()->create(['name' => '山田太郎', 'email' => 'old@example.com']);
+
+        $this->actingAsAdmin()
+            ->putJson("/api/workers/{$worker->id}", ['name' => '山田太郎', 'email' => 'New@Example.com'])
+            ->assertOk()
+            ->assertJsonPath('data.email', 'New@Example.com')
+            ->assertJsonPath('data.is_active', false)
+            ->assertJsonPath('data.invitation_expires_at', null)
+            ->assertJsonPath('data.can.invite', false);
+
+        $fresh = $worker->fresh();
+        $this->assertSame('new@example.com', $fresh->login_email);
+        $this->assertFalse($fresh->is_active);
+        $this->assertNotNull($fresh->registered_at);
+        $this->assertSame(0, WorkerInvitation::query()->count());
+        Queue::assertNothingPushed();
+    }
+
+    public function test_登録済みのワーカーが自分のメールのまま他の項目を直しても422にならない(): void
+    {
+        Queue::fake();
+        $worker = Worker::factory()->registered()->create(['name' => '山田太郎', 'email' => 'yamada@example.com', 'phone' => null]);
+
+        // 重なりの確認は自分自身を除く
+        $this->actingAsAdmin()
+            ->putJson("/api/workers/{$worker->id}", ['name' => '山田一郎', 'email' => 'yamada@example.com', 'phone' => '090-1111-2222'])
+            ->assertOk()
+            ->assertJsonPath('data.name', '山田一郎')
+            ->assertJsonPath('data.phone', '090-1111-2222');
+
+        $this->assertSame('yamada@example.com', $worker->fresh()->login_email);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_未登録のワーカー同士はメールが重なってもよい(): void
+    {
+        Queue::fake();
+        // 未登録のワーカーは login_email が NULL なので縛らない（email の列に一意制約はない。docs/01 の 3.1）
+        Worker::factory()->create(['email' => 'shared@example.com']);
+        $worker = Worker::factory()->create(['name' => '山田太郎', 'email' => 'yamada@example.com']);
+
+        $this->actingAsAdmin()
+            ->putJson("/api/workers/{$worker->id}", ['name' => '山田太郎', 'email' => 'shared@example.com'])
+            ->assertOk()
+            ->assertJsonPath('data.email', 'shared@example.com');
+
+        $this->assertSame('shared@example.com', $worker->fresh()->email);
+        $this->assertNull($worker->fresh()->login_email);
+    }
+
+    public function test_メールが重なって422のときは未登録のワーカーの氏名と電話も巻き戻る(): void
+    {
+        Queue::fake();
+        Worker::factory()->registered()->create(['email' => 'taken@example.com']);
+        $worker = Worker::factory()->create(['name' => '山田太郎', 'email' => 'yamada@example.com', 'phone' => '090-0000-0000']);
+
+        $this->actingAsAdmin()
+            ->putJson("/api/workers/{$worker->id}", ['name' => '新氏名', 'email' => 'taken@example.com', 'phone' => '080-9999-9999'])
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.email.0', 'このメールアドレスは、この企業の別のワーカーのログインに使われています。');
+
+        $fresh = $worker->fresh();
+        $this->assertSame('山田太郎', $fresh->name);
+        $this->assertSame('090-0000-0000', $fresh->phone);
+        $this->assertSame('yamada@example.com', $fresh->email);
+        $this->assertNull($fresh->login_email);
+    }
+
+    public function test_確認の後に別のワーカーが同じログイン用メールになっても同じ422の文言で何も変わらない(): void
+    {
+        Queue::fake();
+        $worker = Worker::factory()->registered()->create(['name' => '山田太郎', 'email' => 'yamada@example.com', 'phone' => null]);
+
+        // 重なりの確認（exists）の後、保存（UPDATE）の前に、別のワーカーが同じメールで初回登録を済ませた競合を再現する。
+        // saving はサービスの save() の直前に呼ばれるので、ここで同じ企業・同じ login_email の行を直接入れる
+        $inserted = false;
+        Worker::saving(function (Worker $saving) use ($worker, &$inserted) {
+            if ($inserted || $saving->id !== $worker->id) {
+                return;
+            }
+            $inserted = true;
+            DB::table('workers')->insert([
+                'company_id' => $this->company->id,
+                'name' => '割り込み花子',
+                'email' => 'race@example.com',
+                'is_active' => true,
+                'login_email' => 'race@example.com',
+                'registered_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        });
+
+        $this->actingAsAdmin()
+            ->putJson("/api/workers/{$worker->id}", ['name' => '新氏名', 'email' => 'Race@Example.com', 'phone' => '090-1111-2222'])
+            ->assertUnprocessable()
+            ->assertExactJson([
+                'message' => 'このメールアドレスは、この企業の別のワーカーのログインに使われています。',
+                'errors' => ['email' => ['このメールアドレスは、この企業の別のワーカーのログインに使われています。']],
+            ]);
+
+        $this->assertTrue($inserted);
+        // ワーカーの更新はすべて巻き戻る（同じトランザクションで入れた割り込みの行も消える）
+        $fresh = $worker->fresh();
+        $this->assertSame('山田太郎', $fresh->name);
+        $this->assertNull($fresh->phone);
+        $this->assertSame('yamada@example.com', $fresh->email);
+        $this->assertSame('yamada@example.com', $fresh->login_email);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_他社のワーカーのメールを変えようとすると404で何も変わらない(): void
+    {
+        Queue::fake();
+        $other = Company::factory()->create();
+        [$registered, $unregistered, $invitation] = CurrentCompany::runAs($other->id, function () {
+            $registered = Worker::factory()->registered()->create(['email' => 'theirs-a@example.com']);
+            $unregistered = Worker::factory()->create(['email' => 'theirs-b@example.com']);
+            $invitation = WorkerInvitation::factory()->create(['worker_id' => $unregistered->id]);
+
+            return [$registered, $unregistered, $invitation];
+        });
+        Context::forget('company_id');
+
+        $this->actingAsAdmin()
+            ->putJson("/api/workers/{$registered->id}", ['name' => '乗っ取り', 'email' => 'mine@example.com'])
+            ->assertNotFound();
+        $this->putJson("/api/workers/{$unregistered->id}", ['name' => '乗っ取り', 'email' => 'mine@example.com'])
+            ->assertNotFound();
+
+        $this->assertDatabaseHas('workers', ['id' => $registered->id, 'email' => 'theirs-a@example.com', 'login_email' => 'theirs-a@example.com']);
+        $this->assertDatabaseHas('workers', ['id' => $unregistered->id, 'email' => 'theirs-b@example.com', 'login_email' => null]);
+        $this->assertDatabaseHas('worker_invitations', ['id' => $invitation->id, 'revoked_at' => null]);
+        $this->assertDatabaseCount('worker_invitations', 1);
+        Queue::assertNothingPushed();
     }
 }

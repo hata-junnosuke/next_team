@@ -17,7 +17,7 @@ use Laravel\Sanctum\HasApiTokens;
  * ワーカー（F-02〜F-04）。削除せず is_active で無効化する（要件の非機能要件）。
  * company_id は #[Fillable] に入れない（BelongsToCompany が CurrentCompany::id() で埋める）。
  * ログイン用の列（password・login_email・registered_at。ワーカー Step 5、docs/01 の 3.1・5.3）も #[Fillable] に入れない。
- * 入れるのは初回登録のサービス（WorkerAuthService）だけで、forceFill() で入れる。password は #[Hidden] で JSON に出さない。
+ * 入れるのは初回登録のサービス（WorkerAuthService）と、登録済みのワーカーのメールを直したときに login_email を追従させる WorkerService::update() だけで、forceFill() で入れる。password は #[Hidden] で JSON に出さない。
  *
  * ワーカーアプリ（mobile/）のログインの主体なので Authenticatable を継承し、Sanctum の API トークンを持つ（HasApiTokens。docs/01 の 5.3）。
  * Rails で言えば has_secure_password を持つモデルに、API トークンの has_many を足した形。guard は worker（config/auth.php）。
@@ -95,6 +95,19 @@ class Worker extends Authenticatable
     public function canBeInvited(): bool
     {
         return $this->registered_at === null && $this->is_active;
+    }
+
+    /**
+     * ログイン用メール（login_email）の形にそろえる（docs/01 の 3.1。メールは小文字にして保存し、照合も小文字で行う）。
+     * **ログイン用メールの小文字化はここだけ。** 管理者の編集（WorkerService）、初回登録とログイン（WorkerAuthService）、
+     * ワーカーのレート制限のキー（AppServiceProvider）、ファクトリはどれもこれを呼ぶ（関数が混ざると、非 ASCII の文字で照合がずれる）。
+     * 非 ASCII の文字も小文字にするので mb_strtolower。前後の空白はここでは落とさない（HTTP の入力は既定のミドルウェア TrimStrings が
+     * 先に落としている。Rails で言えば squish 済みの params を受け取る形）
+     * https://www.php.net/manual/ja/function.mb-strtolower.php
+     */
+    public static function normalizeLoginEmail(string $email): string
+    {
+        return mb_strtolower($email);
     }
 
     /**

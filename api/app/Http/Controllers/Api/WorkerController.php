@@ -17,7 +17,7 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 /**
  * ワーカー（F-02〜F-04・F-26・F-27、docs/01 の API 契約（ワーカー））。
  * 登録は招待の発行を伴うので WorkerService、招待の送り直しは WorkerInvitationService に任せる（docs/01 の 4.5）。
- * 編集（T8 で WorkerService へ移す）と有効/無効の切り替えは、今は Eloquent を直接呼ぶ。
+ * 編集もメールの変更で招待を発行し直すので WorkerService。有効/無効の切り替えは Eloquent を直接呼ぶ。
  * 削除はしない（無効化する。要件の非機能要件）ので destroy はない。
  * モデルを型宣言しているので、他社の ID はルートモデルバインディング（グローバルスコープ）で 404 になる。
  * https://readouble.com/laravel/13.x/ja/controllers.html#api-resource-routes
@@ -61,13 +61,12 @@ class WorkerController extends Controller
     }
 
     /**
-     * PUT /api/workers/{worker}
+     * PUT /api/workers/{worker}。メールが変わったときの扱い（ログイン用メールの追従・重なりの 422・招待の発行し直し）は WorkerService（docs/01 の 3.1・4.5）
      */
-    public function update(UpdateWorkerRequest $request, Worker $worker): WorkerResource
+    public function update(UpdateWorkerRequest $request, Worker $worker, WorkerService $service): WorkerResource
     {
-        $worker->update($request->validated());
-
-        return new WorkerResource($worker->loadMissing('usableInvitation'));
+        // サービスはロックして読み直した行を更新して返す。招待を発行し直したかもしれないので、招待は読み直す
+        return new WorkerResource($service->update($worker, $request->validated())->load('usableInvitation'));
     }
 
     /**

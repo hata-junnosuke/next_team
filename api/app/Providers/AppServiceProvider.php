@@ -69,14 +69,14 @@ class AppServiceProvider extends ServiceProvider
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 
         // ワーカーの初回登録とログインの試行回数（docs/01 の 5.3。1 分 5 回、超えたら 429）。Rails の rack-attack の throttle に当たる。
-        // キーは入力の値の表記ゆれ（大文字・小文字）で数え直されないようにそろえる。企業コードは大文字、メールは小文字
+        // キーは入力の値の表記ゆれ（大文字・小文字）で数え直されないようにそろえる。企業コードは大文字、メールは小文字（Worker::normalizeLoginEmail()。照合と同じ関数にする）
         // https://readouble.com/laravel/13.x/ja/routing.html#rate-limiting
         RateLimiter::for('worker-register', fn (Request $request) => Limit::perMinute(5)->by(
-            mb_strtolower(self::stringInput($request, 'email')).'|'.$request->ip()
+            Worker::normalizeLoginEmail(self::stringInput($request, 'email')).'|'.$request->ip()
         ));
         RateLimiter::for('worker-login', fn (Request $request) => Limit::perMinute(5)->by(
             mb_strtoupper(self::stringInput($request, 'company_code')).'|'
-            .mb_strtolower(self::stringInput($request, 'email')).'|'.$request->ip()
+            .Worker::normalizeLoginEmail(self::stringInput($request, 'email')).'|'.$request->ip()
         ));
 
         // 招待の送り直し（F-27。POST /api/workers/{worker}/invitation）の回数。同じワーカーに 1 分 1 回、超えたら 429。

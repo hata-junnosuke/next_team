@@ -50,6 +50,19 @@ class WorkerInvitationService
     }
 
     /**
+     * 使える招待を取り消すだけで、新しい招待は作らない（無効で未登録のワーカーのメールを直したとき。docs/01 の 3.1・4.5）。
+     * issue() と同じく、ワーカーの行 → 招待の順にロックする（ロックの順をそろえてデッドロックを避ける）
+     */
+    public function revoke(Worker $worker): void
+    {
+        DB::transaction(function () use ($worker) {
+            $worker = Worker::query()->lockForUpdate()->findOrFail($worker->id);
+
+            $this->revokeUsable($worker);
+        });
+    }
+
+    /**
      * 前の未使用・未取消の招待（期限切れを含む）を取り消す。revoked_at は状態の列なので #[Fillable] の外（forceFill で入れる）。
      * 期限切れの招待も code を消す（もう要らない秘密を持ち続けない）
      */

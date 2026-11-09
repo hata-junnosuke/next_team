@@ -35,14 +35,14 @@ class WorkerFactory extends Factory
     }
 
     /**
-     * 初回登録を済ませたワーカー（パスワードは password。login_email は email を小文字にしたもの。docs/01 の 3.1）
+     * 初回登録を済ませたワーカー（パスワードは password。login_email は email を Worker::normalizeLoginEmail() で小文字にしたもの。docs/01 の 3.1）
      */
     public function registered(): static
     {
         // login_email は属性のクロージャにする（create(['email' => ...]) で渡したメールを見てから決まるように）
         return $this->state([
             'password' => 'password',
-            'login_email' => fn (array $attributes) => strtolower($attributes['email']),
+            'login_email' => fn (array $attributes) => Worker::normalizeLoginEmail($attributes['email']),
             'registered_at' => now(),
         ]);
     }

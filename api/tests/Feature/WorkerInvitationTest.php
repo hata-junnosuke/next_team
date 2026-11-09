@@ -990,6 +990,133 @@ class WorkerInvitationTest extends TestCase
         $this->assertSame(1, WorkerInvitation::query()->count());
     }
 
+    // ---- メールの変更で招待を発行し直す（PUT /api/workers/{worker}。docs/01 の 3.1・4.5。T8） ----
+
+    public function test_未登録のワーカーのメールを直すと前のコードが使えなくなり新しい招待が積まれる(): void
+    {
+        Queue::fake();
+        $this->freezeSecond();
+        $worker = Worker::factory()->create(['name' => '山田太郎', 'email' => 'old@example.com', 'phone' => null]);
+        $first = WorkerInvitation::factory()->create(['worker_id' => $worker->id, 'code' => 'ABCD2345']);
+
+        $response = $this->actingAsAdmin()
+            ->putJson("/api/workers/{$worker->id}", ['name' => '山田太郎', 'email' => 'new@example.com'])
+            ->assertOk();
+
+        $second = WorkerInvitation::query()->where('id', '!=', $first->id)->sole();
+        $response->assertExactJson(['data' => [
+            'id' => $worker->id,
+            'name' => '山田太郎',
+            'email' => 'new@example.com',
+            'phone' => null,
+            'is_active' => true,
+            'registered_at' => null,
+            'invitation_expires_at' => $second->expires_at->toIso8601String(),
+            'can' => ['invite' => true],
+        ]]);
+
+        // 前のコードは引けても使えない（取り消し・code は NULL）。使えるのは新しい招待だけ
+        $previous = WorkerInvitation::query()->where('code_hash', WorkerInvitation::hashCode('ABCD2345'))->sole();
+        $this->assertFalse($previous->isUsable());
+        $this->assertNull($previous->code);
+        $this->assertTrue($second->isUsable());
+
+        // 新しいメール宛のジョブが 1 本だけ積まれる（メールの宛先はジョブが今の workers.email から決める）
+        Queue::assertPushedOn('mails', SendWorkerInvitationMail::class, fn (SendWorkerInvitationMail $job) => $job->invitationId === $second->id);
+        Queue::assertPushed(SendWorkerInvitationMail::class, 1);
+    }
+
+    public function test_無効で未登録のワーカーのメールは直せて招待は積まれず前の招待は使えなくなる(): void
+    {
+        Queue::fake();
+        $worker = Worker::factory()->inactive()->create(['name' => '山田太郎', 'email' => 'old@example.com', 'phone' => null]);
+        $first = WorkerInvitation::factory()->create(['worker_id' => $worker->id]);
+
+        $this->actingAsAdmin()
+            ->putJson("/api/workers/{$worker->id}", ['name' => '山田太郎', 'email' => 'new@example.com'])
+            ->assertOk()
+            ->assertJsonPath('data.email', 'new@example.com')
+            ->assertJsonPath('data.is_active', false)
+            ->assertJsonPath('data.invitation_expires_at', null)
+            ->assertJsonPath('data.can.invite', false);
+
+        // 前の招待は取り消すだけで、新しい招待は作らない（有効に戻したら F-27 で送り直す）
+        $this->assertSame(1, WorkerInvitation::query()->count());
+        $previous = $first->fresh();
+        $this->assertNotNull($previous->revoked_at);
+        $this->assertNull($previous->code);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_メールを変えない更新では招待を送り直さない(): void
+    {
+        Queue::fake();
+        $worker = Worker::factory()->create(['name' => '山田太郎', 'email' => 'yamada@example.com', 'phone' => null]);
+        $first = WorkerInvitation::factory()->create(['worker_id' => $worker->id]);
+
+        // 氏名と電話だけを変える。メールの大文字小文字だけを変えても、初回登録の照合は小文字なので前のコードはそのまま使える
+        $this->actingAsAdmin()
+            ->putJson("/api/workers/{$worker->id}", ['name' => '山田一郎', 'email' => 'yamada@example.com', 'phone' => '090-1111-2222'])
+            ->assertOk()
+            ->assertJsonPath('data.name', '山田一郎');
+        $this->putJson("/api/workers/{$worker->id}", ['name' => '山田一郎', 'email' => 'Yamada@Example.com'])
+            ->assertOk()
+            ->assertJsonPath('data.email', 'Yamada@Example.com')
+            ->assertJsonPath('data.invitation_expires_at', $first->expires_at->toIso8601String());
+
+        $this->assertSame(1, WorkerInvitation::query()->count());
+        $this->assertTrue($first->fresh()->isUsable());
+        Queue::assertNothingPushed();
+    }
+
+    public function test_メールを直した後の招待のジョブは新しいメール宛に送り通知の記録の宛先も新しいメール(): void
+    {
+        Queue::fake(); // PUT で積まれるジョブはここでは走らせず、下で handle() を直接呼ぶ
+        Mail::fake();
+        $worker = Worker::factory()->create(['name' => '山田太郎', 'email' => 'old@example.com']);
+        $first = WorkerInvitation::factory()->create(['worker_id' => $worker->id]);
+
+        $this->actingAsAdmin()
+            ->putJson("/api/workers/{$worker->id}", ['name' => '山田太郎', 'email' => 'New@Example.com'])
+            ->assertOk();
+        $second = WorkerInvitation::query()->where('id', '!=', $first->id)->sole();
+
+        // 前の招待のジョブ（メールを直す前に積まれていたもの）は送らない
+        $this->runJob($first->id);
+        Mail::assertNothingSent();
+        $this->assertSame(0, NotificationLog::query()->count());
+
+        // 新しい招待のジョブは、入力どおりの新しいメール宛に 1 通だけ送る
+        $this->runJob($second->id);
+        Mail::assertSent(WorkerInvitationMail::class, 1);
+        Mail::assertSent(WorkerInvitationMail::class, fn (WorkerInvitationMail $mail) => count($mail->to) === 1 && $mail->hasTo('New@Example.com'));
+        Mail::assertNotSent(WorkerInvitationMail::class, fn (WorkerInvitationMail $mail) => $mail->hasTo('old@example.com'));
+
+        $log = NotificationLog::query()->sole();
+        $this->assertSame('New@Example.com', $log->recipient_email);
+        $this->assertSame(NotificationStatus::Sent, $log->status);
+        $this->assertSame($second->id, $log->subject_id);
+    }
+
+    public function test_期限切れの招待だけの未登録ワーカーのメールを直しても新しい招待が積まれる(): void
+    {
+        Queue::fake();
+        $worker = Worker::factory()->create(['name' => '山田太郎', 'email' => 'old@example.com']);
+        $expired = WorkerInvitation::factory()->expired()->create(['worker_id' => $worker->id]);
+
+        $this->actingAsAdmin()
+            ->putJson("/api/workers/{$worker->id}", ['name' => '山田太郎', 'email' => 'new@example.com'])
+            ->assertOk()
+            ->assertJsonPath('data.can.invite', true);
+
+        $second = WorkerInvitation::query()->where('id', '!=', $expired->id)->sole();
+        $this->assertTrue($second->isUsable());
+        $this->assertNull($expired->fresh()->code);
+        $this->assertNotNull($expired->fresh()->revoked_at);
+        Queue::assertPushed(SendWorkerInvitationMail::class, fn (SendWorkerInvitationMail $job) => $job->invitationId === $second->id);
+        Queue::assertPushed(SendWorkerInvitationMail::class, 1);
+    }
+
     /**
      * 送り直しの API を叩く。本番のリクエストは CurrentCompany が空で始まるので、setUp で入れた値を消してから叩き
      * （レート制限のキーが company ミドルウェアの後に企業を読めることを確かめる）、終わったらテストの検証のために戻す
