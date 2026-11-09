@@ -76,9 +76,25 @@ git merge-tree --write-tree --name-only origin/main <BRANCH>     # 終了コー�
 - 衝突するなら「N コミット遅れ（衝突: ファイル名）」。衝突の解き方はその worktree の Claude か人が決める
 - 取り込み（`sync-main.md`）は、その worktree の Claude が次のタスクの始めか PR を作る前に行う。すぐ取り込みたければ、その worktree の Claude に「main を取り込んで」と頼んでもらう
 
+**Orca を使用している場合**（`ORCA_WORKTREE_ID` が空でない）、worktree ごとに、そこの Claude が入力待ちか作業中かも添える。読むだけで、ターミナルに文字は送らない。
+```bash
+orca terminal list --worktree path:<WT> --json                                   # .result.terminals[].handle と title
+orca terminal wait --terminal <handle> --for tui-idle --timeout-ms 1500 --json  # ターミナルごとに
+```
+| `wait` の結果 | 報告 |
+|---|---|
+| `ok: true` で `satisfied: true` | 入力待ち |
+| `ok: false` で `error.code` が `timeout` | 作業中（サブエージェントの終わりを待っている間も、ここに入る） |
+| ターミナルがない | Claude なし |
+| ほかのエラー | 状態は不明（エラーをそのまま書く） |
+
+- **作業中の worktree には、遅れがあっても「main を取り込んで」と頼むよう案内しない**。作業の区切り（次のタスクの始めか PR の前）に、その Claude が自分で取り込む。案内するのは入力待ちの worktree だけ
+- 入力待ちでも、人がその画面に打ちかけの文があることがある（`orca terminal read --terminal <handle> --json` の `.result.terminal.draft` が空でない）。そのときは「打ちかけあり」と添える
+- `orca` がエラーになったら、状態の欄を「不明」にして報告を続ける（片付けは止めない）
+
 ### 5. 報告
 - 片付けたもの: worktree の場所・ブランチ・PR 番号
 - 残したもの: 場所と理由（未マージ / 未コミットあり / マージ後のコミットあり / `-d` で消せない）
 - `main` の今のコミット（`git log -1 --oneline`）
-- 残っている worktree ごとの遅れと衝突の見込み（4 の結果）
+- 残っている worktree ごとの遅れと衝突の見込み、Orca なら Claude の状態（4 の結果）
 - Orca の外の手順で消した worktree が Orca の画面に残っていれば、そちらで閉じてもらう
