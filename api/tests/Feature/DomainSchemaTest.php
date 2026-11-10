@@ -4,9 +4,11 @@ namespace Tests\Feature;
 
 use App\Models\Application;
 use App\Models\Attendance;
+use App\Models\Company;
 use App\Models\JobPosting;
 use App\Models\Location;
 use App\Models\Worker;
+use App\Support\CurrentCompany;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -102,12 +104,16 @@ class DomainSchemaTest extends TestCase
         ]);
     }
 
-    public function test_ワーカーのメールは一意ではない(): void
+    public function test_ワーカーのメールは同じ企業の中で一意で他社とは重なってよい(): void
     {
+        $other = Company::factory()->create();
         Worker::factory()->create(['email' => 'same@example.com']);
-        Worker::factory()->create(['email' => 'same@example.com']);
+        CurrentCompany::runAs($other->id, fn () => Worker::factory()->create(['email' => 'same@example.com']));
 
-        $this->assertSame(2, Worker::query()->where('email', 'same@example.com')->count());
+        $this->assertSame(2, Worker::withoutGlobalScopes()->where('email', 'same@example.com')->count()); // 全社の行を数えるためスコープを外す
+
+        $this->expectException(QueryException::class);
+        Worker::factory()->create(['email' => 'same@example.com']);
     }
 
     public function test_docs01の3_1の索引と一意制約がある(): void
@@ -131,7 +137,8 @@ class DomainSchemaTest extends TestCase
         ));
         $this->assertContains(['job_posting_id', 'worker_id'], $uniques('applications'));
         $this->assertContains(['application_id'], $uniques('attendances'));
-        // メールの一意制約は付けない（docs/01 の業務テーブル）
+        // メールは企業の中で一意（docs/01 の 3.1）。メールだけの一意制約は付けない（他社とは重なってよい）
+        $this->assertContains(['company_id', 'email'], $uniques('workers'));
         $this->assertNotContains(['email'], $uniques('workers'));
     }
 

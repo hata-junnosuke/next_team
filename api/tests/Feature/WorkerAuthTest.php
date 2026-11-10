@@ -40,8 +40,6 @@ class WorkerAuthTest extends TestCase
 
     private const INVALID_CODE_MESSAGE = '招待コードが正しくないか、有効期限が切れています。';
 
-    private const EMAIL_TAKEN_MESSAGE = 'このメールアドレスは、この企業の別のワーカーのログインに使われています。';
-
     private const INVALID_CREDENTIALS_MESSAGE = '企業コード・メールアドレス・パスワードのいずれかが正しくありません。';
 
     /** 招待コードの文字（紛らわしい文字を除いた英大文字と数字）だけで作った、テストで使う招待コード */
@@ -78,9 +76,9 @@ class WorkerAuthTest extends TestCase
         $this->assertNull($invitation->getRawOriginal('code'));
         $this->assertNull($invitation->revoked_at);
 
-        // ワーカーにログイン用の列が入る
+        // ワーカーにログイン用の列が入る（メールはそのまま）
         $worker = CurrentCompany::runAs($this->company->id, fn () => $worker->fresh());
-        $this->assertSame('taro@example.com', $worker->login_email);
+        $this->assertSame('taro@example.com', $worker->email);
         $this->assertTrue(now()->equalTo($worker->registered_at));
         $this->assertTrue(Hash::check('secret-pass', $worker->password));
 
@@ -106,7 +104,7 @@ class WorkerAuthTest extends TestCase
 
     public function test_ワーカーのトークンで自分の情報を取得できる(): void
     {
-        $worker = $this->registeredWorker(['name' => '山田 太郎', 'email' => 'Yamada@Example.com']);
+        $worker = $this->registeredWorker(['name' => '山田 太郎', 'email' => 'yamada@example.com']);
         $token = $this->workerToken($worker);
         Context::forget('company_id');
 
@@ -243,7 +241,7 @@ class WorkerAuthTest extends TestCase
     public function test_企業が決まる前でもトークンから他社のワーカーを読めてその企業の情報が返る(): void
     {
         // docs/01 の 13 章の 8。PersonalAccessToken::tokenable() の withoutGlobalScope('company') を外すと、
-        // 企業が空のリクエストでは CurrentCompany::id() の LogicException で 500 になる（tester がトークンのモデルを差し替えて確認済み）。
+        // 企業が空のリクエストでは CurrentCompany::id() の LogicException で 500 になる。
         // setUp の企業（$this->company）ではないワーカーにして、setUp の値や同じ企業の偶然に助けられないようにする
         $other = Company::factory()->create();
         $worker = CurrentCompany::runAs($other->id, fn () => $this->registeredWorker());
@@ -447,9 +445,10 @@ class WorkerAuthTest extends TestCase
         $this->assertSame(0, Worker::withoutGlobalScopes()->whereNotNull('registered_at')->count());
     }
 
-    public function test_メールの大文字小文字を変えても登録できログイン用メールは小文字で入る(): void
+    public function test_メールの大文字小文字を変えても登録できメールは小文字のまま(): void
     {
-        $worker = $this->invitedWorker('Taro.Yamada@Example.com');
+        // workers.email は Worker の email のミューテタが小文字で保存している（docs/01 の 3.1）。入力の大文字小文字は問わない
+        $worker = $this->invitedWorker('taro.yamada@example.com');
         Context::forget('company_id');
 
         $this->postJson('/api/worker/register', $this->registerPayload(['email' => 'TARO.YAMADA@EXAMPLE.COM']))
@@ -457,9 +456,8 @@ class WorkerAuthTest extends TestCase
             ->assertJsonPath('data.worker.email', 'taro.yamada@example.com');
 
         $worker = CurrentCompany::runAs($this->company->id, fn () => $worker->fresh());
-        $this->assertSame('taro.yamada@example.com', $worker->login_email);
-        // 連絡用のメール（email）は管理者が入れたまま
-        $this->assertSame('Taro.Yamada@Example.com', $worker->email);
+        $this->assertSame('taro.yamada@example.com', $worker->email);
+        $this->assertNotNull($worker->registered_at);
     }
 
     public function test_無効ワーカーは初回登録できない(): void
@@ -477,44 +475,6 @@ class WorkerAuthTest extends TestCase
             ->assertExactJson(['message' => self::DISABLED_MESSAGE, 'errors' => ['email' => [self::DISABLED_MESSAGE]]]);
 
         $this->assertRegisterRolledBack($worker);
-    }
-
-    public function test_同じ企業の登録済みワーカーとメールが重なると初回登録できない(): void
-    {
-        $this->registeredWorker(['name' => '山田 花子', 'email' => 'taro@example.com']);
-        $worker = $this->invitedWorker('Taro@Example.com');
-        Context::forget('company_id');
-
-        $this->postJson('/api/worker/register', $this->registerPayload())
-            ->assertUnprocessable()
-            ->assertExactJson(['message' => self::EMAIL_TAKEN_MESSAGE, 'errors' => ['email' => [self::EMAIL_TAKEN_MESSAGE]]]);
-
-        $this->assertRegisterRolledBack($worker);
-    }
-
-    public function test_確認の後に同じメールで登録されてもunique違反は同じ422でerrors_email(): void
-    {
-        // ④ の確認の後・保存の前に、同じメールの別のワーカーが登録を済ませた競合を再現する（保存の直前に割り込む）
-        $worker = $this->invitedWorker('taro@example.com');
-        $other = Worker::factory()->create(['name' => '山田 花子', 'email' => 'taro@example.com']);
-        $raced = false;
-        Worker::saving(function (Worker $saving) use ($worker, $other, &$raced) {
-            if ($raced || $saving->id !== $worker->id) {
-                return;
-            }
-            $raced = true;
-            Worker::query()->whereKey($other->id)->update(['login_email' => 'taro@example.com', 'registered_at' => now()]);
-        });
-        Context::forget('company_id');
-
-        $this->postJson('/api/worker/register', $this->registerPayload())
-            ->assertUnprocessable()
-            ->assertExactJson(['message' => self::EMAIL_TAKEN_MESSAGE, 'errors' => ['email' => [self::EMAIL_TAKEN_MESSAGE]]]);
-
-        $this->assertTrue($raced);
-        $this->assertDatabaseCount('personal_access_tokens', 0);
-        // 招待の使用済みもロールバックされる
-        $this->assertSame(0, WorkerInvitation::withoutGlobalScopes()->whereNotNull('used_at')->count());
     }
 
     public function test_招待を引いた後でロックの前に取り消しやメールの変更が入ると同じ422でロールバックする(): void
@@ -548,7 +508,6 @@ class WorkerAuthTest extends TestCase
 
             $worker = Worker::withoutGlobalScopes()->find($worker->id);
             $this->assertNull($worker->registered_at, $label);
-            $this->assertNull($worker->login_email, $label);
             $this->assertNull($worker->getRawOriginal('password'), $label);
         }
 
@@ -646,7 +605,7 @@ class WorkerAuthTest extends TestCase
         }
     }
 
-    // ---- 初回登録: 判定の順（②→③→④）の境界（docs/01 の 4.5） ----
+    // ---- 初回登録: 判定の順（②→③）の境界（docs/01 の 4.5） ----
 
     public function test_無効で招待も使えないワーカーは無効を明かさずerrors_code(): void
     {
@@ -666,23 +625,9 @@ class WorkerAuthTest extends TestCase
         $this->assertDatabaseCount('personal_access_tokens', 0);
     }
 
-    public function test_無効で登録済みのメールとも重なるワーカーは無効の文言(): void
-    {
-        // ③ が ④ より先
-        $this->registeredWorker(['name' => '山田 花子', 'email' => 'taro@example.com']);
-        $worker = $this->invitedWorker('taro@example.com', attributes: ['is_active' => false]);
-        Context::forget('company_id');
-
-        $this->postJson('/api/worker/register', $this->registerPayload())
-            ->assertUnprocessable()
-            ->assertExactJson(['message' => self::DISABLED_MESSAGE, 'errors' => ['email' => [self::DISABLED_MESSAGE]]]);
-
-        $this->assertRegisterRolledBack($worker);
-    }
-
     public function test_メールが合わなければ登録済みのメールと重なっても重なりを明かさずerrors_code(): void
     {
-        // ② が ④ より先: 入力のメールが招待の相手と合わなければ、そのメールが登録済みかを答えない
+        // ② が先: 入力のメールが招待の相手と合わなければ、そのメールの登録済みのワーカーがいるかを答えない
         $this->registeredWorker(['name' => '山田 花子', 'email' => 'hanako@example.com']);
         $worker = $this->invitedWorker('taro@example.com');
         Context::forget('company_id');
@@ -715,19 +660,17 @@ class WorkerAuthTest extends TestCase
     {
         // ② は招待を出したときのメールではなく、今の workers.email と比べる
         $worker = $this->invitedWorker('old@example.com');
-        Worker::query()->whereKey($worker->id)->update(['email' => 'New@Example.com']);
+        Worker::query()->whereKey($worker->id)->update(['email' => 'new@example.com']);
         Context::forget('company_id');
 
         $this->postJson('/api/worker/register', $this->registerPayload(['email' => 'old@example.com']))
             ->assertUnprocessable()
             ->assertJsonPath('errors', ['code' => [self::INVALID_CODE_MESSAGE]]);
 
-        $this->postJson('/api/worker/register', $this->registerPayload(['email' => 'new@example.com']))
+        $this->postJson('/api/worker/register', $this->registerPayload(['email' => 'New@Example.com']))
             ->assertCreated()
-            ->assertJsonPath('data.worker.id', $worker->id);
-
-        $worker = CurrentCompany::runAs($this->company->id, fn () => $worker->fresh());
-        $this->assertSame('new@example.com', $worker->login_email);
+            ->assertJsonPath('data.worker.id', $worker->id)
+            ->assertJsonPath('data.worker.email', 'new@example.com');
     }
 
     public function test_取り消した招待のコードは使えず新しい招待のコードで登録できる(): void
@@ -764,7 +707,6 @@ class WorkerAuthTest extends TestCase
         // 自社のワーカーと招待はそのまま
         [$own, $ownInvitation] = CurrentCompany::runAs($this->company->id, fn () => [$own->fresh(), $own->invitations()->sole()]);
         $this->assertNull($own->registered_at);
-        $this->assertNull($own->login_email);
         $this->assertTrue($ownInvitation->isUsable());
         $this->assertSame('OWNC2345', $ownInvitation->code);
         $this->assertSame(0, $own->tokens()->count());
@@ -1377,7 +1319,7 @@ class WorkerAuthTest extends TestCase
     {
         [$worker, $invitation] = CurrentCompany::runAs($this->company->id, fn () => [$worker->fresh(), $worker->invitations()->sole()]);
         $this->assertNull($worker->registered_at);
-        $this->assertNull($worker->login_email);
+        $this->assertNull($worker->getRawOriginal('password'));
         $this->assertTrue($invitation->isUsable());
         $this->assertSame(self::CODE, $invitation->code);
         $this->assertDatabaseCount('personal_access_tokens', 0);

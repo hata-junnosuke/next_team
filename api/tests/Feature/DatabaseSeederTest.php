@@ -115,7 +115,6 @@ class DatabaseSeederTest extends TestCase
 
             $worker = $registered->first();
             $this->assertSame('worker@example.com', $worker->email);
-            $this->assertSame('worker@example.com', $worker->login_email);
             $this->assertTrue($worker->is_active);
             $this->assertNotNull($worker->registered_at);
             $this->assertTrue(Hash::check('password', $worker->password));

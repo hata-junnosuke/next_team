@@ -12,11 +12,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use LogicException;
+use RuntimeException;
 use Tests\TestCase;
 
 /**
  * ワーカーアプリの土台（docs/01 の 3.1 の企業コード・workers に足す列、3.2 の worker_invitations、4.1 の NotificationKind）を
- * DB とモデルに直接当てて確かめる。API はまだないので HTTP は叩かない（ワーカー Step 5 の T3 以降で叩く）。
+ * DB とモデルに直接当てて確かめる。HTTP は叩かない（API は WorkerAuthTest・WorkerInvitationTest などで叩く）。
  */
 class WorkerFoundationTest extends TestCase
 {
@@ -88,51 +89,119 @@ class WorkerFoundationTest extends TestCase
 
     // --- workers のログイン列（3.1） ------------------------------------------
 
-    public function test_同じ企業の登録済みワーカーのログイン用メールはdbでも重複できない(): void
+    public function test_同じ企業でメールが重なるワーカーは保存できない(): void
     {
-        Worker::factory()->registered()->create(['email' => 'same@example.com']);
+        // 未登録でも縛る（企業の中でメールは一意。docs/01 の 3.1）
+        Worker::factory()->create(['email' => 'same@example.com']);
 
         $this->expectException(QueryException::class);
 
-        Worker::factory()->registered()->create(['email' => 'same@example.com']);
+        Worker::factory()->create(['email' => 'same@example.com']);
     }
 
-    public function test_未登録のワーカーは同じ企業に何人いてもよい(): void
+    public function test_ワーカーのメールのマイグレーションは既存の行を小文字にしてからuniqueにする(): void
     {
-        Worker::factory()->count(3)->create(['email' => 'same@example.com']);
+        $migration = require database_path('migrations/2026_11_09_100100_add_login_columns_to_workers_table.php');
+        $other = Company::factory()->create();
 
-        $this->assertSame(3, Worker::query()->whereNull('login_email')->whereNull('registered_at')->count());
+        // 列と一意制約を足す前に戻し、大文字を含むメールの既存の行を用意する（他社とは小文字にしても重なってよい）
+        $migration->down();
+        $this->assertFalse(Schema::hasColumn('workers', 'password'));
+        $insert = fn (int $companyId, string $email) => DB::table('workers')->insertGetId([
+            'company_id' => $companyId, 'name' => '既存', 'email' => $email, 'is_active' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $mixed = $insert($this->company->id, 'Taro.Yamada@Example.COM');
+        $umlaut = $insert($this->company->id, 'ÄÖ山田@Example.com');
+        $lower = $insert($this->company->id, 'hanako@example.com');
+        $theirs = $insert($other->id, 'TARO.YAMADA@example.com');
+
+        $migration->up();
+
+        $emails = DB::table('workers')->pluck('email', 'id');
+        $this->assertSame('taro.yamada@example.com', $emails[$mixed]);
+        $this->assertSame('äö山田@example.com', $emails[$umlaut]);
+        $this->assertSame('hanako@example.com', $emails[$lower]);
+        $this->assertSame('taro.yamada@example.com', $emails[$theirs]);
+        $this->assertTrue(Schema::hasColumn('workers', 'password'));
+        $this->assertTrue(Schema::hasColumn('workers', 'registered_at'));
+
+        // 小文字にした後は同じ企業の中で一意
+        $this->expectException(QueryException::class);
+        $insert($this->company->id, 'taro.yamada@example.com');
     }
 
-    public function test_別の企業なら同じログイン用メールで登録できる(): void
+    public function test_ワーカーのメールのマイグレーションは小文字にして重なる行があれば失敗する(): void
+    {
+        $migration = require database_path('migrations/2026_11_09_100100_add_login_columns_to_workers_table.php');
+        $migration->down();
+        $ids = array_map(fn (string $email) => DB::table('workers')->insertGetId([
+            'company_id' => $this->company->id, 'name' => '既存', 'email' => $email, 'is_active' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]), ['same@example.com', 'Same@Example.com']);
+
+        // 黙って片方を消したり残したりせず、書き込みと DDL の前の検査で止まる（docs/01 の 3.1）。
+        // 例外の文言に企業 ID と行 ID が入り、どの行を直せばよいかが分かる
+        try {
+            $migration->up();
+            $this->fail('重なる行があるのにマイグレーションが通った');
+        } catch (RuntimeException $e) {
+            // QueryException も RuntimeException の子なので、DB の失敗（UNIQUE の追加）ではないことも確かめる
+            $this->assertNotInstanceOf(QueryException::class, $e);
+            $this->assertStringContainsString("company_id={$this->company->id}", $e->getMessage());
+            $this->assertStringContainsString("{$ids[0]}, {$ids[1]}", $e->getMessage());
+        }
+
+        // 何も書き込まれていない（列は増えず、メールも小文字にしていない）。MySQL は DDL が自動コミットなので、途中まで進むと再実行もできなくなる
+        $this->assertFalse(Schema::hasColumn('workers', 'password'));
+        $this->assertFalse(Schema::hasColumn('workers', 'registered_at'));
+        $this->assertSame('Same@Example.com', DB::table('workers')->where('id', $ids[1])->value('email'));
+    }
+
+    public function test_ワーカーのメールはどの経路で保存しても小文字になる(): void
+    {
+        // サービスを通さない経路（ファクトリ・モデルの update・forceFill・new）でも小文字で入る（Worker の email のミューテタ）
+        $created = Worker::factory()->create(['email' => 'ÄÖ.Created@Example.COM']);
+        $this->assertSame('äö.created@example.com', $created->email);
+        $this->assertDatabaseHas('workers', ['id' => $created->id, 'email' => 'äö.created@example.com']);
+
+        $created->update(['email' => 'Updated@Example.COM']);
+        $this->assertDatabaseHas('workers', ['id' => $created->id, 'email' => 'updated@example.com']);
+
+        $created->forceFill(['email' => 'Forced@Example.COM'])->save();
+        $this->assertDatabaseHas('workers', ['id' => $created->id, 'email' => 'forced@example.com']);
+
+        $made = new Worker(['name' => '山田太郎', 'email' => 'New@Example.COM']);
+        $this->assertSame('new@example.com', $made->email);
+    }
+
+    public function test_他社なら同じメールのワーカーを保存できる(): void
     {
         $other = Company::factory()->create();
 
-        $mine = Worker::factory()->registered()->create(['email' => 'same@example.com']);
+        $mine = Worker::factory()->create(['email' => 'same@example.com']);
         $theirs = CurrentCompany::runAs($other->id, fn () => Worker::factory()->registered()->create(['email' => 'same@example.com']));
 
-        $this->assertSame('same@example.com', $mine->login_email);
-        $this->assertSame('same@example.com', $theirs->login_email);
+        $this->assertSame('same@example.com', $mine->email);
+        $this->assertSame('same@example.com', $theirs->email);
         $this->assertNotSame($mine->company_id, $theirs->company_id);
     }
 
-    public function test_パスワードとログイン用メールと登録日時は一括代入できずパスワードは配列に出ない(): void
+    public function test_パスワードと登録日時は一括代入できずパスワードは配列に出ない(): void
     {
         $worker = Worker::create([
             'name' => '山田太郎',
             'email' => 'yamada@example.com',
             'password' => 'secret-password',
-            'login_email' => 'yamada@example.com',
             'registered_at' => now(),
         ]);
 
         $this->assertNull($worker->password);
-        $this->assertNull($worker->login_email);
         $this->assertNull($worker->registered_at);
-        $this->assertDatabaseHas('workers', ['id' => $worker->id, 'password' => null, 'login_email' => null, 'registered_at' => null]);
+        $this->assertDatabaseHas('workers', ['id' => $worker->id, 'password' => null, 'registered_at' => null]);
 
         // サービスは forceFill で入れる。password は hashed cast でハッシュになり、配列（JSON）には出ない
-        $worker->forceFill(['password' => 'secret-password', 'login_email' => 'yamada@example.com', 'registered_at' => now()])->save();
+        $worker->forceFill(['password' => 'secret-password', 'registered_at' => now()])->save();
         $stored = (string) DB::table('workers')->where('id', $worker->id)->value('password');
 
         $this->assertNotSame('secret-password', $stored);

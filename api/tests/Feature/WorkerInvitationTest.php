@@ -171,7 +171,7 @@ class WorkerInvitationTest extends TestCase
         Queue::assertNothingPushed();
     }
 
-    // ---- 追加（tester）: 取り消しの範囲 ----
+    // ---- 取り消しの範囲 ----
 
     public function test_期限切れで未使用の前の招待も取り消されコードが消える(): void
     {
@@ -207,7 +207,7 @@ class WorkerInvitationTest extends TestCase
         $this->assertNull($revoked->used_at);
     }
 
-    // ---- 追加（tester）: 他社・ロックして読み直した後の判定 ----
+    // ---- 他社・ロックして読み直した後の判定 ----
 
     public function test_他社のワーカーには発行できない(): void
     {
@@ -266,7 +266,7 @@ class WorkerInvitationTest extends TestCase
         Queue::assertNothingPushed();
     }
 
-    // ---- 追加（tester）: イベント ----
+    // ---- イベント ----
 
     public function test_イベントはコミットの後に1回だけ発火し招待のidだけを持つ(): void
     {
@@ -295,7 +295,7 @@ class WorkerInvitationTest extends TestCase
         Queue::assertPushed(SendWorkerInvitationMail::class, 1);
     }
 
-    // ---- 追加（tester）: コードの重なり ----
+    // ---- コードの重なり ----
 
     /**
      * 次の $times 回の INSERT の code_hash を、他社の招待の code_hash に差し替える（DB の UNIQUE で本当に重ならせる）。
@@ -528,7 +528,7 @@ class WorkerInvitationTest extends TestCase
         $this->assertSame(0, NotificationLog::withoutGlobalScopes()->count()); // 全社の行を数えるため（他社の行も作られていないこと）
     }
 
-    // ---- 実行したらどうなるか（追加の観点。tester） ----
+    // ---- 実行したらどうなるか ----
 
     public function test_送信で例外が出ると記録はpendingのまま例外を投げ直し再試行に回る(): void
     {
@@ -581,7 +581,7 @@ class WorkerInvitationTest extends TestCase
 
         // 初回登録（WorkerAuthService::register）と同じ状態にする: 招待は使用済みでコードが消え、ワーカーは登録済み
         $invitation->forceFill(['used_at' => now(), 'code' => null])->save();
-        $invitation->worker->forceFill(['login_email' => 'hanako@example.com', 'registered_at' => now()])->save();
+        $invitation->worker->forceFill(['password' => 'secret-pass', 'registered_at' => now()])->save();
         Mail::fake();
         $this->runJob($invitation->id);
 
@@ -743,7 +743,7 @@ class WorkerInvitationTest extends TestCase
         $this->assertNotSame($a->key, $b->key);
     }
 
-    // ---- HTTP の入口（POST /api/workers・POST /api/workers/{worker}/invitation。T7） ----
+    // ---- HTTP の入口（POST /api/workers・POST /api/workers/{worker}/invitation。docs/01 の 6.3） ----
 
     public function test_ワーカーを登録すると招待のジョブが積まれ応答は送信を待たない(): void
     {
@@ -990,7 +990,7 @@ class WorkerInvitationTest extends TestCase
         $this->assertSame(1, WorkerInvitation::query()->count());
     }
 
-    // ---- メールの変更で招待を発行し直す（PUT /api/workers/{worker}。docs/01 の 3.1・4.5。T8） ----
+    // ---- メールの変更で招待を発行し直す（PUT /api/workers/{worker}。docs/01 の 3.1・4.5） ----
 
     public function test_未登録のワーカーのメールを直すと前のコードが使えなくなり新しい招待が積まれる(): void
     {
@@ -1061,7 +1061,7 @@ class WorkerInvitationTest extends TestCase
             ->assertJsonPath('data.name', '山田一郎');
         $this->putJson("/api/workers/{$worker->id}", ['name' => '山田一郎', 'email' => 'Yamada@Example.com'])
             ->assertOk()
-            ->assertJsonPath('data.email', 'Yamada@Example.com')
+            ->assertJsonPath('data.email', 'yamada@example.com')
             ->assertJsonPath('data.invitation_expires_at', $first->expires_at->toIso8601String());
 
         $this->assertSame(1, WorkerInvitation::query()->count());
@@ -1086,14 +1086,14 @@ class WorkerInvitationTest extends TestCase
         Mail::assertNothingSent();
         $this->assertSame(0, NotificationLog::query()->count());
 
-        // 新しい招待のジョブは、入力どおりの新しいメール宛に 1 通だけ送る
+        // 新しい招待のジョブは、新しいメール（小文字で保存したもの）宛に 1 通だけ送る
         $this->runJob($second->id);
         Mail::assertSent(WorkerInvitationMail::class, 1);
-        Mail::assertSent(WorkerInvitationMail::class, fn (WorkerInvitationMail $mail) => count($mail->to) === 1 && $mail->hasTo('New@Example.com'));
+        Mail::assertSent(WorkerInvitationMail::class, fn (WorkerInvitationMail $mail) => count($mail->to) === 1 && $mail->hasTo('new@example.com'));
         Mail::assertNotSent(WorkerInvitationMail::class, fn (WorkerInvitationMail $mail) => $mail->hasTo('old@example.com'));
 
         $log = NotificationLog::query()->sole();
-        $this->assertSame('New@Example.com', $log->recipient_email);
+        $this->assertSame('new@example.com', $log->recipient_email);
         $this->assertSame(NotificationStatus::Sent, $log->status);
         $this->assertSame($second->id, $log->subject_id);
     }

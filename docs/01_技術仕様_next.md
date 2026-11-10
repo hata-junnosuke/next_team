@@ -146,17 +146,16 @@ Fortify の 2FA 用の列は作りません（`features` が空なので使わ�
 | phone | string | NULL |
 | is_active | boolean | NOT NULL、default true |
 
-INDEX: `(company_id, is_active)`、`(company_id, name)`。`email` には一意制約を付けません（未登録のワーカーは同じメールでもよい）。登録済みのワーカーの一意は、下の `login_email` で守ります。
+INDEX: `(company_id, is_active)`、`(company_id, name)`。`email` は**同じ企業の中で一意**（UNIQUE `(company_id, email)`。下のワーカーアプリの列と同じマイグレーションで足す）。小文字にして保存する。
 
-**ワーカーアプリ（docs/05 の Step 5）で足す列**（新しいマイグレーションファイルで足す。既存のファイルは触らない）:
+**ワーカーアプリ（docs/05 の Step 5）で足す列と制約**（新しいマイグレーションファイルで足す。既存のファイルは触らない。同じファイルで既存の `email` を小文字にしてから UNIQUE `(company_id, email)` を付ける）:
 
 | 列 | 型 | 制約 |
 |---|---|---|
 | password | string | NULL（hashed cast。初回登録で入る。`#[Hidden]`） |
-| login_email | string | NULL（初回登録のときに `email` を小文字にして写す。ログインの識別子）。**UNIQUE `(company_id, login_email)`** |
 | registered_at | datetime | NULL（初回登録の日時。NULL なら未登録） |
 
-ログインの識別子（docs/00 の決定 68。決定 64 を変更）: ワーカーは企業ごとに管理し、同じ人が別の企業でも働くなら企業ごとに別のアカウントにする。ログインは**企業コード ＋ メール ＋ パスワード**。登録を済ませたワーカーのメールを**同じ企業の中で一意**にするため、`(company_id, login_email)` に UNIQUE を付ける。未登録のワーカーは NULL なので縛らない（NULL は UNIQUE で重なってよい。SQLite も MySQL も同じ）。部分インデックス（`WHERE registered_at IS NOT NULL`）は MySQL にないので使わない（12 章の方針と同じ）。メールは小文字にして保存し、照合も小文字で行う（SQLite の UNIQUE は大文字と小文字を区別するため）。小文字化は `Worker::normalizeLoginEmail()`（`mb_strtolower`）の 1 か所で行い、照合・保存・レート制限のキーで共有する（`strtolower` は ASCII しか小文字にしない）。管理者がワーカーのメールを直したとき（F-02 の PUT）は `WorkerService::update()` が扱う（4.5）: 登録済みなら `login_email` も同じ値に直し、同じ企業のほかの登録済みワーカーと重なれば 422。未登録なら未使用・未取消の招待（期限切れを含む）を取り消し、有効なワーカーなら新しいメール宛に招待を発行する（**無効なワーカーは取り消すだけで発行しない**。有効に戻したら F-27 で送り直す）。メールが変わったかは大文字小文字を無視して比べる（照合は小文字なので、大文字小文字だけの違いなら前の招待コードをそのまま使える）。未登録でも、新しいメールが同じ企業の登録済みワーカーの `login_email` と重なるなら 422（初回登録が必ず失敗するため）。重複の確認は自社の中だけで閉じるので、他社の登録状況は分からない。
+ログインの識別子（docs/00 の決定 68。決定 64 を変更）: ワーカーは企業ごとに管理し、同じ人が別の企業でも働くなら企業ごとに別のアカウントにする。ログインは**企業コード ＋ メール（`email`）＋ パスワード**。ワーカーのメールは、登録済みかを問わず**同じ企業の中で一意**にする（UNIQUE `(company_id, email)`。他社とは重なってよい）。メールがそのままログインの識別子になる（同じ企業に同じメールのワーカーが 2 人いると、招待とログインがどちらのものか決まらないため）。メールは小文字にして保存し、照合も小文字で行う（SQLite の UNIQUE は大文字と小文字を区別するため。MySQL に移すときは `email` 列の照合順序を `utf8mb4_0900_bin` にする。`_ci` はアクセントも同じとみなし、UNIQUE とログインの照合が SQLite より緩くなる。`utf8mb4_bin` は末尾の空白を同じとみなす PAD SPACE なので、NO PAD の `0900_bin` にする）。小文字化は `Worker::normalizeEmail()`（`mb_strtolower`）の 1 か所で行い、保存（`Worker` の `email` のミューテタ。どの経路で保存しても小文字になる）・照合・レート制限のキーで共有する（`strtolower` は ASCII しか小文字にしない）。管理者がワーカーを登録・編集したとき（F-02）は `WorkerService` が扱う（4.5）: 新しいメールが同じ企業のほかのワーカーと重なれば 422（登録済みかを問わない）。未登録のワーカーのメールが変わったら、未使用・未取消の招待（期限切れを含む）を取り消し、有効なワーカーなら新しいメール宛に招待を発行する（**無効なワーカーは取り消すだけで発行しない**。有効に戻したら F-27 で送り直す）。メールが変わったかは大文字小文字を無視して比べる（大文字小文字だけの違いなら前の招待コードをそのまま使える）。重複の確認は自社の中だけで閉じるので、他社の登録状況は分からない。
 
 **job_postings**（募集）
 
@@ -375,11 +374,11 @@ final class CurrentCompany
 | `DashboardService` | `summary(): array` | 6 章の形 | |
 | | `forget(int $companyId): void`（呼ぶのは Observer だけ。キャッシュの有効期限は「設定の秒数後」と「翌日 0:00」の早い方。キーは `dashboard:{company_id}` のままで、日付またぎで前日の一覧が残らない。P4-07 で決定） | | |
 | `ReportExportService`（P4） | `request(User $u, string $month): ReportExport` | 受け付けた行（読み直した後の状態。Redis では `processing`、拠点 0 件は `queued`、積むのに失敗したら `failed`、sync のテストでは `completed` のこともある。P4-05 で決定） | 同じ月の出力が生成中です。 |
-| `WorkerService`（ワーカー Step 5。F-02 の登録と編集を担う。今の `WorkerController` の登録・編集をここへ移す） | `create(array $data): Worker`（同じトランザクションで `WorkerInvitationService::issue()`） | 作ったワーカー | |
-| | `update(Worker $w, array $data): Worker`（ワーカーの行を `lockForUpdate()` してから判定する。メールが（大文字小文字を無視して）変わったとき: 登録済みなら `login_email` を小文字で追従させる。未登録なら、有効なら `issue()` で新しい招待を発行し（前の招待は `issue()` が取り消す）、無効なら `WorkerInvitationService::revoke()` で取り消すだけ） | 更新後 | このメールアドレスは、この企業の別のワーカーのログインに使われています。（`field: email`。新しいメールが同じ企業の登録済みワーカーの `login_email` と重なるとき。登録済み・未登録を問わない。UNIQUE 違反も同じ文言にする） |
+| `WorkerService`（ワーカー Step 5。F-02 の登録と編集を担う。`WorkerController` はこれを呼ぶだけ） | `create(array $data): Worker`（メールを小文字で保存し、同じトランザクションで `WorkerInvitationService::issue()`） | 作ったワーカー | 次の行の `update()` と同じ（メールの重なり） |
+| | `update(Worker $w, array $data): Worker`（ワーカーの行を `lockForUpdate()` してから判定する。メールは小文字で保存する。メールが（大文字小文字を無視して）変わったとき: 登録済みならそのまま（次のログインから新しいメール）。未登録なら、有効なら `issue()` で新しい招待を発行し（前の招待は `issue()` が取り消す）、無効なら `WorkerInvitationService::revoke()` で取り消すだけ） | 更新後 | このメールアドレスは、この企業の別のワーカーに使われています。（`field: email`。`create()` と `update()` で、新しいメールが同じ企業のほかのワーカーと重なるとき。登録済みかを問わない。UNIQUE 違反も同じ文言にする） |
 | `WorkerInvitationService`（ワーカー Step 5） | `issue(Worker $w): WorkerInvitation`（ワーカーの行を `lockForUpdate()` し、前の未使用・未取消の招待（期限切れを含む）を `lockForUpdate()` で読んで `revoked_at` を入れ `code` を NULL にし、新しい招待を作る（コードが UNIQUE で重なったら INSERT だけをセーブポイントで巻き戻して作り直す。最大 5 回）。コミット後に `WorkerInvited` を発火。`WorkerService` と F-27 の送り直しから呼ぶ）／`revoke(Worker $w): void`（取り消すだけ。無効で未登録のワーカーのメール変更用）。**ロックの順はワーカー → 招待**（`update()`・`register()` も同じ順にする。MySQL でのデッドロックを避ける） | 作った招待 | 無効のワーカーには招待を送れません。／このワーカーはすでに初回登録を済ませています。 |
-| `WorkerAuthService`（ワーカー Step 5） | `register(string $email, string $code, string $password, string $deviceName): array{worker: Worker, token: string}`（トランザクション。**判定はこの順**: ① `code_hash` で招待を引く（スコープを外す。ここだけ。ロックせず、引くのは `id` `worker_id` `company_id` だけ）→ `CurrentCompany::runAs()` → ワーカー → 招待の順に `lockForUpdate()` で読み直す ② 使えるか・入力のメールが**今の** `workers.email` と小文字で一致するか・ワーカーが未登録か（登録済みなら、使える招待が残っていても ② の失敗にする。パスワードを上書きさせない） ③ 無効ワーカーか ④ 同じ企業の登録済みワーカーと `login_email` が重ならないか（保存の UNIQUE 違反も ④ の文言）。通れば招待を使用済みにして `code` を NULL にし、`password` `login_email`（小文字）`registered_at` を入れてトークンを発行する。**FormRequest に `unique` の規則を書かない**（①より前に重複を答えると、認証なしでメールの登録状況が分かるため）） | | 招待コードが正しくないか、有効期限が切れています。（`field: code`。②まで。見つからない・メール不一致・使用済み・取り消し・期限切れを区別しない）／このアカウントは現在利用できません。管理者にお問い合わせください。（③。`field: email`）／このメールアドレスは、この企業の別のワーカーのログインに使われています。（④。`field: email`） |
-| | `login(string $companyCode, string $email, string $password, string $deviceName): array{worker: Worker, token: string}`（企業コードを大文字に直して `Company` を引き、`runAs()` で `login_email`（小文字）のワーカーを引いて `Hash::check()` → `createToken()`。**どの道も「ダミーのハッシュのキャッシュの読み取り 1 回 ＋ `Hash::check()` 1 回」にそろえ**、見つからない・未登録でもダミーのハッシュ（`Cache::rememberForever`。キーはハッシュのドライバと設定）で照合する。全体を `Illuminate\Support\Timebox`（200ms）で包む（照合が速い設定での下限。本番のコストでは照合だけで超える）。応答時間でアカウントの有無が分からないように。成功したら `Hash::needsRehash()` で今の設定のハッシュに作り直す） | | 企業コード・メールアドレス・パスワードのいずれかが正しくありません。（`field: email`。どれが誤りかを明かさない）／このアカウントは現在利用できません。管理者にお問い合わせください。（パスワードが合ったうえで無効のとき。`field: email`） |
+| `WorkerAuthService`（ワーカー Step 5） | `register(string $email, string $code, string $password, string $deviceName): array{worker: Worker, token: string}`（トランザクション。**判定はこの順**: ① `code_hash` で招待を引く（スコープを外す。ここだけ。ロックせず、引くのは `id` `worker_id` `company_id` だけ）→ `CurrentCompany::runAs()` → ワーカー → 招待の順に `lockForUpdate()` で読み直す ② 使えるか・入力のメールが**今の** `workers.email` と小文字で一致するか・ワーカーが未登録か（登録済みなら、使える招待が残っていても ② の失敗にする。パスワードを上書きさせない） ③ 無効ワーカーか（メールは企業の中で一意なので、ほかのワーカーとの重なりは起きない）。通れば招待を使用済みにして `code` を NULL にし、`password` `registered_at` を入れてトークンを発行する。**FormRequest に `unique` の規則を書かない**（①より前に重複を答えると、認証なしでメールの登録状況が分かるため）） | | 招待コードが正しくないか、有効期限が切れています。（`field: code`。②まで。見つからない・メール不一致・使用済み・取り消し・期限切れを区別しない）／このアカウントは現在利用できません。管理者にお問い合わせください。（③。`field: email`） |
+| | `login(string $companyCode, string $email, string $password, string $deviceName): array{worker: Worker, token: string}`（企業コードを大文字に直して `Company` を引き、`runAs()` で `email`（小文字）のワーカーを引いて `Hash::check()` → `createToken()`。**どの道も「ダミーのハッシュのキャッシュの読み取り 1 回 ＋ `Hash::check()` 1 回」にそろえ**、見つからない・未登録でもダミーのハッシュ（`Cache::rememberForever`。キーはハッシュのドライバと設定）で照合する。全体を `Illuminate\Support\Timebox`（200ms）で包む（照合が速い設定での下限。本番のコストでは照合だけで超える）。応答時間でアカウントの有無が分からないように。成功したら `Hash::needsRehash()` で今の設定のハッシュに作り直す） | | 企業コード・メールアドレス・パスワードのいずれかが正しくありません。（`field: email`。どれが誤りかを明かさない）／このアカウントは現在利用できません。管理者にお問い合わせください。（パスワードが合ったうえで無効のとき。`field: email`） |
 | | `logout(Worker $w): void`（今のトークンだけ消す） | | |
 | `WorkerPortalService`（ワーカー Step 5） | `searchPostings(Worker $w, array $filters, int $perPage): LengthAwarePaginator`（自社の募集中・勤務日が今日以降（`JobPosting::scopeListedForWorkers()`）。勤務日 → 開始時刻 → id の昇順。確定数は `withCount('confirmedApplications')`。自分の応募だけを読み込む） | | |
 | | `findPosting(Worker $w, JobPosting $p): JobPosting`（募集中かつ今日以降、または自分の応募がある募集だけ。ほかは `ModelNotFoundException`（404）） | | |
@@ -469,7 +468,7 @@ sequenceDiagram
 | 設定 | 内容 |
 |---|---|
 | `config/auth.php` | provider `workers`（`eloquent`、`App\Models\Worker`）を足す。guard `worker`（`driver: sanctum`、`provider: workers`）を足す。**guard `sanctum` に `provider: users` を付ける**（管理者の API にワーカーのトークンで入れないため） |
-| `Worker` モデル | `Authenticatable` を継承し `HasApiTokens` を使う。`password` は `#[Hidden]`・hashed cast。`#[Fillable]` に `password` `login_email` `registered_at` を入れない（サービスが `forceFill()` で入れる） |
+| `Worker` モデル | `Authenticatable` を継承し `HasApiTokens` を使う。`password` は `#[Hidden]`・hashed cast。`#[Fillable]` に `password` `registered_at` を入れない（サービスが `forceFill()` で入れる） |
 | トークンのモデル | `App\Models\PersonalAccessToken`（Sanctum のモデルを継承）を `Sanctum::usePersonalAccessTokenModel()` で使う。`tokenable()` を `morphTo()->withoutGlobalScope('company')` にする（**理由のコメント**: Sanctum が持ち主を読む時点では企業がまだ決まっておらず、`Worker` のグローバルスコープが `CurrentCompany::id()` で例外になるため） |
 | トークン | 名前は入力の `device_name`（例: `iPhone 16`）、ability は `['worker']`（`worker` ミドルウェアが `tokenCan('worker')` を確かめる）、有効期限は `config('myteam.worker_token_days')` 日（既定 30。`createToken()` の第 3 引数）。期限切れは `routes/console.php` で毎日 `sanctum:prune-expired --hours=24`。1 人あたりのトークンの数の上限と、端末をなくしたときに管理者が全トークンを消す手段は後の弾の課題 |
 | ミドルウェア `AuthenticateWorker`（別名 `worker`） | `auth:worker` の後ろ。`$request->user('worker')` が `Worker` でない（stateful なリクエストでは Sanctum が web ガードの `User` を**必ず**返すので、これが唯一の守り。13 章の 9）・`tokenCan('worker')` でない・`registered_at` が NULL・無効なら **401**（無効のときは `{"message": "このアカウントは現在利用できません。管理者にお問い合わせください。", "errors": {}}`）。通れば `CurrentCompany::set($worker->company_id)`。`SubstituteBindings` より前に動くよう、`bootstrap/app.php` のミドルウェアの優先順に入れる（`company` と同じ扱い） |
@@ -553,8 +552,8 @@ sequenceDiagram
 
 | メソッド | パス | 入力 | 成功 |
 |---|---|---|---|
-| POST | `/api/workers` | （既存）| 201。`WorkerService::create()` が**登録と同じトランザクションで招待を発行し、コミット後に招待メールを積む**（F-26。応答はメールの送信を待たない） |
-| PUT | `/api/workers/{id}` | （既存）| 200。`WorkerService::update()`。メールが変わったら 3.1 のとおり（登録済みは `login_email` が追従、重なれば 422 `errors.email`。未登録で有効なら招待を送り直し、無効なら前の招待を取り消すだけ） |
+| POST | `/api/workers` | （既存）| 201。同じ企業のほかのワーカーとメールが重なれば 422 `errors.email`（4.5 の文言）。`WorkerService::create()` が**登録と同じトランザクションで招待を発行し、コミット後に招待メールを積む**（F-26。応答はメールの送信を待たない） |
+| PUT | `/api/workers/{id}` | （既存）| 200。`WorkerService::update()`。メールが変わったら 3.1 のとおり（同じ企業のほかのワーカーと重なれば 422 `errors.email`。未登録で有効なら招待を送り直し、無効なら前の招待を取り消すだけ） |
 | POST | `/api/workers/{id}/invitation` | | 200 `WorkerResource`（F-27 の送り直し。前の招待は使えなくなる）。無効・登録済みは 422（4.5 の文言）。`throttle:worker-invitation`（同じワーカーに 1 分 1 回。超えたら 429） |
 
 一覧の絞り込み: `q` は前後の空白を除いて氏名の部分一致（`%` `_` も文字として扱う。空白だけなら絞り込まない）。`is_active` は `1` / `0` / `true` / `false` のいずれか（空・未指定なら絞り込まない。それ以外は 422）。登録・更新（POST / PUT）では `is_active` を受け付けず、切り替えは PATCH だけ（P2-02 で決定）。
@@ -693,7 +692,7 @@ sequenceDiagram
 | `POST job-postings/{id}/applications` | 404（他社・存在しない募集）、422（4.5 の `applyAsWorker()` の 5 つと、ミドルウェアの後に無効にされたとき） |
 | `GET applications` | 422（`status` が Enum にない値） |
 
-`WorkerMeResource`: `{id, name, email, company: {id, name, code}}`（`email` は `login_email`。アプリは `company.code` を覚えておき、次のログインの入力欄に入れておく）
+`WorkerMeResource`: `{id, name, email, company: {id, name, code}}`（`email` は小文字で保存したメール。アプリは `company.code` を覚えておき、次のログインの入力欄に入れておく）
 
 `WorkerJobPostingResource`: `{id, location: {id, name}, job_title, work_date, start_time, end_time, hourly_wage, transport_allowance, capacity, remaining, status: {value, label}, my_application: {id, status: {value, label}} | null, can: {apply}}`
 
@@ -706,9 +705,8 @@ sequenceDiagram
 
 | 場面 | `message` | `errors` |
 |---|---|---|
-| 初回登録: コードが見つからない・メールと合わない・使用済み・取り消し・期限切れ | 招待コードが正しくないか、有効期限が切れています。 | `code` |
+| 初回登録: コードが見つからない・メールと合わない・使用済み・取り消し・期限切れ・登録済み | 招待コードが正しくないか、有効期限が切れています。 | `code` |
 | 初回登録: 無効ワーカー | このアカウントは現在利用できません。管理者にお問い合わせください。 | `email` |
-| 初回登録: 同じ企業の登録済みのワーカーとメールが重なる | このメールアドレスは、この企業の別のワーカーのログインに使われています。 | `email` |
 | ログイン: 企業コード・メール・パスワードのどれかが誤り | 企業コード・メールアドレス・パスワードのいずれかが正しくありません。 | `email` |
 | ログイン: 無効ワーカー（パスワードは合っている） | このアカウントは現在利用できません。管理者にお問い合わせください。 | `email` |
 | 応募 | 4.5 の `applyAsWorker()` の 5 つ | 空 |
@@ -966,8 +964,8 @@ mobile/
 | ファイル | 守るもの |
 |---|---|
 | `Feature/WorkerInvitationTest.php` | 登録で招待が積まれる（`Queue::fake()`）／送り直しで前のコードが使えなくなる／未登録のワーカーのメールを直すと前のコードが使えなくなり、新しい招待が積まれる／無効で未登録のワーカーのメールは直せて、招待は積まれない（前の招待は使えなくなる）／無効・登録済みは 422／ジョブがコード・有効期限・企業コードを含むメールを送り通知の記録が残る（`handle()` を直接）／`handle()` を 2 回呼んでも 1 通／`failed()` で記録が failed になり、再実行で sent になる／使用済み・取り消し・期限切れの招待と、無効になったワーカーには送らない／他社のワーカーは 404 |
-| `Feature/WorkerTest.php`（既存に足す） | 登録済みのワーカーのメールを直すと `login_email` が追従する／同じ企業の登録済みワーカーと重なると 422（`errors.email`）／**別の企業の登録済みワーカーと同じメールにしても 422 にならない**（他社の登録状況が分からない） |
-| `Feature/WorkerAuthTest.php` | 初回登録の成功（トークンが返り、同じコードはもう使えない）／招待コードを小文字や前後の空白つきで入れても通る／期限切れ・使用済み・取り消し・メール不一致は同じ 422／無効ワーカーは登録もログインもできない／同じ企業の登録済みのメールと重なると 422、**別の企業なら登録できる**（同じメールで 2 社のアカウント）／ログインの成功と失敗（企業コード・メール・パスワードのどれが誤りかを明かさない。企業コードの大文字と小文字は問わない）／同じメールの 2 社のアカウントは、企業コードでどちらにログインするかが決まる／ログインと初回登録は 6 回目から 429／ログアウトで今のトークンだけ消える／**5.3 の「入れないことの確認」の 4 行（本物のトークンで）**／期限切れのトークンは 401 |
+| `Feature/WorkerTest.php`（既存に足す） | メールを小文字で保存する／登録・編集で同じ企業のほかのワーカー（登録済みかを問わない）と重なると 422（`errors.email`）／**別の企業のワーカーと同じメールにしても 422 にならない**（他社の登録状況が分からない）／大文字小文字だけの違いなら前の招待が残る |
+| `Feature/WorkerAuthTest.php` | 初回登録の成功（トークンが返り、同じコードはもう使えない）／招待コードを小文字や前後の空白つきで入れても通る／期限切れ・使用済み・取り消し・メール不一致は同じ 422／無効ワーカーは登録もログインもできない／**別の企業なら同じメールで登録できる**（同じメールで 2 社のアカウント）／ログインの成功と失敗（企業コード・メール・パスワードのどれが誤りかを明かさない。企業コードの大文字と小文字は問わない）／同じメールの 2 社のアカウントは、企業コードでどちらにログインするかが決まる／ログインと初回登録は 6 回目から 429／ログアウトで今のトークンだけ消える／**5.3 の「入れないことの確認」の 4 行（本物のトークンで）**／期限切れのトークンは 401 |
 | `Feature/WorkerJobPostingTest.php` | 自社の募集中・今日以降だけが並ぶ／日付と拠点で絞れる／`remaining` と `my_application` と `can.apply`／詳細は条件を満たさなければ 404、自分の応募がある締切・中止の募集は見られる／**他社の募集は 404**／応答にほかのワーカーの氏名が出ない（`assertJsonPath` か `JSON_UNESCAPED_UNICODE` で確かめる。`testing.md`） |
 | `Feature/WorkerApplicationTest.php` | 応募できる（管理者の応募一覧に応募中で出る）／残り枠 0・締切・中止・勤務日が過ぎた・二重は 422（文言は 4.5 のもの。`errors` は空）／残り枠 0 でも管理者の代行入力（F-09）はできる／**無効にされたワーカーの応募は 401 で、応募は作られない**／自分の応募だけが並び、状態で絞れる。キャンセルは理由区分（企業都合）が出る／**他社の募集への応募は 404** |
 | `Feature/WorkerAcceptanceScenarioTest.php` | 要件 4.8 の動線（docs/05 の付録 A.3）を API 経由で 1 本。キューは sync のまま `Mail::fake()` で「届く」を確かめ、招待コードは送られた `WorkerInvitationMail` から取る。勤務日は `travelTo()` で今日を固定して決める |
@@ -1082,7 +1080,7 @@ B と C の境界: C の `AttendanceService::save()` は B の `Application`（�
 | 通知の記録を自前のテーブルに | `notification_logs`（ポリモーフィック）＋ `dedupe_key` の UNIQUE | 冪等性を DB 制約で保証できる。Laravel の `notifications` テーブルは「管理者のアプリ内通知」にだけ使う |
 | ジョブに ID を渡す | `SerializesModels` に頼らない | 実行時点の最新状態を読む。確定後すぐキャンセルされた応募に確定通知を送らない |
 | ワーカーの認証を管理者と分ける（ワーカー Step 5） | ワーカーは Sanctum の API トークン、guard `worker`。管理者の guard `sanctum` は provider を `users` に絞り、`company` ミドルウェアでも `User` かを確かめる | スマホアプリでは Cookie と CSRF を前提にできない。`auth:sanctum` はトークンの持ち主のモデルを問わないので、絞らないとワーカーのトークンで管理者の API に入れてしまう。provider だけに頼らず、ミドルウェアでも型を確かめて 2 重に守る |
-| ログインの識別子を「企業コード ＋ `login_email`」に（ワーカー Step 5） | 初回登録で `email` を小文字で写す NULL 可の列に、UNIQUE `(company_id, login_email)` | 同じ人が別の企業で働くなら別のアカウントにする（docs/00 の決定 68）。「登録済みのワーカーだけ企業の中で一意」を、MySQL にない部分インデックスを使わずに DB で守れる。全社で一意にすると、メールの変更の 422 で他社の登録状況が分かり、先取りで他社の初回登録を塞げてしまう（T3 の security-reviewer の指摘で決定 64 から変えた） |
+| ログインの識別子を「企業コード ＋ `email`」に（ワーカー Step 5） | `email` を小文字で保存し、UNIQUE `(company_id, email)`。メールがそのままログインの識別子になる（同じ企業に同じメールのワーカーが 2 人いると、招待とログインがどちらのものか決まらない） | 同じ人が別の企業で働くなら別のアカウントにする（docs/00 の決定 68）。全社で一意にすると、メールの変更の 422 で他社の登録状況が分かり、先取りで他社の初回登録を塞げてしまう（T3 の security-reviewer の指摘で決定 64 から変えた） |
 | 招待コードを HMAC と暗号化の 2 本で持つ（ワーカー Step 5） | `code_hash`（HMAC、UNIQUE）で引き、`code`（`encrypted` cast）はメールにだけ使う | bcrypt では入力から行を引けない。ジョブに生のコードを渡さずに済む（ペイロードに秘密を入れない） |
 | ワーカーの応募の持ち主の確認（ワーカー Step 5） | 今回は Policy を作らない。応募の一覧は `worker_id` で絞り、応募 ID を受け取る API を作らない | 決定 24 と同じ。応募 ID を受け取る取り下げ・キャンセル（docs/05 の Step 8）を足すときに、Policy を使うかを決める |
 | `/horizon` `/telescope` の入口を「ローカル かつ ログイン済み管理者」に（P4-01b で 2 章の表を更新） | `HorizonServiceProvider` / `TelescopeServiceProvider` の `authorization()` を上書き | 2 章の表は Telescope を「ローカルのみ」と書いていたが、パッケージの既定（親の `authorization()`）は「ローカル環境 または Gate」で、ローカルなら未ログインでも通る。`rules/common/security.md`（ログイン済み管理者・ローカル環境に限定）に合わせ、両方とも「ログイン済み かつ Gate（ローカル）」にした。テストは `api/tests/Feature/HorizonAccessTest.php` |

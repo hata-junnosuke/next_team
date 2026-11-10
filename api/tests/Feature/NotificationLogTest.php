@@ -30,15 +30,22 @@ use Tests\TestCase;
  */
 class NotificationLogTest extends TestCase
 {
+    /** confirmedLog() を呼んだ回数（ワーカーのメールを呼ぶたびに変えるための連番） */
+    private int $confirmedLogCount = 0;
+
     /**
-     * 確定済みの応募に対する、そのワーカーへの確定通知
+     * 確定済みの応募に対する、そのワーカーへの確定通知。
+     * ワーカーのメールは同じ企業の中で一意なので、1 回目は yamada@example.com、2 回目からは yamada2@example.com のように連番にする
      */
     private function confirmedLog(string $jobTitle = '検品', string $workDate = '2026-10-10', string $workerName = '山田 太郎'): NotificationLog
     {
+        $this->confirmedLogCount++;
+        $email = $this->confirmedLogCount === 1 ? 'yamada@example.com' : "yamada{$this->confirmedLogCount}@example.com";
+
         $posting = JobPosting::factory()->create(['job_title' => $jobTitle, 'work_date' => $workDate]);
         $application = Application::factory()
             ->for($posting)
-            ->for(Worker::factory()->state(['name' => $workerName, 'email' => 'yamada@example.com']))
+            ->for(Worker::factory()->state(['name' => $workerName, 'email' => $email]))
             ->confirmed()
             ->create();
 
@@ -417,7 +424,7 @@ class NotificationLogTest extends TestCase
 
     public function test_宛先と対象の種類のラベルに不明や募集が出ない(): void
     {
-        // docs/01 の NotificationLogResource: type の label は「ワーカー」「管理者」「応募」「集計出力」「招待」の 5 つだけ（issue #25 で「募集」を外した。招待はワーカー Step 5）
+        // docs/01 の NotificationLogResource: type の label は「ワーカー」「管理者」「応募」「集計出力」「招待」の 5 つだけ（docs/01 の 6.10。「募集」は出さない）
         $this->claimAllKinds();
         // 行が消えた記録も混ぜる（ラベルは *_type から決まるので、行がなくても 5 つのどれかになる）
         NotificationLog::query()->update(['recipient_id' => 999999, 'subject_id' => 999999]);
@@ -679,7 +686,7 @@ class NotificationLogTest extends TestCase
         $this->assertDatabaseHas('notification_logs', ['id' => $log->id]);
     }
 
-    // ---- テスト補強（tester・issue #37 T6 招待） ----
+    // ---- 招待の通知（docs/01 の 6.10） ----
 
     public function test_招待のラベルのワーカー名は今の名前で出てemailは記録時のアドレス(): void
     {

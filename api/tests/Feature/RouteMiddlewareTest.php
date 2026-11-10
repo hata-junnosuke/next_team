@@ -46,7 +46,7 @@ class RouteMiddlewareTest extends TestCase
 
     public function test_管理者のapiで試行回数の制限が付くのは招待の送り直しだけ(): void
     {
-        // 送り直しは同じワーカーに 1 分 1 回（issue #37 の決定 Q5）。ほかの管理者のルートには付けない
+        // 送り直しは同じワーカーに 1 分 1 回（docs/01 の 6.3）。ほかの管理者のルートには付けない
         $limited = ['POST api/workers/{worker}/invitation' => 'throttle:worker-invitation'];
         $seen = [];
 
@@ -257,7 +257,7 @@ class RouteMiddlewareTest extends TestCase
 
     /**
      * ワーカーの API でも、他社の ID は worker ミドルウェアが決めた企業のグローバルスコープで 404 になる（6.11 の失敗の表）。
-     * 本物のトークン（withToken）で叩く（docs/01 の 5.3）。T11・T12 で中身を実装した後も、ここで 404 を固定する
+     * 本物のトークン（withToken）で叩く（docs/01 の 5.3）。FormRequest の検証（422）より先に 404 になることをここで固定する
      */
     public function test_ワーカーのidを持つ全ルートで他社のidは404(): void
     {

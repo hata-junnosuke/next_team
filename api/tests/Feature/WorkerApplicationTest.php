@@ -280,7 +280,7 @@ class WorkerApplicationTest extends TestCase
         $this->assertDatabaseCount('applications', 0);
     }
 
-    // ---- 判定の順の境界（T12 で決定。docs/01 への追記は T15: 無効 → 締切・中止 → 勤務日 → 二重 → 残り枠） ----
+    // ---- 判定の順の境界（docs/01 の 4.5: 無効 → 締切・中止 → 勤務日 → 二重 → 残り枠） ----
 
     public function test_締切で勤務日も過ぎた募集は締切の文言(): void
     {

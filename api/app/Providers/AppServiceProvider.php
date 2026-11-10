@@ -69,22 +69,22 @@ class AppServiceProvider extends ServiceProvider
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 
         // ワーカーの初回登録とログインの試行回数（docs/01 の 5.3。1 分 5 回、超えたら 429）。Rails の rack-attack の throttle に当たる。
-        // キーは入力の値の表記ゆれ（大文字・小文字）で数え直されないようにそろえる。企業コードは大文字、メールは小文字（Worker::normalizeLoginEmail()。照合と同じ関数にする）
+        // キーは入力の値の表記ゆれ（大文字・小文字）で数え直されないようにそろえる。企業コードは大文字、メールは小文字（Worker::normalizeEmail()。照合と同じ関数にする）
         // https://readouble.com/laravel/13.x/ja/routing.html#rate-limiting
         // 初回登録の 429 は既定（auth.throttle の「ログインの試行回数が…」）ではなく初回登録の文言にする（ワーカーアプリは message をそのまま出す）
         RateLimiter::for('worker-register', fn (Request $request) => Limit::perMinute(5)
-            ->by(Worker::normalizeLoginEmail(self::stringInput($request, 'email')).'|'.$request->ip())
+            ->by(Worker::normalizeEmail(self::stringInput($request, 'email')).'|'.$request->ip())
             ->response(fn (Request $request, array $headers) => response()->json([
                 'message' => '初回登録の試行回数が多すぎます。'.(int) ($headers['Retry-After'] ?? 60).' 秒後にお試しください。',
                 'errors' => (object) [],
             ], 429, $headers)));
         RateLimiter::for('worker-login', fn (Request $request) => Limit::perMinute(5)->by(
             mb_strtoupper(self::stringInput($request, 'company_code')).'|'
-            .Worker::normalizeLoginEmail(self::stringInput($request, 'email')).'|'.$request->ip()
+            .Worker::normalizeEmail(self::stringInput($request, 'email')).'|'.$request->ip()
         ));
 
         // 招待の送り直し（F-27。POST /api/workers/{worker}/invitation）の回数。同じワーカーに 1 分 1 回、超えたら 429。
-        // 管理者の連打や誤操作でワーカーにメールが何通も届かないようにする（issue #37 の決定 Q5）。
+        // 管理者の連打や誤操作でワーカーにメールが何通も届かないようにする（docs/01 の 6.3）。
         // キーは企業とワーカー（company_id:worker_id）。別のワーカーなら続けて送れる。
         // 優先順により、いつも company の後・ルートモデルバインディングの前に動く（bootstrap/app.php）ので、{worker} は URL の文字列。
         // ルートの whereNumber('worker') で数字だけにし、(int) で 007 と 7 を同じ枠にそろえる。

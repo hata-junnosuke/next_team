@@ -8,7 +8,6 @@ use App\Models\Company;
 use App\Models\Worker;
 use App\Models\WorkerInvitation;
 use App\Support\CurrentCompany;
-use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -28,12 +27,6 @@ class WorkerAuthService
     /** 初回登録の ①② の失敗（見つからない・メール不一致・使用済み・取り消し・期限切れを区別しない。アカウントの有無を明かさない） */
     public const INVALID_CODE = '招待コードが正しくないか、有効期限が切れています。';
 
-    /**
-     * 同じ企業の登録済みワーカーと login_email が重なる（④）
-     * （WorkerService::update() の重なりの 422 もこの定数を使う。文言はこの 1 か所）
-     */
-    public const EMAIL_TAKEN = 'このメールアドレスは、この企業の別のワーカーのログインに使われています。';
-
     /** ログインの失敗（企業コード・メール・パスワードのどれが誤りか、未登録かを区別しない。アカウントの有無を明かさない） */
     public const INVALID_CREDENTIALS = '企業コード・メールアドレス・パスワードのいずれかが正しくありません。';
 
@@ -48,8 +41,9 @@ class WorkerAuthService
     /**
      * 初回登録（F-28）。判定の順と文言は docs/01 の 4.5 のとおり:
      * ① code_hash で招待を引く → CurrentCompany::runAs() ② 使えるか・入力のメールが今の workers.email と小文字で一致するか
-     * ③ 無効ワーカーか ④ 同じ企業の登録済みワーカーと login_email が重ならないか。
-     * 通れば招待を使用済みにして code を NULL にし、password・login_email・registered_at を入れてトークンを発行する。
+     * ③ 無効ワーカーか。
+     * 通れば招待を使用済みにして code を NULL にし、password・registered_at を入れてトークンを発行する。
+     * メールは同じ企業の中で一意（UNIQUE (company_id, email)。WorkerService が保存時に守る）なので、ほかのワーカーとの重なりは確かめない。
      *
      * ロックの順は WorkerInvitationService・WorkerService と同じ「ワーカー → 招待」（逆にするとデッドロックしうる）。
      * そのため ① はロックせずに引いて worker_id と company_id だけを得て、ワーカー → 招待の順にロックして読み直してから判定する。
@@ -80,7 +74,7 @@ class WorkerAuthService
 
     /**
      * ログイン（F-29。docs/01 の 4.5）。企業コードを大文字に直して Company を引き（企業にはスコープがない）、
-     * CurrentCompany::runAs() でその企業のワーカーを login_email（小文字）で引いて Hash::check() → createToken()。
+     * CurrentCompany::runAs() でその企業のワーカーを email（小文字。Worker::normalizeEmail()）で引いて Hash::check() → createToken()。
      * 判定の順: 企業・ワーカー・登録済み・パスワードのどれかが合わない → INVALID_CREDENTIALS。合ったうえで無効 → 無効の文言
      * （無効かどうかはパスワードを知っている人にだけ答える）。
      *
@@ -100,7 +94,7 @@ class WorkerAuthService
             $worker = $company === null ? null : CurrentCompany::runAs(
                 $company->id,
                 fn () => Worker::query()
-                    ->where('login_email', Worker::normalizeLoginEmail($email))
+                    ->where('email', Worker::normalizeEmail($email))
                     ->whereNotNull('registered_at')
                     ->first(),
             );
@@ -140,7 +134,7 @@ class WorkerAuthService
     }
 
     /**
-     * ②〜④ と登録。CurrentCompany は招待の企業になっている（ここから先はスコープを外さない）
+     * ②③ と登録。CurrentCompany は招待の企業になっている（ここから先はスコープを外さない）
      *
      * @return array{worker: Worker, token: string}
      */
@@ -149,13 +143,13 @@ class WorkerAuthService
         $worker = Worker::query()->lockForUpdate()->find($found->worker_id);
         $invitation = WorkerInvitation::query()->lockForUpdate()->find($found->id);
 
-        // ② 読み直した今の値で判定する（①の後に使用済み・取り消し・メールの変更が入りうる）。
+        // ② 読み直した今の値で判定する（①の後に使用済み・取り消し・メールの変更が入りうる）。保存済みの email はミューテタで常に小文字なので、入力だけを小文字にして比べる。
         // 登録済みのワーカーは、使える招待が残っていても登録をやり直させない（パスワードを上書きさせない）
         if ($worker === null
             || $invitation === null
             || ! $invitation->isUsable()
             || $worker->registered_at !== null
-            || Worker::normalizeLoginEmail($email) !== Worker::normalizeLoginEmail($worker->email)) {
+            || Worker::normalizeEmail($email) !== $worker->email) {
             throw new DomainException(self::INVALID_CODE, 'code');
         }
 
@@ -164,34 +158,14 @@ class WorkerAuthService
             throw new DomainException(AuthenticateWorker::DISABLED_MESSAGE, 'email');
         }
 
-        // ④ 企業のグローバルスコープが効いているので自社の中だけを見る（他社に同じメールの登録済みワーカーがいてもよい）
-        $loginEmail = Worker::normalizeLoginEmail($worker->email);
-        $taken = Worker::query()
-            ->whereKeyNot($worker->id)
-            ->where('login_email', $loginEmail)
-            ->exists();
-
-        if ($taken) {
-            throw new DomainException(self::EMAIL_TAKEN, 'email');
-        }
-
         // used_at と code は状態の列・秘密なので #[Fillable] の外（forceFill で入れる）。使ったコードはもう持たない
         $invitation->forceFill(['used_at' => now(), 'code' => null])->save();
 
         // ログイン用の列は #[Fillable] の外（docs/01 の 5.3）。password は hashed cast がハッシュにする
         $worker->forceFill([
             'password' => $password,
-            'login_email' => $loginEmail,
             'registered_at' => now(),
-        ]);
-
-        try {
-            $worker->save();
-        } catch (UniqueConstraintViolationException) {
-            // ④ の確認の後に、同じメールで別のワーカーが登録を済ませた。workers の UNIQUE は (company_id, login_email) だけである前提で、
-            // ④ と同じ文言の 422 にする。投げ直すので招待の使用済みも含めてロールバックする
-            throw new DomainException(self::EMAIL_TAKEN, 'email');
-        }
+        ])->save();
 
         $token = $this->issueToken($worker, $deviceName);
 

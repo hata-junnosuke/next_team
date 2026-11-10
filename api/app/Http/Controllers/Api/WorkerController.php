@@ -61,7 +61,7 @@ class WorkerController extends Controller
     }
 
     /**
-     * PUT /api/workers/{worker}。メールが変わったときの扱い（ログイン用メールの追従・重なりの 422・招待の発行し直し）は WorkerService（docs/01 の 3.1・4.5）
+     * PUT /api/workers/{worker}。メールの扱い（小文字での保存・重なりの 422・招待の発行し直し）は WorkerService（docs/01 の 3.1・4.5）
      */
     public function update(UpdateWorkerRequest $request, Worker $worker, WorkerService $service): WorkerResource
     {

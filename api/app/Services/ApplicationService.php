@@ -59,7 +59,7 @@ class ApplicationService
     /**
      * ワーカー本人の応募（F-32。docs/01 の 4.5・6.11）。管理者の代行入力（apply()）と違い、残り枠 0 なら拒否する（要件 4.8）。
      * 文言はワーカー向けで、errors は空（ワーカーの画面には worker_id の入力欄がない）。行を作る処理とロックは apply() と共有する。
-     * 判定の順（T12 で決定。docs/01 への追記は T15）: 無効 → 締切・中止 → 勤務日 → 二重 → 残り枠
+     * 判定の順（docs/01 の 4.5）: 無効 → 締切・中止 → 勤務日 → 二重 → 残り枠
      * （自分が確定して満員になった募集に「残り枠がない」と出さないよう、二重を残り枠より先に見る）。
      */
     public function applyAsWorker(JobPosting $posting, Worker $worker): Application
