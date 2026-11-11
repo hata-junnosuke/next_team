@@ -22,6 +22,8 @@ export const statusTones = {
     posting_cancelled: "red",
     shift_reminder: "blue",
     export_ready: "purple",
+    // 残りの色で既存の 4 種別と重ならないのは amber と gray。gray は未知の value の既定色なので amber にする
+    worker_invitation: "amber",
   },
   // NotificationStatus
   notificationStatus: { pending: "amber", sent: "green", failed: "red" },

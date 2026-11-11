@@ -26,6 +26,7 @@ const kindOptions: { value: KindValue; label: string }[] = [
   { value: "posting_cancelled", label: "中止通知" },
   { value: "shift_reminder", label: "前日リマインド" },
   { value: "export_ready", label: "出力完了" },
+  { value: "worker_invitation", label: "招待" },
 ];
 
 const statusOptions: { value: StatusValue; label: string }[] = [
