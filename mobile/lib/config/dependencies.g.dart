@@ -130,7 +130,7 @@ final class ApiClientProvider
   }
 }
 
-String _$apiClientHash() => r'ebbf7fedf40a6a9906ece9d534b0d1fd3596b1e9';
+String _$apiClientHash() => r'b0f948047468d9e90e2022ee6f22b8e69ce7fd25';
 
 @ProviderFor(authRepository)
 final authRepositoryProvider = AuthRepositoryProvider._();

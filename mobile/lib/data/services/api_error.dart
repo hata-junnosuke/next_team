@@ -78,7 +78,8 @@ class ApiError implements Exception {
   // ?. は「左が null なら null を返し、そうでなければ続ける」（JavaScript の ?. と同じ）。
   String? firstErrorOf(String field) => errors[field]?.firstOrNull;
 
-  // print や例外のログに出たときの見え方。トークンなどの秘密はここに入らない（文言と状態コードだけ）。
+  // 文字列にしたときの見え方。画面で '$error' と書くと、この日本語の文言がそのまま出る
+  // （画面が ApiError の型を知らなくても、利用者向けの文言を出せる）。トークンなどの秘密は入らない。
   @override
-  String toString() => 'ApiError($statusCode): $message';
+  String toString() => message;
 }

@@ -5,7 +5,7 @@
 // やること:
 // - 接続先（API_BASE_URL）と、毎回付けるヘッダ（Accept: application/json）を決める
 // - 失敗（DioException）を ApiError（api_error.dart）に変えて投げる。画面は dio の例外を見ない
-// トークンを付けるのは Step 6 の後のタスクで足す AuthInterceptor の役目（ここには書かない）。
+// トークンを付けるのは AuthInterceptor（auth_interceptor.dart）の役目。ここでは受け取って dio に差し込むだけ。
 //
 // dio: https://pub.dev/packages/dio
 // BaseOptions: https://pub.dev/documentation/dio/latest/dio/BaseOptions-class.html
@@ -29,8 +29,12 @@ const String _networkErrorMessage = 'サーバーに接続できません。通�
 class ApiClient {
   // コンストラクタの : の後ろ（初期化リスト）で、フィールド _dio を作る。
   // _ で始まる名前はこのファイルの外から見えない（Dart の private。TypeScript の private / # に近い）。
-  ApiClient({required String baseUrl})
-    : _dio = Dio(
+  // interceptors: 毎回はさむ処理の一覧（AuthInterceptor など）。外から渡すので、ApiClient はトークンを知らない。
+  // const [] は「渡されなかったときの空の一覧」。
+  ApiClient({
+    required String baseUrl,
+    List<Interceptor> interceptors = const [],
+  }) : _dio = Dio(
         BaseOptions(
           baseUrl: baseUrl,
           // Accept: application/json を付けないと、Laravel は 401 や 422 で JSON ではなく
@@ -41,7 +45,10 @@ class ApiClient {
           connectTimeout: const Duration(seconds: 10),
           receiveTimeout: const Duration(seconds: 15),
         ),
-      );
+      ) {
+    // 初期化リストの後の { } はコンストラクタの本体。_dio ができてから動く。
+    _dio.interceptors.addAll(interceptors);
+  }
 
   final Dio _dio;
 

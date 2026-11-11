@@ -15,6 +15,7 @@ import '../data/repositories/auth_repository.dart';
 import '../data/repositories/fake_job_repository.dart';
 import '../data/repositories/job_repository.dart';
 import '../data/services/api_client.dart';
+import '../data/services/auth_interceptor.dart';
 import '../data/services/token_storage.dart';
 
 // part: 生成されたファイル（dependencies.g.dart）を、このファイルの一部として取り込む印。
@@ -51,8 +52,12 @@ TokenStorage tokenStorage(Ref ref) => TokenStorage();
 // API の呼び出し口（dio を包んだもの）。
 // 何を持つか: ApiClient の実体 1 つ。接続先は --dart-define=API_BASE_URL（main.dart が空でないことを確かめ済み）。
 // いつ作り直されるか: 作り直さない（keepAlive）。作り直すと dio の設定（タイムアウトやインターセプタ）を毎回組み立てることになる。
+// AuthInterceptor にトークンの保存先を渡し、すべてのリクエストに Bearer を付けさせる（T9）。
 @Riverpod(keepAlive: true)
-ApiClient apiClient(Ref ref) => ApiClient(baseUrl: apiBaseUrl);
+ApiClient apiClient(Ref ref) => ApiClient(
+  baseUrl: apiBaseUrl,
+  interceptors: [AuthInterceptor(tokenStorage: ref.watch(tokenStorageProvider))],
+);
 
 // ログイン・初回登録・ログアウトと、ログインの状態を持つリポジトリ（docs/01 の 7A.1。issue #46 の Q1）。
 // 何を持つか: AuthRepository の実体 1 つ。ログインの状態（isLoggedIn）はこの中にある。
