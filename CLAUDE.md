@@ -44,7 +44,7 @@ make web-dev                      # http://localhost:3002
 make horizon                      # キューワーカー
 make ports                        # 8002 / 3002 を誰が使っているか
 make mobile-analyze               # flutter analyze（issue #31 の T6 で足す。Step 9 までは verify に入らない）
-make mobile-run                   # iOS シミュレータで mobile/ を起動（同上）
+make mobile-run                   # redis / mailpit・API・管理画面・シミュレータをそろえて mobile/ を起動（同上。止めるのは make mobile-down）
 ```
 
 ## この人と働くときの約束

@@ -13,8 +13,8 @@
 ## 動かし方（`next_team/` から）
 
 ```bash
-xcrun simctl boot "iPhone 17"                                          # シミュレータを起動
-open /Applications/Xcode.app/Contents/Applications/DeviceHub.app      # 画面を出す（Xcode 27）
-make mobile-run                                                        # 起動。r でホットリロード、R でホットリスタート、q で終了
+make mobile-run    # これ 1 つで、redis / mailpit・API（8002）・管理画面（3002）・シミュレータ（iPhone 17）をそろえてからアプリを起動
+                   # 起動済みのものはそのまま使う。r でホットリロード、R でホットリスタート、q で終了
+make mobile-down   # q の後も残る API と管理画面を止める（この作業ツリーのものだけ。redis / mailpit は make down）
 make mobile-analyze                                                    # 静的解析（警告 0 件）
 ```
