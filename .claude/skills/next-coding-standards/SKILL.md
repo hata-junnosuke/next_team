@@ -87,7 +87,7 @@ description: next_team の Next.js 16 実装規約。Server Component でのデ�
 - 型は `z.infer` だけ。`type` や `interface` を手で書くのは props と `FormState` だけ
 - 検証を二重に書かない。必須チェックや範囲チェックは Laravel が 422 で返すものを表示する
 - 業務ルールを書かない。ボタンを使えるかどうかは API の `can`（拠点は `deletable`）を見る。定員に達したかどうかを web で計算しない
-- **状態ボタンは非表示ではなく非活性で出し分ける**: `can.*` / `deletable` が false なら `<Button disabled>`。最終的な判定は API の 422
+- **状態ボタンは非表示ではなく非活性で出し分ける**: `can.*` / `deletable` が false なら `<Button disabled>`。最終的な判定は API の 422。例外は docs/01 の 7.5 に書いたものだけ（例: 招待の送り直しは `can.invite` が false なら出さない。issue #38）
 - 状態ボタン（承認・却下・キャンセル・削除）は小さなフォーム + Server Action。成功したら `revalidatePath` だけして同じページに留まる。表のセル内に Alert を出すときは包む要素に `whitespace-normal` と `max-w-*` を付ける
 - 必須項目に HTML の `required` を付けない（ブラウザが止めると API の 422 が入力欄の下に出ることを確かめられない）
 - 数値の入力は `FormData` では文字列で届く。Laravel 側の検証（`integer`）が数値文字列を受け付けるので、web で変換しない

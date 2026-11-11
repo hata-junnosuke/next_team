@@ -783,7 +783,7 @@ export type FormState = { ok?: boolean; message?: string; errors?: Record<string
 - 422 のときは送った値を `values` に入れて返し、入力欄は `defaultValue={state.values?.[name] ?? 元の値}` にする（React 19 の `<form action>` は終了時にフォームをリセットするため。P1-03 のレビューで決定）。`password` と `$ACTION_` で始まるキーは返さない
 - 項目に紐づかないエラー（`errors` が空の 422、業務ルール違反）は `Alert`、項目エラーは `Field` に出す。判定は `Alert` の中の 1 箇所
 - 検証はサーバ（Laravel）を正とする。**クライアント側に同じ検証を二重に書かない**（HTML の `required` 程度は可）
-- 成功したら `revalidatePath()` して `redirect()`。状態ボタン（承認・却下など）は `redirect` せず同じページを再検証する
+- 成功したら `revalidatePath()` して `redirect()`。状態ボタン（承認・却下など）は `redirect` せず同じページを再検証する。成功を知らせたいときは `{ok: true, message}` を返して同じ `Alert` に出す（例: 招待の送り直しの「招待を送り直しました。」。issue #38 の Q4）
 - Server Action は公開エンドポイントと同じ扱い。認可は Laravel の 401 / 404 / 422 に任せ、Action 側で勝手に判定しない
 
 ### 7.4 画面と使う API
@@ -817,7 +817,8 @@ export type FormState = { ok?: boolean; message?: string; errors?: Record<string
 - 例外（P5-02 で決定）: 通知履歴のエラー列だけは折り返す（`whitespace-pre-wrap` と幅の上限を中の要素に付け、空白のない長い語も切る）。共通部品の `Td` は折り返さないので、この列だけ `<td>` を直接書く
 - 例外（P3-03 で決定）: キャンセル理由の選択肢（company 企業都合 / worker ワーカー都合）のラベルも、状態の絞り込みと同じ理由で web に置く。表示は API の label を出す
 - 例外（issue #38 で決定）: ワーカーの招待の状態のラベル（登録済み・未登録・期限・未登録（使える招待なし））は web に置く。API は `registered_at` と `invitation_expires_at` を返すだけで `{value, label}` を返さないため。出し分けはこの 2 つの値だけで決める（可否の判定は書かない。送り直しの可否は `can.invite`）
-- 表の中の操作（承認・却下・キャンセル・勤怠・締切・中止）の 404 は not-found 画面にせず、行の Alert に API の message を出す
+- 例外（issue #38 で決定）: 「招待を送り直す」ボタンは、`can.invite` が false なら非活性ではなく出さない（登録済みのワーカーが大半の一覧で、押せないボタンが並ぶのを避けるため。計画の承認で決定）。判定は API の `can.invite` だけで、最終的には 422
+- 表の中の操作（承認・却下・キャンセル・勤怠・締切・中止・招待の送り直し）の 404 は not-found 画面にせず、行の Alert に API の message を出す。招待の送り直しの 429（同じワーカーに 1 分 1 回）も、共通の `toFormState` が投げ直す前に Action の中で受けて行の Alert に出す（issue #38）
 
 ---
 

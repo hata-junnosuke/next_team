@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 import { InvitationStatus } from "@/components/workers/InvitationStatus";
+import { ResendInvitationButton } from "@/components/workers/ResendInvitationButton";
 import { WorkerForm } from "@/components/workers/WorkerForm";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { updateWorker } from "@/lib/actions/worker";
+import { resendWorkerInvitation, updateWorker } from "@/lib/actions/worker";
 import { apiGet } from "@/lib/api";
 import { workerResponse } from "@/lib/schemas/worker";
 
@@ -28,11 +29,20 @@ export default async function EditWorkerPage({ params }: Props) {
     <div className="space-y-6">
       <PageHeader title="ワーカーを編集" />
       {/* 招待の状態。表示は API の registered_at / invitation_expires_at だけで決める */}
-      <div className="flex items-center gap-3">
-        <span className="text-ink text-sm font-semibold whitespace-nowrap">
+      {/* 送り直しの文言がボタンの下に出ても、見出しと状態はボタン（h-8）の高さにそろえたままにする */}
+      <div className="flex flex-wrap items-start gap-3">
+        <span className="text-ink inline-flex h-8 items-center text-sm font-semibold whitespace-nowrap">
           招待
         </span>
-        <InvitationStatus worker={worker} />
+        <span className="inline-flex h-8 items-center">
+          <InvitationStatus worker={worker} />
+        </span>
+        {/* 出すかどうかは API の can.invite だけで決める。id は API が返した値を bind する */}
+        {worker.can.invite && (
+          <ResendInvitationButton
+            action={resendWorkerInvitation.bind(null, worker.id)}
+          />
+        )}
       </div>
       <WorkerForm
         // id は URL ではなく API が返した値を使う

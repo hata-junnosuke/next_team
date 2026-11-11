@@ -19,7 +19,11 @@ function describe({
   detail: string | null;
 } {
   if (registered_at !== null) {
-    return { label: "登録済み", tone: "green", detail: dateTime(registered_at) };
+    return {
+      label: "登録済み",
+      tone: "green",
+      detail: dateTime(registered_at),
+    };
   }
   if (invitation_expires_at !== null) {
     return {

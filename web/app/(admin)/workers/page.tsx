@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ActiveBadge } from "@/components/workers/ActiveBadge";
 import { InvitationStatus } from "@/components/workers/InvitationStatus";
+import { ResendInvitationButton } from "@/components/workers/ResendInvitationButton";
 import { ToggleWorkerActiveButton } from "@/components/workers/ToggleWorkerActiveButton";
 import { WorkerSearchForm } from "@/components/workers/WorkerSearchForm";
 import { Alert } from "@/components/ui/Alert";
@@ -8,7 +9,7 @@ import { buttonClassName } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { emptyText, Pagination } from "@/components/ui/Pagination";
 import { Table, Td } from "@/components/ui/Table";
-import { setWorkerActive } from "@/lib/actions/worker";
+import { resendWorkerInvitation, setWorkerActive } from "@/lib/actions/worker";
 import { ApiError, apiGet } from "@/lib/api";
 import { workerListResponse } from "@/lib/schemas/worker";
 
@@ -114,6 +115,12 @@ export default async function WorkersPage({ searchParams }: Props) {
                       )}
                       isActive={worker.is_active}
                     />
+                    {/* 出すかどうかは API の can.invite だけで決める（送れるかの最終的な判定は API の 422） */}
+                    {worker.can.invite && (
+                      <ResendInvitationButton
+                        action={resendWorkerInvitation.bind(null, worker.id)}
+                      />
+                    )}
                   </div>
                 </Td>
               </tr>
