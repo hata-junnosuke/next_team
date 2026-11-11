@@ -11,6 +11,7 @@
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../data/repositories/auth_repository.dart';
 import '../data/repositories/fake_job_repository.dart';
 import '../data/repositories/job_repository.dart';
 import '../data/services/api_client.dart';
@@ -52,3 +53,19 @@ TokenStorage tokenStorage(Ref ref) => TokenStorage();
 // いつ作り直されるか: 作り直さない（keepAlive）。作り直すと dio の設定（タイムアウトやインターセプタ）を毎回組み立てることになる。
 @Riverpod(keepAlive: true)
 ApiClient apiClient(Ref ref) => ApiClient(baseUrl: apiBaseUrl);
+
+// ログイン・初回登録・ログアウトと、ログインの状態を持つリポジトリ（docs/01 の 7A.1。issue #46 の Q1）。
+// 何を持つか: AuthRepository の実体 1 つ。ログインの状態（isLoggedIn）はこの中にある。
+// いつ作り直されるか: 作り直さない（keepAlive）。作り直すとログインの状態が消え、
+// go_router が聞いている相手（refreshListenable）もずれてしまう。
+// ref.watch(apiClientProvider): 上の ApiClient を受け取る（Provider から Provider を読む）。
+// 片付け: Provider が捨てられるとき（アプリの終了時）に ChangeNotifier の dispose を呼ぶ（ref.onDispose）。
+@Riverpod(keepAlive: true)
+AuthRepository authRepository(Ref ref) {
+  final repository = AuthRepository(
+    apiClient: ref.watch(apiClientProvider),
+    tokenStorage: ref.watch(tokenStorageProvider),
+  );
+  ref.onDispose(repository.dispose);
+  return repository;
+}
