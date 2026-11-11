@@ -146,7 +146,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 onSubmitted: (_) => _submit(),
               ),
               const SizedBox(height: 24),
-              FilledButton(onPressed: _submit, child: const Text('ログイン')),
+              // 送っている途中は onPressed を null にして押せなくし、文字の代わりにくるくるを出す（T13）。
+              // React で言うと <button disabled={pending}>{pending ? <Spinner /> : 'ログイン'}</button>。
+              FilledButton(
+                onPressed: form.isSubmitting ? null : _submit,
+                child: form.isSubmitting
+                    // SizedBox.square: 縦横を同じ大きさにする箱。くるくるを文字の高さに収める。
+                    ? const SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('ログイン'),
+              ),
               const SizedBox(height: 8),
               // 初回登録の画面へ（T12）。push: 今の画面の上に重ねる（戻るボタンでログイン画面に戻れる）。
               // go('/register') だと履歴を置き換えるので戻れない（Next.js の router.push と router.replace の違い）。

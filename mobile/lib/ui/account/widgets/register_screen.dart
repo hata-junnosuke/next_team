@@ -117,7 +117,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 onSubmitted: (_) => _submit(),
               ),
               const SizedBox(height: 24),
-              FilledButton(onPressed: _submit, child: const Text('登録する')),
+              // 送っている途中は押せなくし、くるくるを出す（T13。ログイン画面と同じ）。
+              FilledButton(
+                onPressed: form.isSubmitting ? null : _submit,
+                child: form.isSubmitting
+                    ? const SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('登録する'),
+              ),
             ],
           ),
         ),
