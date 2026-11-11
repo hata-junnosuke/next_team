@@ -17,6 +17,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../domain/models/worker_me.dart';
 import '../services/api_client.dart';
+import '../services/api_error.dart';
 import '../services/device_name.dart';
 import '../services/token_storage.dart';
 
@@ -104,9 +105,21 @@ class AuthRepository extends ChangeNotifier {
   }
 
   // ログアウト（POST /api/worker/logout）。今の端末のトークンだけを API 側で消す（5.3）。
+  // API の呼び出しが失敗しても（圏外・すでに失効して 401 など）、手元のトークンは必ず消してログイン画面に戻す（T11）。
+  // 手元に残すと「ログアウトしたのにログインしたまま」になるため。API 側に残ったトークンは期限（30 日）で消える。
+  // 企業コードは消さない（次のログインの入力欄に入れておく。7A.4）。
   Future<void> logout() async {
-    await _apiClient.post('/api/worker/logout');
-    await _signOut();
+    try {
+      await _apiClient.post('/api/worker/logout');
+    } on ApiError {
+      // 失敗は利用者に見せない（ログアウトしたい、という目的は手元で果たせる）。
+    } finally {
+      // finally: 成功しても失敗しても最後に必ず動く（Ruby の ensure、JavaScript の finally）。
+      // 401 のときは AuthInterceptor が理由（もう一度ログインしてください。）を入れているが、
+      // 自分でログアウトしたのだから出さない。
+      _signOutReason = null;
+      await _signOut();
+    }
   }
 
   // API が 401 を返したときに AuthInterceptor から呼ばれる（T10）。トークンを消して未ログインにする。

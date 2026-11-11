@@ -1,5 +1,5 @@
 // マイページ タブの画面。パスは /account。
-// 自分の名前・メールアドレス・企業名を出す（GET /api/worker/me。docs/01 の 6.11）。
+// 自分の名前・メールアドレス・企業名を出し（GET /api/worker/me）、ログアウトできる（POST /api/worker/logout。docs/01 の 6.11）。
 // Next.js で言うと app/account/page.tsx に当たる。
 //
 // RefreshIndicator: https://api.flutter.dev/flutter/material/RefreshIndicator-class.html
@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../domain/models/worker_me.dart';
+import '../view_models/logout_view_model.dart';
 import '../view_models/me_provider.dart';
 
 // 自分では状態を持たず、meProvider を読んで描くだけなので ConsumerWidget にする（Step 5 までは Stateless の空の画面）。
@@ -18,9 +19,26 @@ class AccountScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final meAsync = ref.watch(meProvider);
+    // ログアウトを送っている途中か。途中はボタンを押せなくする。
+    final isLoggingOut = ref.watch(logoutViewModelProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('マイページ')),
+      appBar: AppBar(
+        title: const Text('マイページ'),
+        // actions: 上のバーの右側に並べるボタン。自分の情報を読めなかったとき（エラー）でもログアウトできるように、
+        // 本文ではなくバーに置く。
+        actions: [
+          TextButton.icon(
+            // onPressed を null にすると押せなくなり、色も薄くなる（HTML の disabled）。
+            // 成功したら redirect がログイン画面に移すので、ここでは画面を移さない（T5・T10 と同じ）。
+            onPressed: isLoggingOut
+                ? null
+                : () => ref.read(logoutViewModelProvider.notifier).logout(),
+            icon: const Icon(Icons.logout),
+            label: const Text('ログアウト'),
+          ),
+        ],
+      ),
       // 読み込み中 / エラー / データ の 3 つを必ず書く（一覧の画面と同じ when）。
       body: meAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
