@@ -40,6 +40,15 @@ class AuthRepository extends ChangeNotifier {
   bool _isLoggedIn = false;
   bool get isLoggedIn => _isLoggedIn;
 
+  // 起動したときに 1 回だけ呼ぶ: 保存したトークンがあれば、ログインした状態に戻す（T7）。
+  // API は呼ばない（トークンが手元にあるかだけで決める）。トークンが失効・無効にされていたら、
+  // 最初に API を呼んだときの 401 で未ログインに戻る（T10）。起動のたびに API を待つと、圏外で開けなくなる。
+  Future<void> restore() async {
+    final token = await _tokenStorage.readToken();
+    _isLoggedIn = token != null;
+    notifyListeners();
+  }
+
   // ログイン（POST /api/worker/login。docs/01 の 6.11 と 5.3）。
   // 成功したらトークンを保存し、ログイン済みにして知らせる。自分の情報（WorkerMe）を返す。
   // 失敗したら ApiClient が ApiError を投げるので、ここでは受けずに、そのまま呼んだ側（view_models）に渡す。
