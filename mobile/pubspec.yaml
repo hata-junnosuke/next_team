@@ -41,6 +41,12 @@ dependencies:
   # @riverpod という印（アノテーション）。これを付けた関数やクラスから、下の riverpod_generator が Provider を作る。
   riverpod_annotation: ^4.0.7
 
+  # API の呼び出し（Step 6）。Next.js で言うと fetch を包んだ lib/api.ts の中身、Rails で言うと Faraday。
+  # インターセプタ（送る前・受け取った後に毎回はさむ処理）でトークンを付けたり、401 を拾ったりできる。
+  # 使ってよいのは data/services/ の ApiClient だけ（docs/01 の 7A.4）。
+  # https://pub.dev/packages/dio
+  dio: ^5.11.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
