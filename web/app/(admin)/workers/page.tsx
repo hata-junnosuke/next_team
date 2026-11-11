@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ActiveBadge } from "@/components/workers/ActiveBadge";
+import { InvitationStatus } from "@/components/workers/InvitationStatus";
 import { ToggleWorkerActiveButton } from "@/components/workers/ToggleWorkerActiveButton";
 import { WorkerSearchForm } from "@/components/workers/WorkerSearchForm";
 import { Alert } from "@/components/ui/Alert";
@@ -71,7 +72,7 @@ export default async function WorkersPage({ searchParams }: Props) {
       ) : (
         <>
           <Table
-            head={["氏名", "メールアドレス", "電話番号", "状態", ""]}
+            head={["氏名", "メールアドレス", "電話番号", "状態", "招待", ""]}
             empty={emptyText(
               result.meta,
               result.data.length,
@@ -89,6 +90,11 @@ export default async function WorkersPage({ searchParams }: Props) {
                   {/* 行内ボタン（h-8）と高さをそろえる */}
                   <span className="inline-flex h-8 items-center">
                     <ActiveBadge isActive={worker.is_active} />
+                  </span>
+                </Td>
+                <Td>
+                  <span className="inline-flex h-8 items-center">
+                    <InvitationStatus worker={worker} />
                   </span>
                 </Td>
                 <Td>
