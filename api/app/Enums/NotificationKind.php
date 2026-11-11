@@ -3,7 +3,7 @@
 namespace App\Enums;
 
 /**
- * 通知の種類（F-20〜F-23。notification_logs.kind）。
+ * 通知の種類（F-20〜F-23、ワーカー Step 5 の招待 F-26。notification_logs.kind）。
  * dedupe_key の先頭にもこの値を使う（例: application_confirmed:application:15）。
  */
 enum NotificationKind: string
@@ -12,6 +12,7 @@ enum NotificationKind: string
     case PostingCancelled = 'posting_cancelled';
     case ShiftReminder = 'shift_reminder';
     case ExportReady = 'export_ready';
+    case WorkerInvitation = 'worker_invitation';
 
     public function label(): string
     {
@@ -20,6 +21,7 @@ enum NotificationKind: string
             self::PostingCancelled => '中止通知',
             self::ShiftReminder => '前日リマインド',
             self::ExportReady => '出力完了',
+            self::WorkerInvitation => '招待',
         };
     }
 }

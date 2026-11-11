@@ -12,7 +12,7 @@
 ## 認証
 - 管理者の認証は Fortify に任せる。`Auth::attempt()` を自前で書かない。`config/fortify.php` の `features` は空、`views` は `false`
 - **例外はワーカーの認証だけ**: ワーカー（`mobile/`）は Sanctum の API トークンで、ログインと初回登録は `WorkerAuthService` が Sanctum の公式手順（`Hash::check()` → `createToken()`）で書く（docs/01 の 5.3、docs/00 の決定 57）。ほかの場所でトークンを発行しない
-- `RateLimiter::for('login')` と、ワーカーの `worker-login` `worker-register` を消さない
+- `RateLimiter::for('login')` と、ワーカーの `worker-login` `worker-register`、招待の送り直しの `worker-invitation` を消さない。キーに `CurrentCompany` を使う制限は `company` / `worker` ミドルウェアの後で動かし、429 の文言は `Limit::...->response()` で場面に合わせる（共通の文言はログイン用。issue #37）
 - 管理者向けの `/api/*` はすべて `auth:sanctum` + `company` ミドルウェアの中。例外は署名付きURL のダウンロードだけ（`signed` ミドルウェア必須）
 - ワーカー向けの `/api/worker/*` はすべて `auth:worker` + `worker` ミドルウェアの中。例外は `register` と `login` だけ（`throttle` 必須）
 - ワーカーのトークンで管理者の API に、管理者の Cookie でワーカーの API に入れないことを、テストで守る（docs/01 の 5.3「入れないことの確認」）。guard の provider だけに頼らず、`company` と `worker` のミドルウェアでもモデルの型を確かめる
@@ -35,6 +35,6 @@
 
 ## 共通
 - `.env` / `.env.local` を読まない・書かない・値を docs に書かない（`.env.example` を編集し、人が反映）
-- 秘密情報や個人情報をコミットしない（シーダーの管理者は `admin@example.com / password` のダミーのみ）
+- 秘密情報や個人情報をコミットしない（シーダーの管理者は `admin@example.com / password`、ワーカーは `worker@example.com / password` のダミーのみ）
 - CSV のセルが `=` `+` `-` `@` タブ CR で始まるときは先頭に `'` を付ける
 - ジョブのペイロードとログにパスワードや Cookie を入れない

@@ -108,6 +108,7 @@ class NotificationStatusTest extends TestCase
             'posting_cancelled' => '中止通知',
             'shift_reminder' => '前日リマインド',
             'export_ready' => '出力完了',
+            'worker_invitation' => '招待',
         ], $this->labels(NotificationKind::cases()));
         $this->assertSame([
             'pending' => '送信待ち',

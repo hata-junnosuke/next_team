@@ -28,4 +28,11 @@ return [
     // .env の MYTEAM_DASHBOARD_CACHE_SECONDS で変える。0 以下ならキャッシュしない
     'dashboard_cache_seconds' => (int) env('MYTEAM_DASHBOARD_CACHE_SECONDS', 300),
 
+    // F-26: 招待コードの有効期限の日数（発行から。WorkerInvitation の expires_at）。.env の MYTEAM_WORKER_INVITATION_DAYS で変える
+    'worker_invitation_days' => (int) env('MYTEAM_WORKER_INVITATION_DAYS', 7),
+
+    // ワーカーのトークン（Sanctum の API トークン）の有効期限の日数（docs/01 の 5.3。createToken() の第 3 引数）。
+    // .env の MYTEAM_WORKER_TOKEN_DAYS で変える
+    'worker_token_days' => (int) env('MYTEAM_WORKER_TOKEN_DAYS', 30),
+
 ];

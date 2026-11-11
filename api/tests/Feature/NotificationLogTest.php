@@ -11,6 +11,7 @@ use App\Models\NotificationLog;
 use App\Models\ReportExport;
 use App\Models\User;
 use App\Models\Worker;
+use App\Models\WorkerInvitation;
 use App\Services\NotificationLogService;
 use App\Support\CurrentCompany;
 use Exception;
@@ -29,15 +30,22 @@ use Tests\TestCase;
  */
 class NotificationLogTest extends TestCase
 {
+    /** confirmedLog() を呼んだ回数（ワーカーのメールを呼ぶたびに変えるための連番） */
+    private int $confirmedLogCount = 0;
+
     /**
-     * 確定済みの応募に対する、そのワーカーへの確定通知
+     * 確定済みの応募に対する、そのワーカーへの確定通知。
+     * ワーカーのメールは同じ企業の中で一意なので、1 回目は yamada@example.com、2 回目からは yamada2@example.com のように連番にする
      */
     private function confirmedLog(string $jobTitle = '検品', string $workDate = '2026-10-10', string $workerName = '山田 太郎'): NotificationLog
     {
+        $this->confirmedLogCount++;
+        $email = $this->confirmedLogCount === 1 ? 'yamada@example.com' : "yamada{$this->confirmedLogCount}@example.com";
+
         $posting = JobPosting::factory()->create(['job_title' => $jobTitle, 'work_date' => $workDate]);
         $application = Application::factory()
             ->for($posting)
-            ->for(Worker::factory()->state(['name' => $workerName, 'email' => 'yamada@example.com']))
+            ->for(Worker::factory()->state(['name' => $workerName, 'email' => $email]))
             ->confirmed()
             ->create();
 
@@ -49,6 +57,18 @@ class NotificationLogTest extends TestCase
         return NotificationLog::factory()->forExport()->state([
             'subject_id' => ReportExport::factory()->for($this->admin)->state(['month' => $month]),
         ])->create();
+    }
+
+    /**
+     * ワーカーへの招待の通知（宛先はワーカー、対象は招待。SendWorkerInvitationMail と同じく claim() で作る）
+     * email を省くとワーカーごとに別のアドレスになる。email を期待値で見るテストは明示して渡す
+     */
+    private function invitationLog(string $workerName = '鈴木 一郎', ?string $email = null): NotificationLog
+    {
+        $worker = Worker::factory()->create(['name' => $workerName, 'email' => $email ?? fake()->unique()->safeEmail()]);
+        $invitation = WorkerInvitation::factory()->for($worker)->create();
+
+        return app(NotificationLogService::class)->claim(NotificationKind::WorkerInvitation, $worker, $invitation);
     }
 
     public function test_通知履歴が新しい順にページングで返る(): void
@@ -173,6 +193,59 @@ class NotificationLogTest extends TestCase
         $this->assertStringNotContainsString('他社 管理者', json_encode($response->json(), JSON_UNESCAPED_UNICODE));
     }
 
+    public function test_招待の通知は対象がワーカー名への招待のラベルで返る(): void
+    {
+        $log = $this->invitationLog('鈴木 一郎', 'suzuki@example.com');
+
+        $this->actingAsAdmin()
+            ->getJson('/api/notification-logs')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.kind', ['value' => 'worker_invitation', 'label' => '招待'])
+            ->assertJsonPath('data.0.recipient', ['type' => ['value' => 'worker', 'label' => 'ワーカー'], 'name' => '鈴木 一郎', 'email' => 'suzuki@example.com'])
+            ->assertJsonPath('data.0.subject', ['type' => ['value' => 'worker_invitation', 'label' => '招待'], 'id' => $log->subject_id, 'label' => '鈴木 一郎 への招待']);
+    }
+
+    public function test_招待の対象の行が消えていたら削除された招待で返る(): void
+    {
+        $log = $this->invitationLog();
+        NotificationLog::query()->whereKey($log->id)->update(['subject_id' => 999999]);
+
+        $this->actingAsAdmin()
+            ->getJson('/api/notification-logs')
+            ->assertOk()
+            ->assertJsonPath('data.0.subject', ['type' => ['value' => 'worker_invitation', 'label' => '招待'], 'id' => 999999, 'label' => '削除された招待']);
+    }
+
+    public function test_招待のワーカーが読めないときは削除されたワーカーへの招待で他社のワーカー名が出ない(): void
+    {
+        // 読めない状態は「他社のワーカーを指す」で作る（グローバルスコープで読まれない）
+        $log = $this->invitationLog('鈴木 一郎');
+        $other = Company::factory()->create();
+        $theirWorker = CurrentCompany::runAs($other->id, fn () => Worker::factory()->create(['name' => '他社 ワーカー']));
+        WorkerInvitation::query()->whereKey($log->subject_id)->update(['worker_id' => $theirWorker->id]);
+
+        $response = $this->actingAsAdmin()
+            ->getJson('/api/notification-logs')
+            ->assertOk()
+            ->assertJsonPath('data.0.subject.label', '削除されたワーカー への招待');
+        $this->assertStringNotContainsString('他社 ワーカー', json_encode($response->json(), JSON_UNESCAPED_UNICODE));
+    }
+
+    public function test_種類を招待で絞り込める(): void
+    {
+        $invitation = $this->invitationLog();
+        $this->confirmedLog();
+        $this->exportLog();
+
+        $this->actingAsAdmin()
+            ->getJson('/api/notification-logs?kind=worker_invitation')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $invitation->id)
+            ->assertJsonPath('data.0.kind.value', 'worker_invitation');
+    }
+
     public function test_kindとstatusで絞り込める(): void
     {
         $confirmedSent = NotificationLog::factory()->sent()->create();
@@ -240,18 +313,19 @@ class NotificationLogTest extends TestCase
             $this->confirmedLog();
             NotificationLog::factory()->state(['kind' => NotificationKind::PostingCancelled])->create();
             $this->exportLog();
+            $this->invitationLog();
         };
         $make();
         $this->actingAsAdmin()->getJson('/api/notification-logs')->assertOk();   // 認証などの初回分を済ませる
 
         DB::enableQueryLog();
-        $this->getJson('/api/notification-logs')->assertOk()->assertJsonCount(3, 'data');
+        $this->getJson('/api/notification-logs')->assertOk()->assertJsonCount(4, 'data');
         $few = count(DB::getQueryLog());
 
         $make();
         $make();
         DB::flushQueryLog();
-        $this->getJson('/api/notification-logs')->assertOk()->assertJsonCount(9, 'data');
+        $this->getJson('/api/notification-logs')->assertOk()->assertJsonCount(12, 'data');
         $many = count(DB::getQueryLog());
         DB::disableQueryLog();
 
@@ -261,7 +335,7 @@ class NotificationLogTest extends TestCase
     // ---- テスト補強（tester） ----
 
     /**
-     * 本番の 4 種の通知の記録を、ジョブと同じく NotificationLogService::claim() で作る（宛先・対象の組み合わせが本番と同じになる）
+     * 本番の 5 種の通知の記録を、ジョブと同じく NotificationLogService::claim() で作る（宛先・対象の組み合わせが本番と同じになる）
      *
      * @return array<string, NotificationLog>
      */
@@ -272,16 +346,18 @@ class NotificationLogTest extends TestCase
         $worker = Worker::factory()->create(['name' => '佐藤 花子', 'email' => 'sato@example.com']);
         $application = Application::factory()->for($posting)->for($worker)->confirmed()->create();
         $export = ReportExport::factory()->for($this->admin)->create(['month' => '2026-08']);
+        $invitation = WorkerInvitation::factory()->for($worker)->create();
 
         return [
             'application_confirmed' => $service->claim(NotificationKind::ApplicationConfirmed, $worker, $application),
             'posting_cancelled' => $service->claim(NotificationKind::PostingCancelled, $worker, $application),
             'shift_reminder' => $service->claim(NotificationKind::ShiftReminder, $worker, $application),
             'export_ready' => $service->claim(NotificationKind::ExportReady, $this->admin, $export),
+            'worker_invitation' => $service->claim(NotificationKind::WorkerInvitation, $worker, $invitation),
         ];
     }
 
-    public function test_4種の通知すべてで種別のラベルと対象のラベルが返る(): void
+    public function test_5種の通知すべてで種別のラベルと対象のラベルが返る(): void
     {
         $logs = $this->claimAllKinds();
         $expected = [
@@ -289,6 +365,7 @@ class NotificationLogTest extends TestCase
             'posting_cancelled' => ['中止通知', 'worker', 'ワーカー', 'application', '応募', 'ピッキング 2026/09/20（日） / 佐藤 花子'],
             'shift_reminder' => ['前日リマインド', 'worker', 'ワーカー', 'application', '応募', 'ピッキング 2026/09/20（日） / 佐藤 花子'],
             'export_ready' => ['出力完了', 'user', '管理者', 'report_export', '集計出力', '2026-08 の月次集計'],
+            'worker_invitation' => ['招待', 'worker', 'ワーカー', 'worker_invitation', '招待', '佐藤 花子 への招待'],
         ];
 
         foreach ($expected as $kind => [$kindLabel, $recipientType, $recipientTypeLabel, $subjectType, $subjectTypeLabel, $subjectLabel]) {
@@ -308,7 +385,7 @@ class NotificationLogTest extends TestCase
     {
         $logs = $this->claimAllKinds();
 
-        $response = $this->actingAsAdmin()->getJson('/api/notification-logs')->assertOk()->assertJsonCount(4, 'data');
+        $response = $this->actingAsAdmin()->getJson('/api/notification-logs')->assertOk()->assertJsonCount(5, 'data');
 
         $byId = collect($response->json('data'))->keyBy('id');
         $this->assertSame(['type' => ['value' => 'worker', 'label' => 'ワーカー'], 'name' => '佐藤 花子', 'email' => 'sato@example.com'], $byId[$logs['shift_reminder']->id]['recipient']);
@@ -331,31 +408,31 @@ class NotificationLogTest extends TestCase
             ->assertJsonPath('data.0.subject', ['type' => ['value' => 'report_export', 'label' => '集計出力'], 'id' => 999999, 'label' => '削除された集計出力']);
     }
 
-    public function test_対象の種類は応募と集計出力の2つだけが返る(): void
+    public function test_対象の種類は応募と集計出力と招待の3つだけが返る(): void
     {
-        // 通知 4 種の対象は応募か集計出力だけ（docs/01 の 3.2）。募集は morph map にないので対象にできない
+        // 通知 5 種の対象は応募か集計出力か招待だけ（docs/01 の 3.2）。募集は morph map にないので対象にできない
         // 募集を対象にできないことは AsyncFoundationTest の morph map のテストで固定している
         $this->claimAllKinds();
 
-        $response = $this->actingAsAdmin()->getJson('/api/notification-logs')->assertOk()->assertJsonCount(4, 'data');
+        $response = $this->actingAsAdmin()->getJson('/api/notification-logs')->assertOk()->assertJsonCount(5, 'data');
 
         $this->assertEqualsCanonicalizing(
-            ['application', 'report_export'],
+            ['application', 'report_export', 'worker_invitation'],
             collect($response->json('data'))->pluck('subject.type.value')->unique()->values()->all(),
         );
     }
 
     public function test_宛先と対象の種類のラベルに不明や募集が出ない(): void
     {
-        // docs/01 の NotificationLogResource: type の label は「ワーカー」「管理者」「応募」「集計出力」の 4 つだけ（issue #25 で「募集」を外した）
+        // docs/01 の NotificationLogResource: type の label は「ワーカー」「管理者」「応募」「集計出力」「招待」の 5 つだけ（docs/01 の 6.10。「募集」は出さない）
         $this->claimAllKinds();
-        // 行が消えた記録も混ぜる（ラベルは *_type から決まるので、行がなくても 4 つのどれかになる）
+        // 行が消えた記録も混ぜる（ラベルは *_type から決まるので、行がなくても 5 つのどれかになる）
         NotificationLog::query()->update(['recipient_id' => 999999, 'subject_id' => 999999]);
 
-        $rows = collect($this->actingAsAdmin()->getJson('/api/notification-logs')->assertOk()->assertJsonCount(4, 'data')->json('data'));
+        $rows = collect($this->actingAsAdmin()->getJson('/api/notification-logs')->assertOk()->assertJsonCount(5, 'data')->json('data'));
 
         $this->assertEqualsCanonicalizing(['ワーカー', '管理者'], $rows->pluck('recipient.type.label')->unique()->values()->all());
-        $this->assertEqualsCanonicalizing(['応募', '集計出力'], $rows->pluck('subject.type.label')->unique()->values()->all());
+        $this->assertEqualsCanonicalizing(['応募', '集計出力', '招待'], $rows->pluck('subject.type.label')->unique()->values()->all());
         // type の label は上で確定しているので、残りは subject.label に「不明」が出ないことだけ
         foreach ($rows as $row) {
             $this->assertStringNotContainsString('不明', $row['subject']['label']);
@@ -486,6 +563,7 @@ class NotificationLogTest extends TestCase
         $service->markSent($logs['application_confirmed']);
         $service->markFailed($logs['posting_cancelled'], new TransportException('x'));
         $service->markFailed($logs['export_ready'], null);
+        $service->markSent($logs['worker_invitation']);
         // shift_reminder は pending のまま
 
         $statusOf = [
@@ -493,6 +571,7 @@ class NotificationLogTest extends TestCase
             'posting_cancelled' => 'failed',
             'shift_reminder' => 'pending',
             'export_ready' => 'failed',
+            'worker_invitation' => 'sent',
         ];
 
         $this->actingAsAdmin();
@@ -605,5 +684,135 @@ class NotificationLogTest extends TestCase
         $this->getJson("/api/notification-logs/{$log->id}")->assertNotFound();
         $this->deleteJson("/api/notification-logs/{$log->id}")->assertNotFound();
         $this->assertDatabaseHas('notification_logs', ['id' => $log->id]);
+    }
+
+    // ---- 招待の通知（docs/01 の 6.10） ----
+
+    public function test_招待のラベルのワーカー名は今の名前で出てemailは記録時のアドレス(): void
+    {
+        // docs/01 の 6.10: recipient.name と label の名前は今の値、recipient.email は記録時の recipient_email
+        $log = $this->invitationLog('鈴木 一郎', 'suzuki@example.com');
+        Worker::query()->whereKey($log->recipient_id)->update(['name' => '鈴木 二郎', 'email' => 'new@example.com']);
+
+        $this->actingAsAdmin()
+            ->getJson('/api/notification-logs')
+            ->assertOk()
+            ->assertJsonPath('data.0.recipient', ['type' => ['value' => 'worker', 'label' => 'ワーカー'], 'name' => '鈴木 二郎', 'email' => 'suzuki@example.com'])
+            ->assertJsonPath('data.0.subject.label', '鈴木 二郎 への招待');
+    }
+
+    public function test_使用済みや取り消しや期限切れの招待でもワーカー名への招待のラベルで返る(): void
+    {
+        // 招待の状態はラベルに関係しない（送り直しで前の招待が取り消されても、過去の送信の記録は読める）
+        $service = app(NotificationLogService::class);
+        $worker = Worker::factory()->create(['name' => '鈴木 一郎']);
+        foreach (['used', 'revoked', 'expired'] as $state) {
+            $service->claim(NotificationKind::WorkerInvitation, $worker, WorkerInvitation::factory()->for($worker)->{$state}()->create());
+        }
+
+        $rows = $this->actingAsAdmin()
+            ->getJson('/api/notification-logs?kind=worker_invitation')
+            ->assertOk()
+            ->assertJsonCount(3, 'data')
+            ->json('data');
+
+        foreach ($rows as $row) {
+            $this->assertSame(['value' => 'worker_invitation', 'label' => '招待'], $row['subject']['type']);
+            $this->assertSame('鈴木 一郎 への招待', $row['subject']['label']);
+        }
+    }
+
+    public function test_他社の招待の通知は見えず他社のワーカー名も出ない(): void
+    {
+        $mine = $this->invitationLog('鈴木 一郎');
+        $other = Company::factory()->create();
+        CurrentCompany::runAs($other->id, function () {
+            $service = app(NotificationLogService::class);
+            $worker = Worker::factory()->create(['name' => '他社 ワーカー']);
+            $log = $service->claim(NotificationKind::WorkerInvitation, $worker, WorkerInvitation::factory()->for($worker)->create());
+            $service->markSent($log);
+        });
+
+        $response = $this->actingAsAdmin()
+            ->getJson('/api/notification-logs?kind=worker_invitation')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $mine->id)
+            ->assertJsonPath('meta.total', 1);
+        $this->assertStringNotContainsString('他社 ワーカー', json_encode($response->json(), JSON_UNESCAPED_UNICODE));
+
+        // 他社の記録は送信済み。自社の記録は pending なので、招待 × 送信済みは 0 件
+        $this->getJson('/api/notification-logs?kind=worker_invitation&status=sent')
+            ->assertOk()
+            ->assertJsonCount(0, 'data')
+            ->assertJsonPath('meta.total', 0);
+    }
+
+    public function test_種類を招待で状態と組み合わせて絞り込める(): void
+    {
+        $service = app(NotificationLogService::class);
+        $sent = $this->invitationLog('鈴木 一郎');
+        $service->markSent($sent);
+        $failed = $this->invitationLog('佐藤 花子');
+        $service->markFailed($failed, new TransportException('x'));
+        $pending = $this->invitationLog('田中 次郎');
+        // ほかの種類の送信済みは、招待 × 送信済みに混ざらない
+        NotificationLog::factory()->sent()->create();
+
+        $this->actingAsAdmin();
+        foreach (['sent' => $sent, 'failed' => $failed, 'pending' => $pending] as $status => $log) {
+            $this->getJson("/api/notification-logs?kind=worker_invitation&status={$status}")
+                ->assertOk()
+                ->assertJsonCount(1, 'data')
+                ->assertJsonPath('data.0.id', $log->id)
+                ->assertJsonPath('data.0.kind.value', 'worker_invitation')
+                ->assertJsonPath('data.0.status.value', $status);
+        }
+        $this->getJson('/api/notification-logs?kind=worker_invitation')->assertOk()->assertJsonCount(3, 'data');
+    }
+
+    public function test_招待の通知履歴の応答に招待コードもcode_hashも出ない(): void
+    {
+        // 招待コードは平文で持たず、画面にも出さない（docs/01 の 3.2・.claude/rules/common/security.md）
+        $service = app(NotificationLogService::class);
+        $worker = Worker::factory()->create(['name' => '鈴木 一郎', 'email' => 'suzuki@example.com']);
+        $invitation = WorkerInvitation::factory()->for($worker)->create(['code' => 'ABCD2345']);
+        $codeHash = WorkerInvitation::hashCode('ABCD2345');
+        $this->assertSame($codeHash, WorkerInvitation::query()->whereKey($invitation->id)->value('code_hash'));
+        $service->markSent($service->claim(NotificationKind::WorkerInvitation, $worker, $invitation));
+
+        $response = $this->actingAsAdmin()
+            ->getJson('/api/notification-logs?kind=worker_invitation')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.subject.id', $invitation->id);
+
+        $body = json_encode($response->json(), JSON_UNESCAPED_UNICODE);
+        $this->assertStringNotContainsString('ABCD2345', $body);
+        $this->assertStringNotContainsString($codeHash, $body);
+        // キー名としても出ない（"code": と "code_hash": を足していない）。値の中の文字列には当てない
+        $this->assertStringNotContainsString('"code', $body);
+    }
+
+    public function test_招待の通知が増えてもクエリ数は一定(): void
+    {
+        // 招待のワーカー（ラベルに使う）を morphWith でまとめて読むことを、招待だけの一覧で確かめる
+        $this->invitationLog('鈴木 一郎');
+        $this->actingAsAdmin()->getJson('/api/notification-logs')->assertOk();   // 認証などの初回分を済ませる
+
+        DB::enableQueryLog();
+        $this->getJson('/api/notification-logs')->assertOk()->assertJsonCount(1, 'data');
+        $few = count(DB::getQueryLog());
+
+        foreach (range(1, 5) as $i) {
+            $this->invitationLog("ワーカー {$i}");
+        }
+        DB::flushQueryLog();
+        $this->getJson('/api/notification-logs')->assertOk()->assertJsonCount(6, 'data')
+            ->assertJsonPath('data.0.subject.label', 'ワーカー 5 への招待');
+        $many = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        $this->assertSame($few, $many);
     }
 }

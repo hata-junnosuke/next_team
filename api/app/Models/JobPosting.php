@@ -9,6 +9,7 @@ use App\Models\Concerns\BelongsToCompany;
 use Carbon\CarbonImmutable;
 use Database\Factories\JobPostingFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -84,6 +85,68 @@ class JobPosting extends Model
 
         // status は Fillable ではないので forceFill で入れる
         $this->forceFill(['status' => $next])->save();
+    }
+
+    /**
+     * ワーカーの一覧に出す募集（F-30。docs/01 の 6.11）: 募集中（acceptsApplications() と同じ Open）かつ勤務日が今日以降。
+     * 「今日以降」は日付だけで比べる（今日の勤務は開始時刻を過ぎても出す）。PHP 側の同じ判定は isListedForWorkers()。
+     * work_date は "Y-m-d" の文字列で保存しているので、文字列の比較で日付の範囲になる
+     *
+     * @param  Builder<self>  $query
+     */
+    public function scopeListedForWorkers(Builder $query): void
+    {
+        $query->where('status', JobPostingStatus::Open)
+            ->where('work_date', '>=', today()->toDateString());
+    }
+
+    /**
+     * 勤務日が今日以降か（日付だけで比べる。今日の勤務は開始時刻を過ぎても true）
+     */
+    public function isOnOrAfterToday(): bool
+    {
+        return ! $this->work_date->lt(today());
+    }
+
+    /**
+     * scopeListedForWorkers() の PHP 側。募集中かつ勤務日が今日以降
+     */
+    public function isListedForWorkers(): bool
+    {
+        return $this->status->acceptsApplications() && $this->isOnOrAfterToday();
+    }
+
+    /**
+     * 残り枠 = max(定員 − 確定数, 0)（docs/01 の 4.6）。式はここの 1 か所。
+     * ApplicationService::applyAsWorker() のようにロックの中で確定数を数え直す所は、数えた値をこれに渡す
+     */
+    public static function remainingFrom(int $capacity, int $confirmedCount): int
+    {
+        return max($capacity - $confirmedCount, 0);
+    }
+
+    /**
+     * 読み込み済みの確定数（withCount('confirmedApplications') / loadCount）から残り枠を出す。
+     * 読み込み忘れで黙ってクエリを発行したり 0 とみなしたりしないよう、なければ LogicException
+     */
+    public function remainingSlots(): int
+    {
+        $confirmed = $this->getAttribute('confirmed_applications_count');
+
+        if ($confirmed === null) {
+            throw new LogicException('残り枠の計算には withCount(\'confirmedApplications\') が必要です。');
+        }
+
+        return self::remainingFrom($this->capacity, (int) $confirmed);
+    }
+
+    /**
+     * ワーカーに応募ボタンを出すか（docs/01 の 6.11 の can.apply）。募集中 かつ 勤務日が今日以降 かつ 残り枠 > 0 かつ 自分の応募がない。
+     * 表示の出し分けにだけ使う。可否の最終判定は ApplicationService::applyAsWorker() の 422
+     */
+    public function canBeAppliedBy(?Application $myApplication): bool
+    {
+        return $this->isListedForWorkers() && $this->remainingSlots() > 0 && $myApplication === null;
     }
 
     /**

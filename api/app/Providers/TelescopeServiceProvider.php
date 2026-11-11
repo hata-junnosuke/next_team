@@ -43,6 +43,11 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
             'password_hash_sanctum',
             // F-23 のダウンロード（GET /report-exports/{id}/download?expires=...&signature=...）のクエリの署名
             'signature',
+            // ワーカーの初回登録（POST /api/worker/register。docs/01 の 5.3）の招待コードとパスワード。
+            // password と password_confirmation は Telescope の既定でも隠れるが、既定が変わっても残さないよう明示する
+            'code',
+            'password',
+            'password_confirmation',
         ]);
 
         // RequestWatcher は応答ヘッダも同じ一覧で隠す。set-cookie を入れないと laravel_session と XSRF-TOKEN の値が残る
@@ -57,6 +62,8 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
         // URL を持っていること自体が認可になる）。詳細（{data: {...}}）はドット記法のキーで隠せる
         Telescope::hideResponseParameters([
             'data.download_url',
+            // ワーカーの初回登録・ログインの応答（{data: {token, worker}}）の API トークン（docs/01 の 5.3）
+            'data.token',
         ]);
 
         // 一覧（{data: [{...}, ...]}）は hideResponseParameters では隠せない。RequestWatcher::hideParameters() は
