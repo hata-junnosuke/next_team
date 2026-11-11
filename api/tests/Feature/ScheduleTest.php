@@ -46,6 +46,19 @@ class ScheduleTest extends TestCase
         }
     }
 
+    public function test_期限切れのトークンの掃除が毎日スケジュールに登録されている(): void
+    {
+        // ワーカーの API トークン（docs/01 の 5.3）。期限が切れて 24 時間たった行を消す。testing でも環境の条件で外れない
+        $events = $this->eventsFor('sanctum:prune-expired');
+        $this->assertCount(1, $events);
+
+        $event = $events->first();
+        $this->assertStringContainsString('--hours=24', (string) $event->command);
+        $this->assertSame('0 0 * * *', $event->expression, '毎日 0 時に実行する');
+        $this->assertSame([], $event->environments, 'environments() で環境を絞っていない');
+        $this->assertTrue($event->filtersPass($this->app), 'when() / skip() で外れていない');
+    }
+
     public function test_スケジュールに登録したコマンドはすべてartisanに存在する(): void
     {
         // 無いコマンドを積むと schedule:run で落ちる（Telescope の prune を環境で絞っている理由）の再発防止

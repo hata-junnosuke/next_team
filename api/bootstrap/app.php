@@ -1,6 +1,7 @@
 <?php
 
 use App\Exceptions\DomainException;
+use App\Http\Middleware\AuthenticateWorker;
 use App\Http\Middleware\SetCurrentCompany;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -8,6 +9,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Routing\Exceptions\InvalidSignatureException;
 use Illuminate\Routing\Middleware\SubstituteBindings;
+use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Session\TokenMismatchException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -24,15 +26,21 @@ return Application::configure(basePath: dirname(__DIR__))
         // https://readouble.com/laravel/13.x/ja/sanctum.html#spa-authentication
         $middleware->statefulApi();
 
+        // company は管理者の API、worker はワーカーの API（docs/01 の 5.3）で企業を決める
         $middleware->alias([
             'company' => SetCurrentCompany::class,
+            'worker' => AuthenticateWorker::class,
         ]);
 
         // ルートモデルバインディング（SubstituteBindings）はグローバルスコープを通るので、その前に企業を決める必要がある。
         // 優先順位の既定は「認証（auth:sanctum）→ … → SubstituteBindings」なので、SubstituteBindings の直前に入れれば
         // 「認証の後・バインディングの前」になる。これがないと他社 ID が 404 にならず LogicException の 500 になる
         // https://readouble.com/laravel/13.x/ja/middleware.html#sorting-middleware
-        $middleware->prependToPriorityList(before: SubstituteBindings::class, prepend: SetCurrentCompany::class);
+        // worker（AuthenticateWorker）も同じ理由で、auth:worker の後・SubstituteBindings の前に置く
+        // さらに throttle のキーが CurrentCompany を使う（worker-invitation）ので、企業は throttle（ThrottleRequests）より前に決める。
+        // 既定の優先順位で ThrottleRequests は認証と SubstituteBindings の間にあるので、認証の後・バインディングの前なのは変わらない
+        $middleware->prependToPriorityList(before: ThrottleRequests::class, prepend: SetCurrentCompany::class);
+        $middleware->prependToPriorityList(before: SubstituteBindings::class, prepend: AuthenticateWorker::class);
 
         // 未ログイン時にリダイレクト先を作らない（JSON API 専用。ログイン画面は web 側にある）。
         // null にしておくと、AuthenticationException は 401 の JSON として返る

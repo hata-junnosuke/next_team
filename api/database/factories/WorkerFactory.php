@@ -20,6 +20,7 @@ class WorkerFactory extends Factory
     {
         return [
             'name' => fake()->name(),
+            // 大文字を渡しても Worker の email のミューテタが小文字にして保存する
             'email' => fake()->unique()->safeEmail(),
             'phone' => fake()->optional()->numerify('090-####-####'),
             'is_active' => true,
@@ -32,5 +33,16 @@ class WorkerFactory extends Factory
     public function inactive(): static
     {
         return $this->state(['is_active' => false]);
+    }
+
+    /**
+     * 初回登録を済ませたワーカー（パスワードは password。docs/01 の 3.1）
+     */
+    public function registered(): static
+    {
+        return $this->state([
+            'password' => 'password',
+            'registered_at' => now(),
+        ]);
     }
 }

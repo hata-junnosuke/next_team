@@ -6,6 +6,7 @@ use App\Enums\ApplicationStatus;
 use App\Enums\JobPostingStatus;
 use App\Models\Application;
 use App\Models\Attendance;
+use App\Models\Company;
 use App\Models\JobPosting;
 use App\Models\Location;
 use App\Models\User;
@@ -13,6 +14,7 @@ use App\Models\Worker;
 use App\Support\CurrentCompany;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Support\Facades\Context;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 /**
@@ -80,5 +82,45 @@ class DatabaseSeederTest extends TestCase
             $this->assertGreaterThan(0, JobPosting::query()->count());
             $this->assertGreaterThan(0, Attendance::query()->count());
         });
+    }
+
+    public function test_シーダーの企業には企業コードが入る(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+
+        $admin = User::query()->where('email', 'admin@example.com')->firstOrFail();
+        $other = User::query()->where('email', 'other@example.com')->firstOrFail();
+
+        // 企業コードは 6 文字（紛らわしい 0 O 1 I L を除いた英大文字と数字。docs/01 の 3.1）
+        foreach ([$admin->company_id, $other->company_id] as $companyId) {
+            $code = Company::query()->findOrFail($companyId)->code;
+            $this->assertMatchesRegularExpression('/\A[A-HJKMNP-Z2-9]{6}\z/', $code);
+        }
+        $this->assertNotSame(
+            Company::query()->findOrFail($admin->company_id)->code,
+            Company::query()->findOrFail($other->company_id)->code,
+        );
+    }
+
+    public function test_シーダーに登録済みのワーカーが1人入る(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+
+        $admin = User::query()->where('email', 'admin@example.com')->firstOrFail();
+
+        // 登録済み（registered_at あり）のワーカーは自社に worker@example.com の 1 人だけ
+        CurrentCompany::runAs($admin->company_id, function () {
+            $registered = Worker::query()->whereNotNull('registered_at')->get();
+            $this->assertCount(1, $registered);
+
+            $worker = $registered->first();
+            $this->assertSame('worker@example.com', $worker->email);
+            $this->assertTrue($worker->is_active);
+            $this->assertNotNull($worker->registered_at);
+            $this->assertTrue(Hash::check('password', $worker->password));
+        });
+
+        // 他社には登録済みのワーカーを置かない（全企業を数えるためにスコープを外す。テストの検査だけ）
+        $this->assertSame(1, Worker::withoutGlobalScopes()->whereNotNull('registered_at')->count());
     }
 }

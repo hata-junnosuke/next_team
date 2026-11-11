@@ -93,9 +93,33 @@ class LoginTest extends TestCase
                     'company' => [
                         'id' => $this->company->id,
                         'name' => $this->company->name,
+                        // 管理者がワーカーに企業コードを伝えるため（docs/01 の 3.1。ワーカー Step 5）
+                        'code' => $this->company->code,
                     ],
                 ],
             ]);
+    }
+
+    public function test_api_userの企業コードは自社の6文字で他社の管理者には他社の企業コードが返る(): void
+    {
+        $other = Company::factory()->create();
+        $otherAdmin = User::factory()->for($other)->create();
+
+        // 企業コードは 6 文字（紛らわしい 0 O 1 I L を除いた英大文字と数字。docs/01 の 3.1）。null 同士の一致で通らないように形も確かめる
+        $code = $this->actingAsAdmin()
+            ->getJson('/api/user')
+            ->assertOk()
+            ->assertJsonPath('data.company.code', $this->company->fresh()->code)
+            ->json('data.company.code');
+        $this->assertMatchesRegularExpression('/\A[A-HJKMNP-Z2-9]{6}\z/', $code);
+        $this->app['auth']->forgetGuards();
+
+        $this->actingAs($otherAdmin)
+            ->getJson('/api/user')
+            ->assertOk()
+            ->assertJsonPath('data.company.id', $other->id)
+            ->assertJsonPath('data.company.code', $other->fresh()->code);
+        $this->assertNotSame($code, $other->fresh()->code);
     }
 
     private function failLogin(string $email, string $ip = '127.0.0.1'): TestResponse

@@ -9,11 +9,15 @@ use App\Http\Requests\ToggleWorkerActiveRequest;
 use App\Http\Requests\UpdateWorkerRequest;
 use App\Http\Resources\WorkerResource;
 use App\Models\Worker;
+use App\Services\WorkerInvitationService;
+use App\Services\WorkerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 /**
- * ワーカー（F-02〜F-04、docs/01 の API 契約（ワーカー））。業務ルールのない CRUD なのでサービスを作らず Eloquent を直接呼ぶ。
+ * ワーカー（F-02〜F-04・F-26・F-27、docs/01 の API 契約（ワーカー））。
+ * 登録は招待の発行を伴うので WorkerService、招待の送り直しは WorkerInvitationService に任せる（docs/01 の 4.5）。
+ * 編集もメールの変更で招待を発行し直すので WorkerService。有効/無効の切り替えは Eloquent を直接呼ぶ。
  * 削除はしない（無効化する。要件の非機能要件）ので destroy はない。
  * モデルを型宣言しているので、他社の ID はルートモデルバインディング（グローバルスコープ）で 404 になる。
  * https://readouble.com/laravel/13.x/ja/controllers.html#api-resource-routes
@@ -31,6 +35,7 @@ class WorkerController extends Controller
         $workers = Worker::query()
             ->when($keyword !== null, fn ($query) => $query->nameLike($keyword))
             ->when($isActive !== null, fn ($query) => $query->where('is_active', $isActive))
+            ->with('usableInvitation') // WorkerResource の invitation_expires_at。1 回のクエリで先読みする（N+1 にしない）
             ->orderBy('id')
             ->paginate($this->perPage($request));
 
@@ -38,11 +43,11 @@ class WorkerController extends Controller
     }
 
     /**
-     * POST /api/workers。登録時は常に有効（$attributes の既定値）
+     * POST /api/workers。登録と同じトランザクションで招待を発行し、コミットの後に招待メールを積む（F-26。応答は送信を待たない）
      */
-    public function store(StoreWorkerRequest $request): JsonResponse
+    public function store(StoreWorkerRequest $request, WorkerService $service): JsonResponse
     {
-        $worker = Worker::create($request->validated());
+        $worker = $service->create($request->validated())->load('usableInvitation');
 
         return (new WorkerResource($worker))->response()->setStatusCode(201);
     }
@@ -52,17 +57,16 @@ class WorkerController extends Controller
      */
     public function show(Worker $worker): WorkerResource
     {
-        return new WorkerResource($worker);
+        return new WorkerResource($worker->loadMissing('usableInvitation'));
     }
 
     /**
-     * PUT /api/workers/{worker}
+     * PUT /api/workers/{worker}。メールの扱い（小文字での保存・重なりの 422・招待の発行し直し）は WorkerService（docs/01 の 3.1・4.5）
      */
-    public function update(UpdateWorkerRequest $request, Worker $worker): WorkerResource
+    public function update(UpdateWorkerRequest $request, Worker $worker, WorkerService $service): WorkerResource
     {
-        $worker->update($request->validated());
-
-        return new WorkerResource($worker);
+        // サービスはロックして読み直した行を更新して返す。招待を発行し直したかもしれないので、招待は読み直す
+        return new WorkerResource($service->update($worker, $request->validated())->load('usableInvitation'));
     }
 
     /**
@@ -72,6 +76,18 @@ class WorkerController extends Controller
     {
         $worker->update(['is_active' => $request->boolean('is_active')]);
 
-        return new WorkerResource($worker);
+        return new WorkerResource($worker->loadMissing('usableInvitation'));
+    }
+
+    /**
+     * POST /api/workers/{worker}/invitation。招待の送り直し（F-27）。200 で WorkerResource を返す（前の招待は使えなくなる）。
+     * 無効・登録済みはサービスの DomainException が 422 になる。他社の ID はルートモデルバインディングで 404
+     */
+    public function invite(Worker $worker, WorkerInvitationService $service): WorkerResource
+    {
+        $service->issue($worker);
+
+        // サービスはロックして読み直した行で判定する。応答もその後の最新の値と新しい招待で作る
+        return new WorkerResource($worker->refresh()->load('usableInvitation'));
     }
 }

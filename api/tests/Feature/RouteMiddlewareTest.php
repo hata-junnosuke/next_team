@@ -4,22 +4,30 @@ namespace Tests\Feature;
 
 use App\Models\Attendance;
 use App\Models\Company;
+use App\Models\JobPosting;
+use App\Models\Worker;
 use App\Support\CurrentCompany;
 use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\Route;
+use Tests\Concerns\ActsAsWorker;
 use Tests\TestCase;
 
 /**
  * /api/* のルートを全部走査し、auth:sanctum と company の付け忘れを機械的に見つける（docs/01 の API の共通）。
  * 例外は署名付きURL のダウンロード（signed 付き）だけ。
+ * ワーカーアプリの /api/worker/* は auth:worker と worker の付け忘れを別に見る（docs/01 の 5.3・6.11）。
  */
 class RouteMiddlewareTest extends TestCase
 {
+    use ActsAsWorker;
+
     public function test_apiの全ルートにauth_sanctumとcompanyが付いている(): void
     {
+        // ワーカー用 API（api/worker/*）は guard が別なので下のテストで見る
         $apiRoutes = collect(Route::getRoutes()->getRoutes())
-            ->filter(fn (RoutingRoute $route) => str_starts_with($route->uri(), 'api/'));
+            ->filter(fn (RoutingRoute $route) => str_starts_with($route->uri(), 'api/'))
+            ->reject(fn (RoutingRoute $route) => str_starts_with($route->uri(), 'api/worker/'));
 
         $this->assertNotEmpty($apiRoutes, 'api/* のルートが 1 本もない');
 
@@ -36,6 +44,71 @@ class RouteMiddlewareTest extends TestCase
         }
     }
 
+    public function test_管理者のapiで試行回数の制限が付くのは招待の送り直しだけ(): void
+    {
+        // 送り直しは同じワーカーに 1 分 1 回（docs/01 の 6.3）。ほかの管理者のルートには付けない
+        $limited = ['POST api/workers/{worker}/invitation' => 'throttle:worker-invitation'];
+        $seen = [];
+
+        $apiRoutes = collect(Route::getRoutes()->getRoutes())
+            ->filter(fn (RoutingRoute $route) => str_starts_with($route->uri(), 'api/'))
+            ->reject(fn (RoutingRoute $route) => str_starts_with($route->uri(), 'api/worker/'));
+
+        foreach ($apiRoutes as $route) {
+            $label = collect($route->methods())->reject(fn (string $method) => $method === 'HEAD')->first().' '.$route->uri();
+            $throttles = array_values(array_filter($route->gatherMiddleware(), fn ($name) => is_string($name) && str_starts_with($name, 'throttle:')));
+
+            if (array_key_exists($label, $limited)) {
+                $seen[] = $label;
+                $this->assertSame([$limited[$label]], $throttles, "{$label} の試行回数の制限が違う");
+
+                continue;
+            }
+
+            $this->assertSame([], $throttles, "{$label} に試行回数の制限が付いている");
+        }
+
+        $this->assertSame(array_keys($limited), $seen, '招待の送り直しのルートがない');
+    }
+
+    public function test_ワーカーのapiの全ルートにauth_workerとworkerが付き登録とログインだけが試行回数の制限つき(): void
+    {
+        $workerRoutes = collect(Route::getRoutes()->getRoutes())
+            ->filter(fn (RoutingRoute $route) => str_starts_with($route->uri(), 'api/worker/'));
+
+        $this->assertNotEmpty($workerRoutes, 'api/worker/* のルートが 1 本もない');
+
+        // 認証の外に置くのはこの 2 本だけ（docs/01 の 5.3）。総当たりに備えて試行回数を制限する
+        $public = [
+            'POST api/worker/register' => 'throttle:worker-register',
+            'POST api/worker/login' => 'throttle:worker-login',
+        ];
+        $seenPublic = [];
+
+        foreach ($workerRoutes as $route) {
+            $middleware = $route->gatherMiddleware();
+            $label = collect($route->methods())->reject(fn (string $method) => $method === 'HEAD')->first().' '.$route->uri();
+            $throttles = array_values(array_filter($middleware, fn ($name) => is_string($name) && str_starts_with($name, 'throttle:')));
+
+            if (array_key_exists($label, $public)) {
+                $seenPublic[] = $label;
+                $this->assertSame([$public[$label]], $throttles, "{$label} の試行回数の制限が違う");
+                $this->assertNotContains('auth:worker', $middleware, "{$label} は認証の外に置く");
+                $this->assertNotContains('auth:sanctum', $middleware, "{$label} は認証の外に置く");
+
+                continue;
+            }
+
+            $this->assertContains('auth:worker', $middleware, "{$label} に auth:worker がない");
+            $this->assertContains('worker', $middleware, "{$label} に worker がない");
+            $this->assertNotContains('auth:sanctum', $middleware, "{$label} に管理者の auth:sanctum が付いている");
+            $this->assertNotContains('company', $middleware, "{$label} に管理者の company が付いている");
+            $this->assertSame([], $throttles, "{$label} に試行回数の制限が付いている");
+        }
+
+        $this->assertEqualsCanonicalizing(array_keys($public), $seenPublic, '登録とログインのルートがない');
+    }
+
     /**
      * docs/01 の API 契約のうち拠点からダッシュボードまでの全パス。先に全部登録し、未実装のものは 501 を返す（docs/01 の基盤の担当）。
      * 並列担当（A / B / C）が routes/api.php を触らずに済むようにするための契約の固定。
@@ -46,7 +119,7 @@ class RouteMiddlewareTest extends TestCase
             'GET api/locations', 'POST api/locations', 'GET api/locations/{location}',
             'PUT api/locations/{location}', 'DELETE api/locations/{location}',
             'GET api/workers', 'POST api/workers', 'GET api/workers/{worker}', 'PUT api/workers/{worker}',
-            'PATCH api/workers/{worker}/active',
+            'PATCH api/workers/{worker}/active', 'POST api/workers/{worker}/invitation',
             'GET api/job-postings', 'POST api/job-postings', 'GET api/job-postings/{job_posting}',
             'PUT api/job-postings/{job_posting}',
             'POST api/job-postings/{job_posting}/close', 'POST api/job-postings/{job_posting}/cancel',
@@ -57,6 +130,11 @@ class RouteMiddlewareTest extends TestCase
             'PUT api/applications/{application}/attendance',
             'GET api/reports/monthly', 'GET api/reports/monthly/csv',
             'GET api/dashboard',
+            // ワーカー用 API（docs/01 の 6.11）
+            'POST api/worker/register', 'POST api/worker/login', 'POST api/worker/logout', 'GET api/worker/me',
+            'GET api/worker/job-postings', 'GET api/worker/job-postings/{job_posting}',
+            'POST api/worker/job-postings/{job_posting}/applications',
+            'GET api/worker/locations', 'GET api/worker/applications',
         ];
 
         $registered = collect(Route::getRoutes()->getRoutes())
@@ -85,6 +163,7 @@ class RouteMiddlewareTest extends TestCase
         return [
             ['GET', '/api/locations/{location}'], ['PUT', '/api/locations/{location}'], ['DELETE', '/api/locations/{location}'],
             ['GET', '/api/workers/{worker}'], ['PUT', '/api/workers/{worker}'], ['PATCH', '/api/workers/{worker}/active'],
+            ['POST', '/api/workers/{worker}/invitation'],
             ['GET', '/api/job-postings/{job_posting}'], ['PUT', '/api/job-postings/{job_posting}'],
             ['POST', '/api/job-postings/{job_posting}/close'], ['POST', '/api/job-postings/{job_posting}/cancel'],
             ['POST', '/api/job-postings/{job_posting}/duplicate'], ['GET', '/api/job-postings/{job_posting}/applicable-workers'],
@@ -160,6 +239,52 @@ class RouteMiddlewareTest extends TestCase
         ];
         foreach ($routes as [$method, $uri]) {
             $this->json($method, self::fill($uri, $ids))->assertUnauthorized();
+        }
+    }
+
+    /**
+     * ワーカー用 API（docs/01 の 6.11）のうち ID を URL に持つルート
+     *
+     * @return list<array{string, string}>
+     */
+    private static function workerBoundRoutes(): array
+    {
+        return [
+            ['GET', '/api/worker/job-postings/{job_posting}'],
+            ['POST', '/api/worker/job-postings/{job_posting}/applications'],
+        ];
+    }
+
+    /**
+     * ワーカーの API でも、他社の ID は worker ミドルウェアが決めた企業のグローバルスコープで 404 になる（6.11 の失敗の表）。
+     * 本物のトークン（withToken）で叩く（docs/01 の 5.3）。FormRequest の検証（422）より先に 404 になることをここで固定する
+     */
+    public function test_ワーカーのidを持つ全ルートで他社のidは404(): void
+    {
+        $other = Company::factory()->create();
+        $otherPosting = CurrentCompany::runAs($other->id, fn () => JobPosting::factory()->create());
+        $token = $this->workerToken(Worker::factory()->registered()->create());
+        Context::forget('company_id');
+
+        foreach (self::workerBoundRoutes() as [$method, $uri]) {
+            $this->withToken($token)
+                ->json($method, self::fill($uri, ['job_posting' => $otherPosting->id]))
+                ->assertNotFound()
+                ->assertExactJson(['message' => '見つかりませんでした。', 'errors' => []]);
+            $this->forgetAuthenticatedUsers();
+        }
+
+        $this->assertDatabaseCount('applications', 0);
+    }
+
+    public function test_ワーカーのidを持つ全ルートで存在しないidは404(): void
+    {
+        $token = $this->workerToken(Worker::factory()->registered()->create());
+        Context::forget('company_id');
+
+        foreach (self::workerBoundRoutes() as [$method, $uri]) {
+            $this->withToken($token)->json($method, self::fill($uri, ['job_posting' => 999999]))->assertNotFound();
+            $this->forgetAuthenticatedUsers();
         }
     }
 }
