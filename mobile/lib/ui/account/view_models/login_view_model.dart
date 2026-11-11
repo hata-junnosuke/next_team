@@ -34,11 +34,17 @@ Future<String?> lastCompanyCode(Ref ref) =>
 
 // 何を持つか: 直前の送信のエラー（なければ空）。
 // いつ作り直されるか: keepAlive なしなので、ログイン画面を離れる（一覧に移る）と捨てられ、
-// 次にログイン画面を開いたときに _initial から始まる（前のエラーが残らない）。
+// 次にログイン画面を開いたときに作り直される（前のエラーが残らない）。
 @riverpod
 class LoginViewModel extends _$LoginViewModel {
+  // 最初の値。401 でログイン画面に戻されたときは、その理由を上の帯に出す（T10。docs/01 の 7A.4）。
+  // 例: 管理者に無効にされた →「このアカウントは現在利用できません。管理者にお問い合わせください。」
+  // takeSignOutReason は読んだら消すので、この画面を開き直したときには出ない。
   @override
-  LoginFormState build() => _initial;
+  LoginFormState build() {
+    final reason = ref.read(authRepositoryProvider).takeSignOutReason();
+    return (message: reason, errors: const {});
+  }
 
   // 送信。入力の検証はしない（空でもそのまま送り、API の 422 に任せる。CLAUDE.md の絶対ルール 1）。
   // 成功したら何もしない: AuthRepository がログイン済みにして知らせ、go_router の redirect が一覧に移す。

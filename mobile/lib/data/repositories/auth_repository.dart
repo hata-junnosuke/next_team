@@ -40,6 +40,9 @@ class AuthRepository extends ChangeNotifier {
   bool _isLoggedIn = false;
   bool get isLoggedIn => _isLoggedIn;
 
+  // 401 でログイン画面に戻したときに、ログイン画面に出す理由（T10）。出したら消す（takeSignOutReason）。
+  String? _signOutReason;
+
   // 起動したときに 1 回だけ呼ぶ: 保存したトークンがあれば、ログインした状態に戻す（T7）。
   // API は呼ばない（トークンが手元にあるかだけで決める）。トークンが失効・無効にされていたら、
   // 最初に API を呼んだときの 401 で未ログインに戻る（T10）。起動のたびに API を待つと、圏外で開けなくなる。
@@ -104,6 +107,22 @@ class AuthRepository extends ChangeNotifier {
   Future<void> logout() async {
     await _apiClient.post('/api/worker/logout');
     await _signOut();
+  }
+
+  // API が 401 を返したときに AuthInterceptor から呼ばれる（T10）。トークンを消して未ログインにする。
+  // reason がなければ（Unauthenticated. の 401）決まりの文言にする（docs/01 の 7A.4。issue #46 の Q4）。
+  // すでに未ログインなら何もしない（同時に飛んだ複数のリクエストが、続けて 401 を受け取ることがある）。
+  Future<void> expireSession(String? reason) async {
+    if (!_isLoggedIn) return;
+    _signOutReason = reason ?? 'もう一度ログインしてください。';
+    await _signOut();
+  }
+
+  // ログイン画面が開いたときに 1 回だけ読む。読んだら消すので、次にログイン画面を開いても同じ文言は出ない。
+  String? takeSignOutReason() {
+    final reason = _signOutReason;
+    _signOutReason = null;
+    return reason;
   }
 
   // ログイン・初回登録の応答 {"data": {"token", "worker"}} を読み、トークンを保存してログイン済みにする。

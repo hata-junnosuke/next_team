@@ -53,10 +53,19 @@ TokenStorage tokenStorage(Ref ref) => TokenStorage();
 // 何を持つか: ApiClient の実体 1 つ。接続先は --dart-define=API_BASE_URL（main.dart が空でないことを確かめ済み）。
 // いつ作り直されるか: 作り直さない（keepAlive）。作り直すと dio の設定（タイムアウトやインターセプタ）を毎回組み立てることになる。
 // AuthInterceptor にトークンの保存先を渡し、すべてのリクエストに Bearer を付けさせる（T9）。
+// 401 のときは AuthRepository に「未ログインにして」と頼む（T10）。
+// ここで ref.watch(authRepositoryProvider) すると、authRepositoryProvider も apiClientProvider を読むので
+// 「互いを待つ輪」になって Riverpod が例外を投げる。だから関数で包み、401 が来たときに初めて ref.read で探す。
 @Riverpod(keepAlive: true)
 ApiClient apiClient(Ref ref) => ApiClient(
   baseUrl: apiBaseUrl,
-  interceptors: [AuthInterceptor(tokenStorage: ref.watch(tokenStorageProvider))],
+  interceptors: [
+    AuthInterceptor(
+      tokenStorage: ref.watch(tokenStorageProvider),
+      onUnauthorized: (reason) =>
+          ref.read(authRepositoryProvider).expireSession(reason),
+    ),
+  ],
 );
 
 // ログイン・初回登録・ログアウトと、ログインの状態を持つリポジトリ（docs/01 の 7A.1。issue #46 の Q1）。
