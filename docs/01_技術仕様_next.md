@@ -793,7 +793,7 @@ export type FormState = { ok?: boolean; message?: string; errors?: Record<string
 | ログイン | `/login` | csrf-cookie、login | 動線 1 |
 | ダッシュボード | `/dashboard` | dashboard | F-19 |
 | 拠点一覧・登録・編集 | `/locations` … | locations | F-01 |
-| ワーカー一覧・登録・編集 | `/workers` … | workers | F-02〜F-04 |
+| ワーカー一覧・登録・編集 | `/workers` … | workers（招待の送り直しを含む）、user（一覧の企業コード。issue #38） | F-02〜F-04、F-27 |
 | 募集一覧・登録・編集 | `/job-postings` … | job-postings、locations | F-05、F-06 |
 | 募集詳細 | `/job-postings/[id]` | job-postings、applications、applicable-workers、attendance | F-07〜F-16 |
 | 月次集計 | `/reports/monthly` | reports/monthly、report-exports（POST。非同期出力の依頼） | F-17、F-18、F-23 |
