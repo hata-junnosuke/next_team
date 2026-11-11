@@ -15,14 +15,22 @@ class WorkerCompany {
     required this.code,
   });
 
-  // 形が合わなければ as のところで TypeError（例外）になる。
-  // 黙って null や空文字にせず、契約（6.11）とのずれとして気づけるようにする（job_posting.dart と同じ）。
+  // 形が合わなければ FormatException を投げる。黙って null や空文字にせず、契約（6.11）とのずれとして気づけるようにする。
+  // as int と書くと、合わないときに TypeError（Error = プログラムのバグの扱い）になり、
+  // 画面の「応答の形が想定と違います」の catch（on FormatException）で受けられない。
+  // だから switch のパターンで形を確かめ、合わなければ FormatException にそろえる（api_error.dart と同じ書き方）。
+  // Map のパターン {'id': final int id, ...}: キーがあり、値がその型のときだけ当たり、値を変数に取り出す。
+  // https://dart.dev/language/patterns
   factory WorkerCompany.fromJson(Map<String, dynamic> json) {
-    return WorkerCompany(
-      id: json['id'] as int,
-      name: json['name'] as String,
-      code: json['code'] as String,
-    );
+    return switch (json) {
+      {
+        'id': final int id,
+        'name': final String name,
+        'code': final String code,
+      } =>
+        WorkerCompany(id: id, name: name, code: code),
+      _ => throw FormatException('WorkerMeResource.company の形が違います: $json'),
+    };
   }
 
   final int id;
@@ -39,14 +47,24 @@ class WorkerMe {
     required this.company,
   });
 
+  // 形が合わなければ FormatException（WorkerCompany.fromJson と同じ理由）。
+  // email は API が小文字にそろえて保存したメール（6.11）。
   factory WorkerMe.fromJson(Map<String, dynamic> json) {
-    return WorkerMe(
-      id: json['id'] as int,
-      name: json['name'] as String,
-      // API が小文字にそろえて保存したメール（6.11）。
-      email: json['email'] as String,
-      company: WorkerCompany.fromJson(json['company'] as Map<String, dynamic>),
-    );
+    return switch (json) {
+      {
+        'id': final int id,
+        'name': final String name,
+        'email': final String email,
+        'company': final Map<String, dynamic> company,
+      } =>
+        WorkerMe(
+          id: id,
+          name: name,
+          email: email,
+          company: WorkerCompany.fromJson(company),
+        ),
+      _ => throw FormatException('WorkerMeResource の形が違います: $json'),
+    };
   }
 
   final int id;

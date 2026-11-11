@@ -13,7 +13,7 @@ part of 'register_view_model.dart';
 final registerViewModelProvider = RegisterViewModelProvider._();
 
 final class RegisterViewModelProvider
-    extends $NotifierProvider<RegisterViewModel, RegisterFormState> {
+    extends $NotifierProvider<RegisterViewModel, AuthFormState> {
   RegisterViewModelProvider._()
     : super(
         from: null,
@@ -33,27 +33,27 @@ final class RegisterViewModelProvider
   RegisterViewModel create() => RegisterViewModel();
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(RegisterFormState value) {
+  Override overrideWithValue(AuthFormState value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<RegisterFormState>(value),
+      providerOverride: $SyncValueProvider<AuthFormState>(value),
     );
   }
 }
 
-String _$registerViewModelHash() => r'0b7e8cf4fb05bd3c0333e6bc017d8cb5d47b4636';
+String _$registerViewModelHash() => r'02e7a3e80d6f350acbcf1ce40510f92981a1ff00';
 
-abstract class _$RegisterViewModel extends $Notifier<RegisterFormState> {
-  RegisterFormState build();
+abstract class _$RegisterViewModel extends $Notifier<AuthFormState> {
+  AuthFormState build();
   @$mustCallSuper
   @override
   WhenComplete runBuild() {
-    final ref = this.ref as $Ref<RegisterFormState, RegisterFormState>;
+    final ref = this.ref as $Ref<AuthFormState, AuthFormState>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<RegisterFormState, RegisterFormState>,
-              RegisterFormState,
+              AnyNotifier<AuthFormState, AuthFormState>,
+              AuthFormState,
               Object?,
               Object?
             >;

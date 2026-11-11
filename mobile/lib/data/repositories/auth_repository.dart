@@ -17,7 +17,6 @@ import 'package:flutter/foundation.dart';
 
 import '../../domain/models/worker_me.dart';
 import '../services/api_client.dart';
-import '../services/api_error.dart';
 import '../services/device_name.dart';
 import '../services/token_storage.dart';
 
@@ -47,9 +46,22 @@ class AuthRepository extends ChangeNotifier {
   // 起動したときに 1 回だけ呼ぶ: 保存したトークンがあれば、ログインした状態に戻す（T7）。
   // API は呼ばない（トークンが手元にあるかだけで決める）。トークンが失効・無効にされていたら、
   // 最初に API を呼んだときの 401 で未ログインに戻る（T10）。起動のたびに API を待つと、圏外で開けなくなる。
+  //
+  // Keychain の読み込みが失敗したら（まれ。バックアップから戻した直後など）、未ログインとして起動を続ける。
+  // ここで例外を外に出すと main の runApp に届かず、アプリが起動画面のまま止まる。
+  // 読めなかったトークンは消しておく（次のログインで書き直す）。
   Future<void> restore() async {
-    final token = await _tokenStorage.readToken();
-    _isLoggedIn = token != null;
+    try {
+      final token = await _tokenStorage.readToken();
+      _isLoggedIn = token != null;
+    } on Exception {
+      _isLoggedIn = false;
+      try {
+        await _tokenStorage.deleteToken();
+      } on Exception {
+        // 消せなくても起動は続ける（次のログインで上書きする）。
+      }
+    }
     notifyListeners();
   }
 
@@ -111,7 +123,8 @@ class AuthRepository extends ChangeNotifier {
   Future<void> logout() async {
     try {
       await _apiClient.post('/api/worker/logout');
-    } on ApiError {
+      // on Exception: ApiError（通信・401 など）も FormatException（応答の形）も受ける。
+    } on Exception {
       // 失敗は利用者に見せない（ログアウトしたい、という目的は手元で果たせる）。
     } finally {
       // finally: 成功しても失敗しても最後に必ず動く（Ruby の ensure、JavaScript の finally）。
@@ -140,10 +153,17 @@ class AuthRepository extends ChangeNotifier {
 
   // ログイン・初回登録の応答 {"data": {"token", "worker"}} を読み、トークンを保存してログイン済みにする。
   Future<WorkerMe> _signIn(Map<String, dynamic>? body) async {
-    final data = _dataOf(body);
-    // 形が違えば as で例外になる（契約のずれ。7A.4）。
-    final token = data['token'] as String;
-    final worker = WorkerMe.fromJson(data['worker'] as Map<String, dynamic>);
+    // 形が違えば FormatException（契約のずれ。7A.4）。as を使わない理由は worker_me.dart。
+    final (token, worker) = switch (_dataOf(body)) {
+      {
+        'token': final String token,
+        'worker': final Map<String, dynamic> worker,
+      } =>
+        // ( , ) はレコード: 2 つの値を 1 つにまとめて返し、左の final (token, worker) で分けて受け取る
+        // （TypeScript で [a, b] を返して const [a, b] = ... と分ける、のに近い）。
+        (token, WorkerMe.fromJson(worker)),
+      _ => throw const FormatException('ログインの応答に token か worker がありません'),
+    };
 
     await _tokenStorage.writeToken(token);
     // 企業コードを覚えておく（T8）。入力した値ではなく API が返した値（大文字にそろえたもの）を保存する。

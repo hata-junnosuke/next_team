@@ -44,7 +44,10 @@ class AccountScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => _ErrorView(
           // ApiError は文字列にすると日本語の文言になる（api_error.dart の toString）。
-          message: '$error',
+          // 応答の形が契約と違う（FormatException）ときは、英語の中身を出さずに決まりの文言にする。
+          message: error is FormatException
+              ? '応答の形が想定と違います。管理者にお問い合わせください。'
+              : '$error',
           isRetrying: meAsync.isLoading,
           onRetry: () => ref.invalidate(meProvider),
         ),

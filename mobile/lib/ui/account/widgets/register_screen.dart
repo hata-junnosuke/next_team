@@ -94,7 +94,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               TextField(
                 controller: _password,
                 decoration: InputDecoration(
-                  labelText: 'パスワード（8 文字以上）',
+                  // 文字数の決まり（8 文字以上）は書かない。決まりは API にあり、足りなければ 422 の文言が出る
+                  // （ここに書くと、API の決まりが変わったときに表示とずれる。CLAUDE.md の絶対ルール 1）。
+                  labelText: 'パスワード',
                   errorText: errorOf('password'),
                 ),
                 obscureText: true,

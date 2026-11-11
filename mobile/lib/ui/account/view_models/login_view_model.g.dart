@@ -46,7 +46,7 @@ String _$lastCompanyCodeHash() => r'ebf53817b1ce759a3072f8bae67292ecec8cf22a';
 final loginViewModelProvider = LoginViewModelProvider._();
 
 final class LoginViewModelProvider
-    extends $NotifierProvider<LoginViewModel, LoginFormState> {
+    extends $NotifierProvider<LoginViewModel, AuthFormState> {
   LoginViewModelProvider._()
     : super(
         from: null,
@@ -66,27 +66,27 @@ final class LoginViewModelProvider
   LoginViewModel create() => LoginViewModel();
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(LoginFormState value) {
+  Override overrideWithValue(AuthFormState value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<LoginFormState>(value),
+      providerOverride: $SyncValueProvider<AuthFormState>(value),
     );
   }
 }
 
-String _$loginViewModelHash() => r'f59336cc57d34df1a1235dab1c20250d32a55f1c';
+String _$loginViewModelHash() => r'11796f3888586c796ba81966ed408ab472bea6b6';
 
-abstract class _$LoginViewModel extends $Notifier<LoginFormState> {
-  LoginFormState build();
+abstract class _$LoginViewModel extends $Notifier<AuthFormState> {
+  AuthFormState build();
   @$mustCallSuper
   @override
   WhenComplete runBuild() {
-    final ref = this.ref as $Ref<LoginFormState, LoginFormState>;
+    final ref = this.ref as $Ref<AuthFormState, AuthFormState>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<LoginFormState, LoginFormState>,
-              LoginFormState,
+              AnyNotifier<AuthFormState, AuthFormState>,
+              AuthFormState,
               Object?,
               Object?
             >;

@@ -13,20 +13,24 @@ import '../../../data/services/api_error.dart';
 
 part 'login_view_model.g.dart';
 
-// フォームの状態の型。typedef = 型に名前を付ける（TypeScript の type FormState = {...}）。
+// ログイン画面と初回登録の画面のフォームの状態の型（register_view_model.dart もこれを使う）。
+// typedef = 型に名前を付ける（TypeScript の type FormState = {...}）。
 // ({...}) は「レコード」: クラスを書かずに、名前付きの値をまとめた型を作れる（TypeScript のオブジェクト型に近い）。
 // - isSubmitting: 送っている途中か（T13。true の間はボタンを押せなくし、くるくるを出す。useFormStatus の pending）
 // - message: 画面の上に出す文言（422 以外のエラーと、項目に結びつかないエラー）。なければ null
-// - errors: 項目ごとの文言（422 の errors。company_code / email / password）。入力欄の下に出す
+// - errors: 項目ごとの文言（422 の errors。ログインは company_code / email / password）。入力欄の下に出す
 // 画面が ApiError（data/ の型）を知らずに済むように、ここで画面に出す形に変えておく。
-typedef LoginFormState = ({
+typedef AuthFormState = ({
   bool isSubmitting,
   String? message,
   Map<String, List<String>> errors,
 });
 
 // 何も出していない状態。
-const LoginFormState _initial = (isSubmitting: false, message: null, errors: {});
+const AuthFormState _initial = (isSubmitting: false, message: null, errors: {});
+
+// ログイン画面に入力欄がある項目（422 の errors のキー）。これ以外のキーの文言は、入力欄の下に出せない。
+const Set<String> _loginFields = {'company_code', 'email', 'password'};
 
 // 前回ログインした企業コード（T8）。ログイン画面を開いたときに 1 回だけ読み、入力欄に入れておく。
 // Future を返す関数の Provider なので、読む側には AsyncValue<String?>（読み込み中 / エラー / 値）として届く。
@@ -46,7 +50,7 @@ class LoginViewModel extends _$LoginViewModel {
   // 例: 管理者に無効にされた →「このアカウントは現在利用できません。管理者にお問い合わせください。」
   // takeSignOutReason は読んだら消すので、この画面を開き直したときには出ない。
   @override
-  LoginFormState build() {
+  AuthFormState build() {
     final reason = ref.read(authRepositoryProvider).takeSignOutReason();
     return (isSubmitting: false, message: reason, errors: const {});
   }
@@ -75,6 +79,9 @@ class LoginViewModel extends _$LoginViewModel {
     } on FormatException {
       // 応答の形が契約（6.11）と違う。アプリの不具合か API の変更なので、項目ではなく上に出す。
       next = _formatError;
+    } on Exception {
+      // それ以外の思わぬ失敗（Keychain に書けなかった など）。黙って何も出さないと「押しても何も起きない」に見える。
+      next = _unexpectedError;
     } finally {
       // finally: どう終わっても（思わぬ例外でも）送信中を解く。解かないとボタンが押せないままになる。
       // ref.mounted: await の間に画面を離れて（ログインに成功して一覧に移って）、この Provider が捨てられていないか。
@@ -84,18 +91,33 @@ class LoginViewModel extends _$LoginViewModel {
   }
 
   // ApiError を画面に出す形に変える。
-  // 422 で項目ごとの文言があれば、項目の下に出すので上の message は出さない（同じ文言が 2 回出るのを避ける）。
-  // それ以外（429・500・接続できない など）は上に出す。
-  LoginFormState _fromApiError(ApiError e) {
+  // - 422 で、文言のキーがすべて画面の入力欄（_loginFields）にある: 項目の下に出し、上の message は出さない
+  //   （同じ文言が 2 回出るのを避ける）
+  // - 422 で、入力欄のないキー（device_name など）の文言がある: 項目の下に出せない分が消えないよう、上にも message を出す
+  // - それ以外（429・500・接続できない など）: 上に出す
+  // 初回登録の view model にも同じ形のメソッドがある。7A.1 で view_models/ には Provider 以外の部品（共有の関数）を
+  // 置かないと決めているので、小さな重複として残す（Step 7 で ApiError の扱いを見直すときに、まとめるか決める）。
+  AuthFormState _fromApiError(ApiError e) {
     if (e.statusCode == 422 && e.errors.isNotEmpty) {
-      return (isSubmitting: false, message: null, errors: e.errors);
+      final allShown = e.errors.keys.every(_loginFields.contains);
+      return (
+        isSubmitting: false,
+        message: allShown ? null : e.message,
+        errors: e.errors,
+      );
     }
     return (isSubmitting: false, message: e.message, errors: const {});
   }
 
-  static const LoginFormState _formatError = (
+  static const AuthFormState _formatError = (
     isSubmitting: false,
     message: '応答の形が想定と違います。管理者にお問い合わせください。',
+    errors: {},
+  );
+
+  static const AuthFormState _unexpectedError = (
+    isSubmitting: false,
+    message: 'エラーが起きました。もう一度お試しください。',
     errors: {},
   );
 }
