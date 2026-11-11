@@ -44,6 +44,10 @@ class ApiClient {
           // Duration は時間の長さを表す型（JavaScript ではミリ秒の数で渡すところ）。
           connectTimeout: const Duration(seconds: 10),
           receiveTimeout: const Duration(seconds: 15),
+          // リダイレクト（3xx）を追わない。API は JSON だけを返し、3xx を返す契約はない（docs/01 の 6.1）。
+          // 追うと、行き先によっては Authorization ヘッダの付いたリクエストが別の所へ送られうる。
+          // 3xx は失敗として ApiError（状態コードつきの文言）になる。
+          followRedirects: false,
         ),
       ) {
     // 初期化リストの後の { } はコンストラクタの本体。_dio ができてから動く。

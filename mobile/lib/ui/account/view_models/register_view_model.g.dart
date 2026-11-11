@@ -41,7 +41,7 @@ final class RegisterViewModelProvider
   }
 }
 
-String _$registerViewModelHash() => r'02e7a3e80d6f350acbcf1ce40510f92981a1ff00';
+String _$registerViewModelHash() => r'981bd3dd0d0a8563c40e340e2c4981c0cb4c27ce';
 
 abstract class _$RegisterViewModel extends $Notifier<AuthFormState> {
   AuthFormState build();

@@ -93,16 +93,22 @@ class LoginViewModel extends _$LoginViewModel {
   // ApiError を画面に出す形に変える。
   // - 422 で、文言のキーがすべて画面の入力欄（_loginFields）にある: 項目の下に出し、上の message は出さない
   //   （同じ文言が 2 回出るのを避ける）
-  // - 422 で、入力欄のないキー（device_name など）の文言がある: 項目の下に出せない分が消えないよう、上にも message を出す
+  // - 422 で、入力欄のないキー（device_name など）の文言がある: 項目の下に出せない分が消えないよう、その文言を上に出す
   // - それ以外（429・500・接続できない など）: 上に出す
   // 初回登録の view model にも同じ形のメソッドがある。7A.1 で view_models/ には Provider 以外の部品（共有の関数）を
   // 置かないと決めているので、小さな重複として残す（Step 7 で ApiError の扱いを見直すときに、まとめるか決める）。
   AuthFormState _fromApiError(ApiError e) {
     if (e.statusCode == 422 && e.errors.isNotEmpty) {
-      final allShown = e.errors.keys.every(_loginFields.contains);
+      // 入力欄のないキーの文言（device_name など。アプリが自動で送る値なので、ふつうは起きない）。
+      // e.message は Laravel が「最初の項目の文言（他 N 件）」の形で作るので、上に出すと入力欄の文言と重なり、
+      // 入力欄のない項目の文言が見えないことがある。だから、入力欄のない項目の文言そのものを上に出す。
+      final hidden = [
+        for (final MapEntry(:key, :value) in e.errors.entries)
+          if (!_loginFields.contains(key)) ...value,
+      ];
       return (
         isSubmitting: false,
-        message: allShown ? null : e.message,
+        message: hidden.isEmpty ? null : hidden.join('\n'),
         errors: e.errors,
       );
     }

@@ -33,7 +33,7 @@ class ApiError implements Exception {
     // https://dart.dev/language/patterns
     final message = switch (json['message']) {
       final String m => m,
-      _ => throw FormatException('API のエラーに message がありません: $json'),
+      _ => throw FormatException('API のエラーに message がありません（キー: ${json.keys.toList()}）'),
     };
 
     // errors は省略されることがある（401 の「Unauthenticated.」など。6.11）。
@@ -45,7 +45,7 @@ class ApiError implements Exception {
       // for (final MapEntry(:key, :value) in ...) は、マップの 1 組をキーと値に分けて取り出す書き方。
       for (final MapEntry(:key, :value) in raw.entries) {
         if (value is! List) {
-          throw FormatException('API のエラーの errors.$key が配列ではありません: $json');
+          throw FormatException('API のエラーの errors.$key が配列ではありません');
         }
         // List<dynamic> を List<String> にそろえる。文字列でないものが混ざっていたら契約のずれ。
         errors[key] = [
@@ -53,11 +53,11 @@ class ApiError implements Exception {
             if (item is String)
               item
             else
-              throw FormatException('API のエラーの errors.$key に文字列でないものがあります: $json'),
+              throw FormatException('API のエラーの errors.$key に文字列でないものがあります'),
         ];
       }
     } else if (raw != null) {
-      throw FormatException('API のエラーの errors がオブジェクトではありません: $json');
+      throw const FormatException('API のエラーの errors がオブジェクトではありません');
     }
 
     return ApiError(statusCode: statusCode, message: message, errors: errors);

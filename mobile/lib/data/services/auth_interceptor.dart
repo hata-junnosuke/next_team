@@ -1,5 +1,5 @@
-// すべてのリクエストに「Authorization: Bearer <トークン>」を付け、401 が返ったらログインの状態を切るインターセプタ
-// （docs/01 の 5.3・7A.4）。
+// API（API_BASE_URL と同じ送り先）へのリクエストに「Authorization: Bearer <トークン>」を付け、
+// 401 が返ったらログインの状態を切るインターセプタ（docs/01 の 5.3・7A.4）。
 // インターセプタ = dio がリクエストを送る前・応答を受け取った後に、毎回はさむ処理。
 // Next.js で言うと、lib/api.ts の中で毎回 Cookie をヘッダに写している所。
 // Rails で言うと Faraday のミドルウェア（conn.request :authorization, 'Bearer', token）。
@@ -22,11 +22,15 @@ class AuthInterceptor extends Interceptor {
   // AuthRepository を直接持たないのは、AuthRepository が ApiClient を持ち、ApiClient がこのインターセプタを持つので、
   // 直接持つと「作るのに互いが要る」輪になるため。関数で受け取れば、呼ぶときに初めて相手を探せばよい
   // （config/dependencies.dart で ref.read を包んだ関数を渡す）。
+  // apiBaseUrl: トークンを付けてよい送り先（API_BASE_URL）。リクエストごとの baseUrl ではなく、作るときに決めた
+  // 固定の値と比べる（後でリクエストの baseUrl を書き換える処理が入っても、そこにトークンが付かないように）。
   AuthInterceptor({
+    required String apiBaseUrl,
     required this._tokenStorage,
     required this._onUnauthorized,
-  });
+  }) : _apiOrigin = Uri.parse(apiBaseUrl);
 
+  final Uri _apiOrigin;
   final TokenStorage _tokenStorage;
   final UnauthorizedCallback _onUnauthorized;
 
@@ -64,26 +68,26 @@ class AuthInterceptor extends Interceptor {
     DioException err,
     ErrorInterceptorHandler handler,
   ) async {
-    if (err.response?.statusCode == 401 && await _sentWithCurrentToken(err)) {
-      // 未ログインにする処理が失敗しても（Keychain に書けない、など。まれ）、元の 401 はそのまま流す。
-      // ここで例外を外に出すと、dio が 401 の代わりに「応答なし」の失敗を流し、画面の文言がずれる。
-      try {
+    // Keychain の読み書きが失敗しても（まれ）、元の 401 はそのまま流す。
+    // ここで例外を外に出すと、dio が 401 の代わりに「応答なし」の失敗を流し、画面の文言がずれる。
+    try {
+      if (err.response?.statusCode == 401 && await _sentWithCurrentToken(err)) {
         await _onUnauthorized(_reasonOf(err.response?.data));
-      } on Exception {
-        // 次の API の 401 でもう一度試す。
       }
+    } on Exception {
+      // 未ログインの知らせは AuthRepository が finally で必ず出す。読めなかったときは、次の 401 でもう一度判定する。
     }
     // handler.next(err): エラーをそのまま次へ流す（ApiClient が ApiError に変えて、呼んだ側に投げる）。
     handler.next(err);
   }
 
   // 送り先が API と同じ scheme・host・port か。options.uri は baseUrl と path を合わせた、実際に送る URL。
+  // Uri は scheme と host を小文字にそろえ、port を省くと http は 80・https は 443 を返すので、そのまま比べられる。
   bool _isApiOrigin(RequestOptions options) {
-    final api = Uri.parse(options.baseUrl);
     final target = options.uri;
-    return target.scheme == api.scheme &&
-        target.host == api.host &&
-        target.port == api.port;
+    return target.scheme == _apiOrigin.scheme &&
+        target.host == _apiOrigin.host &&
+        target.port == _apiOrigin.port;
   }
 
   // 401 を返したリクエストが、今保存しているトークンで送ったものか。

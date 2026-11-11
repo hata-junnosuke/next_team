@@ -901,7 +901,7 @@ mobile/
 | 業務ルールと検証 | **アプリに書かない**（CLAUDE.md の絶対ルール 1）。定員・二重応募・状態遷移・応募できるかは API が判定し、アプリは 422 の `message` を表示する。入力欄の下には `errors` の同じキーの文言を出す。ボタンを出すかどうかは `can.apply` を見る |
 | 残り枠 | API の `remaining` をそのまま出す。Step 3 の偽データの画面だけは学習のためアプリで計算してよいが、Step 7 で API の値に置き換える |
 | 状態の文言 | API が返す `{value, label}` の `label` を出す。色だけアプリが持つ（web の `lib/status.ts` と同じ考え方） |
-| API の呼び出し | `data/services/` の `ApiClient` だけが `dio` を持つ（web の `lib/api.ts` と同じ。Step 6）。リポジトリは `ApiClient` を通す |
+| API の呼び出し | `dio` を import するのは `data/services/` だけ（`ApiClient` と、それに差し込む `AuthInterceptor`）。API を呼ぶのは `ApiClient` だけで（web の `lib/api.ts` と同じ。Step 6）、リポジトリは `ApiClient` を通す。リダイレクトは追わない（`followRedirects: false`） |
 | レスポンスの型 | JSON を `Map` のまま使わず、モデルの `fromJson` で型に変えてから使う（Step 3 は手書き、Step 7 から `freezed` + `json_serializable`）。形が合わなければ例外にして、契約のずれとして報告する（web で zod の parse が落ちるのと同じ） |
 | 401 | トークンを消して `/login` へ戻す（`AuthInterceptor`。インターセプタは画面を移さず、ログインの状態を未ログインにするだけで、行き先は `redirect` が決める）。ログイン画面に出す文言（issue #46 の Q4）: 応答に `errors` があれば `message`（無効にされたワーカーの 5.3 の文言）、なければ「もう一度ログインしてください。」（`Unauthenticated.` は英語なので出さない） |
 | トークン | `flutter_secure_storage` にだけ置く。iOS の Keychain は `unlocked_this_device`（バックアップから別の端末に移さない）。ログに出さない（`rules/common/security.md`）。`Authorization` は送り先が `API_BASE_URL` と同じ scheme・host・port のときだけ付ける（`AuthInterceptor`）。**残るリスク**（issue #46 のレビュー。受け入れる）: iOS の Keychain はアプリを消しても残るので、入れ直した直後は前のトークンでログインした状態で始まる（失効していれば最初の API の 401 でログイン画面に戻る）。消すにはアプリの領域に「初回起動の印」を置くパッケージが要るので、Step 6 ではしない |

@@ -20,6 +20,7 @@ class WorkerCompany {
   // 画面の「応答の形が想定と違います」の catch（on FormatException）で受けられない。
   // だから switch のパターンで形を確かめ、合わなければ FormatException にそろえる（api_error.dart と同じ書き方）。
   // Map のパターン {'id': final int id, ...}: キーがあり、値がその型のときだけ当たり、値を変数に取り出す。
+  // 例外の文言には応答の値（氏名・メール）を入れず、キーだけを書く（個人情報を例外やログに残さない）。
   // https://dart.dev/language/patterns
   factory WorkerCompany.fromJson(Map<String, dynamic> json) {
     return switch (json) {
@@ -29,7 +30,7 @@ class WorkerCompany {
         'code': final String code,
       } =>
         WorkerCompany(id: id, name: name, code: code),
-      _ => throw FormatException('WorkerMeResource.company の形が違います: $json'),
+      _ => throw FormatException('WorkerMeResource.company の形が違います（キー: ${json.keys.toList()}）'),
     };
   }
 
@@ -63,7 +64,7 @@ class WorkerMe {
           email: email,
           company: WorkerCompany.fromJson(company),
         ),
-      _ => throw FormatException('WorkerMeResource の形が違います: $json'),
+      _ => throw FormatException('WorkerMeResource の形が違います（キー: ${json.keys.toList()}）'),
     };
   }
 

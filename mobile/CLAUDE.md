@@ -10,7 +10,7 @@
 1. **業務ルールと検証をアプリに書かない**。定員・二重応募・状態遷移・応募できるかは API が判定し、アプリは 422 の `message` を表示する（docs/01 の 7A.4）。Step 3 の偽データの画面では残り枠を計算せず `remaining` を表示する。満員・応募済みの判定は学習のためだけにアプリに置き、Step 7 で API の `can.apply` と `my_application` に置き換える
 2. **`api/` のコードを読まない**。境界は docs/01 の 6.11 と 7A だけ。形がずれていたらアプリで吸収せず報告する
 3. **パッケージは docs/01 の 1 章の表にあるものだけ**を、表の「いつ」の Step から使う。足したくなったら、メリットとデメリットの表を作って人に確認する。バージョンは導入時に固定し、`pubspec.lock` をコミットする
-4. API は `data/services/` の `ApiClient` だけが `dio` で呼ぶ。レスポンスはモデルの `fromJson` で型にしてから使う（Step 6 から）
+4. API は `data/services/` の `ApiClient` だけが `dio` で呼ぶ（`dio` を import するのは `data/services/` の `ApiClient` と `AuthInterceptor` だけ）。レスポンスはモデルの `fromJson` で型にしてから使う（Step 6 から）
 5. トークン・パスワード・招待コードをログに出さない。`print` は `flutter analyze` が止める（`avoid_print`）。`debugPrint` は止まらないので、使わない（`rules/common/security.md`）
 6. `make mobile-analyze`（`flutter analyze`）が `No issues found!` でなければコミットしない。テストは Step 9 から `mobile/test/` に書く
 

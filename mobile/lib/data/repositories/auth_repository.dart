@@ -47,20 +47,16 @@ class AuthRepository extends ChangeNotifier {
   // API は呼ばない（トークンが手元にあるかだけで決める）。トークンが失効・無効にされていたら、
   // 最初に API を呼んだときの 401 で未ログインに戻る（T10）。起動のたびに API を待つと、圏外で開けなくなる。
   //
-  // Keychain の読み込みが失敗したら（まれ。バックアップから戻した直後など）、未ログインとして起動を続ける。
-  // ここで例外を外に出すと main の runApp に届かず、アプリが起動画面のまま止まる。
-  // 読めなかったトークンは消しておく（次のログインで書き直す）。
+  // Keychain の読み込みが失敗したら（まれ。端末のロック中に OS がアプリを先に起動したときなど）、
+  // 未ログインとして起動を続ける。ここで例外を外に出すと main の runApp に届かず、アプリが起動画面のまま止まる。
+  // トークンは消さない: 読めないのはたいてい一時的なので、消すと「ずっとログアウト」に変わってしまう。
+  // 残ったトークンは、次にログインしたときに書き直される。
   Future<void> restore() async {
     try {
       final token = await _tokenStorage.readToken();
       _isLoggedIn = token != null;
     } on Exception {
       _isLoggedIn = false;
-      try {
-        await _tokenStorage.deleteToken();
-      } on Exception {
-        // 消せなくても起動は続ける（次のログインで上書きする）。
-      }
     }
     notifyListeners();
   }
@@ -180,10 +176,16 @@ class AuthRepository extends ChangeNotifier {
   }
 
   // トークンを消して未ログインにする。
+  // Keychain の削除が失敗しても（まれ）、未ログインにして知らせることは必ずする（finally）。
+  // 知らせないと、_isLoggedIn は false なのに画面がログイン中のまま残る。
+  // 消えずに残ったトークンは、次にログインしたときに書き直される。
   Future<void> _signOut() async {
-    await _tokenStorage.deleteToken();
-    _isLoggedIn = false;
-    notifyListeners();
+    try {
+      await _tokenStorage.deleteToken();
+    } finally {
+      _isLoggedIn = false;
+      notifyListeners();
+    }
   }
 
   // {"data": {...}} の data を取り出す。なければ契約のずれ。

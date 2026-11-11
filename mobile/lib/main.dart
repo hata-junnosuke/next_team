@@ -1,7 +1,7 @@
 // アプリの入口。起動して WorkerApp を画面に出すだけ。
 // Next.js で言うと、フレームワークが持っている「起動処理」に当たる（自分では書かない部分）。
-// 中身は app.dart に置き、ここには次の 3 つ以外は足さない:
-// 接続先の空の検査、保存したログインの状態を戻すこと（Step 6）、ProviderScope で包むこと。
+// 中身は app.dart に置き、ここには次の 4 つ以外は足さない:
+// 接続先の空の検査、リリースのビルドで https かの検査、保存したログインの状態を戻すこと（Step 6）、ProviderScope で包むこと。
 //
 // https://api.flutter.dev/flutter/widgets/runApp.html
 // ProviderScope と ProviderContainer: https://riverpod.dev/ja/docs/concepts2/containers
