@@ -111,6 +111,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   helperText: '管理者から伝えられたコード',
                   errorText: errorOf('company_code'),
                 ),
+                // 英数字だけのキーボードを出す。visiblePassword は iOS では ASCII-capable（英数字）のキーボードになり、
+                // 日本語入力（全角・かな）を通らない。端末の言語が日本語だと、既定のキーボードでは全角になってしまう。
+                // 名前は「見えるパスワード」だが、文字を ● で隠すのは obscureText のほうで、これは隠さない。
+                // https://api.flutter.dev/flutter/services/TextInputType/visiblePassword-constant.html
+                keyboardType: TextInputType.visiblePassword,
                 // 入力を大文字にする（キーボードの設定。値の検証ではない。API も大文字にそろえて比べる）。
                 textCapitalization: TextCapitalization.characters,
                 autocorrect: false,

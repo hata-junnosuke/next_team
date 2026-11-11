@@ -84,6 +84,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   labelText: '招待コード',
                   errorText: errorOf('code'),
                 ),
+                // 英数字だけのキーボード（ログイン画面の企業コードと同じ理由。全角にならない）。
+                keyboardType: TextInputType.visiblePassword,
                 autocorrect: false,
                 // 招待コードはログに出さない値（rules/common/security.md）。入力欄はふつうに見せる（打ち間違いに気づけるように）。
                 // OS の自動入力（ワンタイムコード）の候補にする。
