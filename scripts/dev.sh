@@ -145,10 +145,25 @@ mobile() {
   else
     xcrun simctl boot "$MOBILE_SIM" && echo "シミュレータ $MOBILE_SIM を起動しました"
   fi
+  local udid
+  udid=$(xcrun simctl list devices booted | sed -n 's/.*(\([0-9A-F-]\{36\}\)) (Booted).*/\1/p' | head -1)
+  [ -n "$udid" ] || { echo "起動しているシミュレータが見つかりません" >&2; exit 1; }
+  # シミュレータの iOS のキーボードを英語だけにする。iOS の言語が日本語だと、Mac のキーボードで打った英字が
+  # 日本語入力（ローマ字かな）を通り、全角になったり、英数字だけの欄で捨てられたりする（企業コードに A が打てなかった）。
+  # ワーカーアプリには日本語を打つ欄がないので、シミュレータでは英語だけで足りる。変えたときだけ再起動して効かせる
+  local want="en_US@sw=QWERTY;hw=Automatic" cur
+  cur=$(xcrun simctl spawn "$udid" defaults read -g AppleKeyboards 2>/dev/null | tr -d ' \n"()')
+  if [ "$cur" != "$want" ]; then
+    xcrun simctl spawn "$udid" defaults write -g AppleKeyboards -array "$want"
+    xcrun simctl spawn "$udid" defaults write -g AppleKeyboardsExpanded -int 1
+    xcrun simctl shutdown "$udid" && xcrun simctl boot "$udid"
+    echo "シミュレータ キーボードを英語だけにして再起動しました（Mac のキーボードで英字がそのまま入る）"
+  fi
   # 画面を出す（Xcode 27 は DeviceHub、それより前は Simulator）
   open /Applications/Xcode.app/Contents/Applications/DeviceHub.app 2>/dev/null || open -a Simulator 2>/dev/null || true
   echo "アプリ      $API_URL につないで起動します（r でホットリロード、R でホットリスタート、q で終了）"
-  cd mobile && exec flutter run -d "$MOBILE_DEVICE" --dart-define=API_BASE_URL="$API_URL"
+  echo "            コピペ: Mac でコピー → 別のターミナルで make sim-paste → シミュレータで ⌘V（または欄を長押し → ペースト）"
+  cd mobile && exec flutter run -d "$udid" --dart-define=API_BASE_URL="$API_URL"
 }
 
 stop_port() { # ポート 名前

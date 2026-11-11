@@ -4,7 +4,7 @@
 
 .PHONY: help up down ps api-serve web-dev horizon schedule fresh \
         api-test api-pint api-pint-test api-routes web-typecheck web-lint web-format web-format-check web-build \
-        verify verify-full worktree-env dev-stop ports mobile-analyze mobile-run dev-up dev-down dev-status
+        verify verify-full worktree-env dev-stop ports mobile-analyze mobile-run sim-paste dev-up dev-down dev-status
 
 help: ## ターゲット一覧
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -72,6 +72,9 @@ mobile-analyze: ## flutter analyze（警告 0 件がコミットの条件）
 # 環境をそろえる・アプリを起動するのは scripts/dev.sh（場所でポートを決める。main 8002/3002、issue #N 8100+N/3100+N、review 8012/3012）
 mobile-run: ## 環境（dev-up）をそろえ、シミュレータを起動して、その場所の API につないでアプリを起動（r でホットリロード、q で終了）
 	@MOBILE_DEVICE="$(MOBILE_DEVICE)" scripts/dev.sh mobile
+# DeviceHub（Xcode 27）が Mac のクリップボードをシミュレータに渡さないときに、手で送る
+sim-paste: ## Mac のクリップボードをシミュレータに送る（そのあとシミュレータで ⌘V か、欄を長押し → ペースト）
+	@pbpaste | xcrun simctl pbcopy booted && echo "シミュレータのクリップボードに送りました。シミュレータで ⌘V（または欄を長押し → ペースト）"
 
 # --- worktree ---
 # main の作業ツリー（git worktree list の先頭）の .env / .env.local を WT にコピーする。中身は表示しない。

@@ -17,5 +17,8 @@ make mobile-run    # これ 1 つで、Redis・Mailpit・API・管理画面・Ho
                    # ポートは場所で決まる（main 8002/3002、issue #N の worktree 8100+N/3100+N、review 8012/3012）。アプリもその API につなぐ
                    # 起動済みのものはそのまま使う。ログインの情報も出る。r でホットリロード、R でホットリスタート、q で終了
 make dev-down      # q の後も残る API・管理画面・Horizon・スケジューラを止める（この場所のものだけ。Redis・Mailpit は make down）
+make sim-paste     # Mac でコピーしたものをシミュレータに送る（そのあとシミュレータで ⌘V、または欄を長押し → ペースト）
 make mobile-analyze                                                    # 静的解析（警告 0 件）
 ```
+
+シミュレータの iOS のキーボードは、`make mobile-run` が英語だけにそろえます（iOS の言語が日本語だと、Mac のキーボードで打った英字が日本語入力を通り、全角になったり入らなかったりするため）。
