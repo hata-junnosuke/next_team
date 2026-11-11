@@ -75,14 +75,14 @@ lib/
   main.dart                 起動するだけ
   app.dart                  MaterialApp.router とテーマ（Next.js の app/layout.tsx）
   routing/router.dart       go_router
-  config/dependencies.dart  どの実装を使うかを決める Provider（jobRepositoryProvider）
+  config/dependencies.dart  どの実装を使うかを決める Provider（jobRepositoryProvider。Step 6 から apiClientProvider・tokenStorageProvider・authRepositoryProvider）
   utils/                    表示の形（format.dart）
   ui/core/                  共通の Widget（ui/）とテーマ（themes/）
   ui/<機能>/view_models/    その機能の Riverpod の Provider だけ
   ui/<機能>/widgets/        画面と Widget だけ
   domain/models/            モデルと enum（Flutter も Riverpod も import しない）
-  data/repositories/        リポジトリ（Riverpod を import しない）
-  data/services/            ApiClient など（Step 6）
+  data/repositories/        リポジトリ（Riverpod を import しない。Step 6 からログインの状態を持つ AuthRepository）
+  data/services/            ApiClient・AuthInterceptor・TokenStorage・ApiError・device_name（Step 6）
 ```
 
-依存の向き: `routing → widgets → view_models → config → data → domain`（一方通行。widgets は config と data を直接読まない）。`ui` は `domain` のモデルと `utils` を直接使ってよい。`routing` は `ui/core/ui` も使う（docs/01 の 7A.1）
+依存の向き: `routing → widgets → view_models → config → data → domain`（一方通行。widgets は config と data を直接読まない）。`routing` は `redirect` でログインの状態（`authRepositoryProvider`）を読むためだけに `config` も使う（Step 6）。`ui` は `domain` のモデルと `utils` を直接使ってよい。`routing` は `ui/core/ui` も使う（docs/01 の 7A.1）

@@ -840,7 +840,7 @@ mobile/
     ├── main.dart                 起動するだけ
     ├── app.dart                  MaterialApp.router とテーマ（Next.js の app/layout.tsx）
     ├── routing/router.dart       go_router の定義（Next.js の app/ フォルダの構造）
-    ├── config/dependencies.dart  どの実装を使うかを決める Provider（jobRepositoryProvider）。Step 6 から ApiClient なども
+    ├── config/dependencies.dart  どの実装を使うかを決める Provider（jobRepositoryProvider）。Step 6 から apiClientProvider・tokenStorageProvider・authRepositoryProvider
     ├── utils/format.dart         日付・時刻・金額の表示の形（web の lib/format.ts）
     ├── ui/
     │   ├── core/ui/              複数の画面で使う Widget（scaffold_with_nav_bar.dart）
@@ -851,8 +851,8 @@ mobile/
     │   └── account/              マイページ・ログイン・初回登録（Step 6）
     ├── domain/models/            モデル（JobPosting）と値の定義（DateFilter・ApplyStatus）
     └── data/
-        ├── repositories/         リポジトリ（JobRepository と実装）
-        └── services/             Step 6: ApiClient（dio）・AuthInterceptor・TokenStorage・ApiError
+        ├── repositories/         リポジトリ（JobRepository と実装。Step 6 から auth_repository.dart）
+        └── services/             Step 6: ApiClient（dio）・AuthInterceptor・TokenStorage・ApiError・device_name.dart
 ```
 
 - `domain/models/` はモデル（`JobPosting`）と、画面に依存しない値の定義（`DateFilter`・`ApplyStatus` などの enum）。Flutter（`package:flutter`）も Riverpod も import しない
@@ -862,7 +862,9 @@ mobile/
 - `ui/<機能>/widgets/` は画面（`<機能>_screen.dart`）と Widget だけ。`view_models/` の Provider を `ref.watch` / `ref.read` で読む。`config/` と `data/` を直接読まない（1 件の取得も `jobDetailProvider(id)` のような引数つきの Provider を通す）
 - 機能をまたいで使う状態は `view_models/` に置かない。今の `appliedJobsProvider` は jobs の中だけで使うので `ui/jobs/view_models/` に置く。Step 8 で schedule からも使うようになったら、状態の持ち主を `data/repositories/` のリポジトリ（Riverpod を知らない）にし、それを返す Provider を `config/dependencies.dart` に置いて、jobs と schedule の `view_models/` がそれぞれ読む（公式の「共有する状態はリポジトリに持つ」。issue #35 の Q4=A）
 - `ui/core/` は複数の画面で使う Widget（`ui/`）とテーマ（`themes/`）だけ。状態は置かない
-- 依存の向きは一方通行: `app.dart → routing・ui/core/themes`、`routing → ui/*/widgets・ui/core/ui`、`ui/*/widgets → ui/*/view_models → config → data → domain`（`ui` は `domain` のモデルと `utils` を使ってよい）。`domain` は誰にも依存しない
+- **ログインの状態**（Step 6。issue #46 の Q1）は `data/repositories/auth_repository.dart` の `AuthRepository` が持つ。`ChangeNotifier`（Flutter の `foundation`。Riverpod ではない）を継承し、トークンの有無が変わったら `notifyListeners()` する。go_router は `refreshListenable` でこれを聞き、`redirect` で行き先を決める（公式の compass_app と同じ形）。`AuthRepository` は `config/dependencies.dart` の `authRepositoryProvider` が 1 つだけ作り（`keepAlive`）、`ApiClient`（`apiClientProvider`）と `TokenStorage`（`tokenStorageProvider`）を渡す。画面は `ui/account/view_models/` の Provider を通して使う
+- `device_name`（ログインと初回登録で送るトークンの名前。issue #46 の Q3）は `data/services/device_name.dart` が `dart:io` の `Platform`（`operatingSystem` と `operatingSystemVersion`）から作る（例: `ios 18.2`）。パッケージは足さない
+- 依存の向きは一方通行: `app.dart → routing・ui/core/themes`、`routing → ui/*/widgets・ui/core/ui・config`（`config` は `redirect` でログインの状態を読むためだけ。Step 6）、`ui/*/widgets → ui/*/view_models → config → data → domain`（`ui` は `domain` のモデルと `utils` を使ってよい）。`domain` は誰にも依存しない
 - 公式のサンプルにある `main_development.dart` / `main_staging.dart`（環境ごとの入口）と `testing/`（テスト用の偽物）は、今は作らない。接続先は `--dart-define`（7A.2）で切り替え、テスト用の置き場は Step 9 で決める
 - テストは Step 9 から `mobile/test/`（`lib/` と同じ形。`rules/common/testing.md`）
 
@@ -900,9 +902,9 @@ mobile/
 | 状態の文言 | API が返す `{value, label}` の `label` を出す。色だけアプリが持つ（web の `lib/status.ts` と同じ考え方） |
 | API の呼び出し | `data/services/` の `ApiClient` だけが `dio` を持つ（web の `lib/api.ts` と同じ。Step 6）。リポジトリは `ApiClient` を通す |
 | レスポンスの型 | JSON を `Map` のまま使わず、モデルの `fromJson` で型に変えてから使う（Step 3 は手書き、Step 7 から `freezed` + `json_serializable`）。形が合わなければ例外にして、契約のずれとして報告する（web で zod の parse が落ちるのと同じ） |
-| 401 | トークンを消して `/login` へ戻す（`AuthInterceptor`）。無効にされたワーカーは 401 の `message` を出す |
+| 401 | トークンを消して `/login` へ戻す（`AuthInterceptor`。インターセプタは画面を移さず、ログインの状態を未ログインにするだけで、行き先は `redirect` が決める）。ログイン画面に出す文言（issue #46 の Q4）: 応答に `errors` があれば `message`（無効にされたワーカーの 5.3 の文言）、なければ「もう一度ログインしてください。」（`Unauthenticated.` は英語なので出さない） |
 | トークン | `flutter_secure_storage` にだけ置く。ログに出さない（`rules/common/security.md`） |
-| 企業コード | ログイン後に `WorkerMeResource.company.code` を覚えておき、次のログインの入力欄に入れておく（秘密ではない） |
+| 企業コード | ログイン後と初回登録の後に `WorkerMeResource.company.code`（入力した値ではなく API が返した値）を覚えておき、次のログインの入力欄に入れておく（秘密ではない）。保存先は `flutter_secure_storage` の、トークンとは別のキー（issue #46 の Q2。パッケージを足さないため）。ログアウトしても消さない |
 | 日付と時刻 | 6.1 の形（`"2026-09-20"` `"09:00"` ISO 8601）を受け取り、表示は `2026/09/20（日）` `09:00〜17:00` の形にする（web の 7.5 と揃える） |
 
 ## 8. 非同期の契約（P4。詳細は [`03_非同期処理の設計.md`](03_非同期処理の設計.md)）
