@@ -72,12 +72,12 @@ class JobListScreen extends ConsumerWidget {
 
 ```
 lib/
-  main.dart                 起動するだけ
+  main.dart                 起動する（その前に API_BASE_URL の検査とログインの状態の復元。Step 6）
   app.dart                  MaterialApp.router とテーマ（Next.js の app/layout.tsx）
   routing/router.dart       go_router
   config/dependencies.dart  どの実装を使うかを決める Provider（jobRepositoryProvider。Step 6 から apiClientProvider・tokenStorageProvider・authRepositoryProvider）
   utils/                    表示の形（format.dart）
-  ui/core/                  共通の Widget（ui/）とテーマ（themes/）
+  ui/core/                  共通の Widget（ui/。error_banner など）とテーマ（themes/）
   ui/<機能>/view_models/    その機能の Riverpod の Provider だけ
   ui/<機能>/widgets/        画面と Widget だけ
   domain/models/            モデルと enum（Flutter も Riverpod も import しない）
@@ -85,4 +85,4 @@ lib/
   data/services/            ApiClient・AuthInterceptor・TokenStorage・ApiError・device_name（Step 6）
 ```
 
-依存の向き: `routing → widgets → view_models → config → data → domain`（一方通行。widgets は config と data を直接読まない）。`routing` は `redirect` でログインの状態（`authRepositoryProvider`）を読むためだけに `config` も使う（Step 6）。`ui` は `domain` のモデルと `utils` を直接使ってよい。`routing` は `ui/core/ui` も使う（docs/01 の 7A.1）
+依存の向き: `routing → widgets → view_models → config → data → domain`（一方通行。widgets は config と data を直接読まない）。`routing` は `redirect` でログインの状態（`authRepositoryProvider`）を読むためだけに `config` も使う（Step 6）。`ui` は `domain` のモデルと `utils` を直接使ってよい。`routing` と `widgets` は `ui/core/ui` も使う。`main.dart` は起動前の検査と復元のために `config` と `data/services`（`apiBaseUrl`）を使う。`view_models` は `on ApiError` のためだけに `data/services/api_error.dart` を import してよい（docs/01 の 7A.1）
