@@ -12,7 +12,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../core/ui/error_banner.dart';
 import '../view_models/login_view_model.dart';
 
 // ConsumerStatefulWidget = Provider を読める StatefulWidget。
@@ -99,7 +101,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               // 上に出すエラー（422 以外）。if を [ ] の中に書くと、条件が合うときだけ要素を足せる（collection if）。
               if (form.message != null) ...[
                 // ... はスプレッド（[ ] の中身を展開する。JavaScript の ...[a, b] と同じ）。
-                _ErrorBanner(message: form.message!),
+                ErrorBanner(message: form.message!),
                 const SizedBox(height: 16),
               ],
               TextField(
@@ -145,32 +147,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               const SizedBox(height: 24),
               FilledButton(onPressed: _submit, child: const Text('ログイン')),
+              const SizedBox(height: 8),
+              // 初回登録の画面へ（T12）。push: 今の画面の上に重ねる（戻るボタンでログイン画面に戻れる）。
+              // go('/register') だと履歴を置き換えるので戻れない（Next.js の router.push と router.replace の違い）。
+              TextButton(
+                onPressed: () => context.push('/register'),
+                child: const Text('初回登録はこちら（招待コードをお持ちの方）'),
+              ),
             ],
           ),
         ),
       ),
-    );
-  }
-}
-
-// 画面の上に出すエラーの帯。この画面でしか使わないので、このファイルに置き、_ で外から隠す。
-// 状態を持たないので Stateless。
-class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    // Theme.of(context): アプリのテーマ（色など）を読む（React の useContext(ThemeContext)）。
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: colors.errorContainer,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(message, style: TextStyle(color: colors.onErrorContainer)),
     );
   }
 }
