@@ -84,8 +84,10 @@ class LoginViewModel extends _$LoginViewModel {
       next = _unexpectedError;
     } finally {
       // finally: どう終わっても（思わぬ例外でも）送信中を解く。解かないとボタンが押せないままになる。
-      // ref.mounted: await の間に画面を離れて（ログインに成功して一覧に移って）、この Provider が捨てられていないか。
+      // ref.mounted: await している間に、この Provider が捨てられていないか（ログイン画面が閉じられた など）。
       // 捨てられた後に state を書くと例外になるので確かめる（React の「アンマウント後に setState しない」と同じ）。
+      // ログインに成功したときは、一覧に替わるのは次のフレームなので、ここではまだ true で、送信中を解く値が書かれる
+      // （すぐ画面ごと消えるので害はない）。
       if (ref.mounted) state = next;
     }
   }

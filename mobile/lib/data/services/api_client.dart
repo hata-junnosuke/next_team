@@ -58,8 +58,8 @@ class ApiClient {
 
   // GET。成功したら本文の JSON（{"data": …} の形のオブジェクト）を返す。
   // Future<T> は「あとで T が届く」値（JavaScript の Promise<T>）。async / await も同じ使い方。
-  // Map<String, dynamic> は JSON のオブジェクト（TypeScript の Record<string, unknown>）。
-  // dynamic は「型を決めない」。ここでは型にせず、リポジトリがモデルの fromJson で型に変える（7A.4）。
+  // Map<String, dynamic> は JSON のオブジェクト（TypeScript の Record<string, any>）。
+  // dynamic は「型を検査しない」（TS の any）。ここでは型にせず、リポジトリがモデルの fromJson で確かめて型に変える（7A.4）。
   Future<Map<String, dynamic>> get(
     String path, {
     Map<String, dynamic>? query,

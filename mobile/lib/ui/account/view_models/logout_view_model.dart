@@ -22,7 +22,8 @@ class LogoutViewModel extends _$LogoutViewModel {
       // 成功しても失敗しても、AuthRepository が未ログインにして知らせ、redirect がログイン画面に移す。
       await ref.read(authRepositoryProvider).logout();
     } finally {
-      // ログイン画面に移ると、この Provider は捨てられている。捨てられた後に state を書くと例外になるので確かめる。
+      // await している間に、この Provider が捨てられていたら書かない（捨てられた後に state を書くと例外になる）。
+      // ログアウトが終わってログイン画面に替わるのは次のフレームなので、ふつうはまだ true で、false が書かれる。
       if (ref.mounted) state = false;
     }
   }
