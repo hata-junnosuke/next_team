@@ -873,7 +873,7 @@ mobile/
 | 項目 | 内容 |
 |---|---|
 | 接続先 | `--dart-define=API_BASE_URL=...` で渡し、コードでは `String.fromEnvironment('API_BASE_URL')` で読む。既定値は置かない（渡し忘れに気づけるように、**Step 6 で `ApiClient` を作ってから**は空なら起動時にエラーを出す。API を使わない Step 3〜5 では渡さなくても起動できる） |
-| iOS シミュレータ | `http://localhost:8002`（Mac の API にそのまま届く）。`http://` に繋がらないときは、Info.plist の App Transport Security にローカル開発だけの例外を足す（Step 6 で確かめる。13 章の 10） |
+| iOS シミュレータ | `http://localhost:8002`（Mac の API にそのまま届く）。App Transport Security の例外は要らない（Info.plist に足していない。issue #46 の T6 で確認。13 章の 10） |
 | Android エミュレータ | `http://10.0.2.2:8002`（エミュレータから見た Mac の localhost） |
 | 起動 | `make mobile-run`（`flutter run -d iPhone --dart-define=API_BASE_URL=http://localhost:8002`。`-d` は機種名の前方一致で、`MOBILE_DEVICE=` で変えられる）。静的解析は `make mobile-analyze`（`flutter analyze`）。**この 2 つは Step 3 で足す**。`make mobile-test` と、`make verify`・CI・Stop フックへの組み込みは Step 9 |
 | 秘密 | `--dart-define` に秘密を入れない（ビルドに埋め込まれる。`rules/common/security.md`） |
@@ -1106,4 +1106,4 @@ B と C の境界: C の `AttendanceService::save()` は B の `Application`（�
 | 7 | **確認済み（issue #37 の T3）: 前提どおり。** `WorkerAuthTest::test_ワーカーのトークンで管理者のapi_userを叩くと401`（`assertGuest('sanctum')` で provider の効き目も確認）。 guard `sanctum` に `provider: users` を付けると、ワーカー（`Worker`）のトークンは管理者の API で拒否される（Sanctum の `Guard::hasValidProvider()`）。Cookie（stateful）での管理者のログインには影響しない | ワーカー Step 5 の最初のテスト（`WorkerAuthTest` の「ワーカーのトークンで `/api/user` が 401」と、既存の `LoginTest` が緑のまま） |
 | 8 | **確認済み（issue #37 の T3）: 前提どおり。** `WorkerAuthTest::test_企業が決まる前でもトークンから他社のワーカーを読めてその企業の情報が返る`（スコープを外さないと 500 になることも確認）。 `PersonalAccessToken::tokenable()` で `withoutGlobalScope('company')` にすれば、企業が決まる前でもトークンから `Worker` を読める（外さないと `CurrentCompany::id()` が例外） | 同上（`actingAsWorker()` ではなく、本物のトークンを `withToken()` で付けたテストを 1 本書く） |
 | 9 | **確認済み（issue #37 の T3）: 前提どおり。** `WorkerAuthTest::test_管理者のcookieでワーカーの自分の情報を叩くと401`。 管理者の Cookie（stateful）で `/api/worker/me` を叩くと、Sanctum の guard `worker` は web ガードの `User` を返す（`Guard::__invoke` の stateful の分岐は provider を見ない。T3 の security-reviewer がソースで確認）。`worker` ミドルウェアの型の確認で 401 になる | 同上（`actingAsAdmin()` してから `/api/worker/me` が 401） |
-| 10 | iOS シミュレータのアプリから `http://localhost:8002` に、App Transport Security の例外なしで繋がるか | Step 6 で `ApiClient` を作ったとき、最初のリクエストで確かめる。繋がらなければ Info.plist に `NSAllowsLocalNetworking` を足し、7A.2 を直す |
+| 10 | **確認済み（issue #46 の T6）: 例外なしで繋がる。** iOS 27.0 の iPhone 17 シミュレータから `ApiClient`（dio）で `http://localhost:8146/api/worker/login` に送り、422 と日本語の `message` を受け取った（`localhost` は `::1` で届いた）。dio は `dart:io` の `HttpClient` を使い、ATS が見る iOS の URL 読み込み（`URLSession`）を通らないためと考えられる。Info.plist は変えていない。 iOS シミュレータのアプリから `http://localhost:8002` に、App Transport Security の例外なしで繋がるか | Step 6 で `ApiClient` を作ったとき、最初のリクエストで確かめる。繋がらなければ Info.plist に `NSAllowsLocalNetworking` を足し、7A.2 を直す |
