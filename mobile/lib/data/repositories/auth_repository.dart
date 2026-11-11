@@ -91,6 +91,9 @@ class AuthRepository extends ChangeNotifier {
     return _signIn(body);
   }
 
+  // 前回ログインした企業コード（なければ null）。ログイン画面の入力欄に最初から入れておくために使う（T8）。
+  Future<String?> lastCompanyCode() => _tokenStorage.readCompanyCode();
+
   // 自分の情報（GET /api/worker/me）。応答は {"data": WorkerMeResource}。
   Future<WorkerMe> fetchMe() async {
     final body = await _apiClient.get('/api/worker/me');
@@ -111,6 +114,8 @@ class AuthRepository extends ChangeNotifier {
     final worker = WorkerMe.fromJson(data['worker'] as Map<String, dynamic>);
 
     await _tokenStorage.writeToken(token);
+    // 企業コードを覚えておく（T8）。入力した値ではなく API が返した値（大文字にそろえたもの）を保存する。
+    await _tokenStorage.writeCompanyCode(worker.company.code);
     _isLoggedIn = true;
     // 聞いている人（go_router）に「変わった」と知らせる。redirect がやり直され、ログイン画面から一覧に移る。
     notifyListeners();

@@ -23,6 +23,15 @@ typedef LoginFormState = ({String? message, Map<String, List<String>> errors});
 // 何も出していない状態。
 const LoginFormState _initial = (message: null, errors: {});
 
+// 前回ログインした企業コード（T8）。ログイン画面を開いたときに 1 回だけ読み、入力欄に入れておく。
+// Future を返す関数の Provider なので、読む側には AsyncValue<String?>（読み込み中 / エラー / 値）として届く。
+// 何を持つか: Keychain から読んだ企業コード（なければ null）。
+// いつ作り直されるか: keepAlive なしなので、ログイン画面を離れると捨てられ、次に開いたときに読み直す
+// （ログアウトしてログイン画面に戻ったときに、直前のログインで保存した値が入る）。
+@riverpod
+Future<String?> lastCompanyCode(Ref ref) =>
+    ref.watch(authRepositoryProvider).lastCompanyCode();
+
 // 何を持つか: 直前の送信のエラー（なければ空）。
 // いつ作り直されるか: keepAlive なしなので、ログイン画面を離れる（一覧に移る）と捨てられ、
 // 次にログイン画面を開いたときに _initial から始まる（前のエラーが残らない）。

@@ -34,6 +34,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _email = TextEditingController();
   final _password = TextEditingController();
 
+  // initState: State が作られたときに 1 回だけ呼ばれる（React の useEffect(() => {...}, [])）。
+  // 前回の企業コードを読み、入力欄が空なら入れておく（T8）。
+  @override
+  void initState() {
+    super.initState();
+    // ref.listenManual: Provider を購読し、値が変わるたびに関数を呼ぶ（initState の中で使える listen）。
+    // 画面がある間は購読が続くので、lastCompanyCodeProvider（keepAlive なし）が読み終わる前に捨てられない。
+    // 画面が捨てられると、購読も自動で外れる。
+    // fireImmediately: true = すでに値があれば、すぐに 1 回呼ぶ。
+    ref.listenManual(lastCompanyCodeProvider, (previous, next) {
+      // next は AsyncValue<String?>。.value は届いた値（読み込み中・エラーなら null）。
+      final code = next.value;
+      // 入力欄が空のときだけ入れる（先に打ち始めていたら上書きしない）。
+      if (code != null && _companyCode.text.isEmpty) {
+        _companyCode.text = code;
+      }
+    }, fireImmediately: true);
+  }
+
   // dispose: State が捨てられるときに 1 回呼ばれる（React の useEffect の後片付け return () => {...}）。
   // Controller は捨てないと聞き手が残る（メモリが漏れる）ので、ここで片付ける。
   @override

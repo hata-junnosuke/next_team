@@ -9,6 +9,39 @@ part of 'login_view_model.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
+@ProviderFor(lastCompanyCode)
+final lastCompanyCodeProvider = LastCompanyCodeProvider._();
+
+final class LastCompanyCodeProvider
+    extends $FunctionalProvider<AsyncValue<String?>, String?, FutureOr<String?>>
+    with $FutureModifier<String?>, $FutureProvider<String?> {
+  LastCompanyCodeProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'lastCompanyCodeProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$lastCompanyCodeHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<String?> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<String?> create(Ref ref) {
+    return lastCompanyCode(ref);
+  }
+}
+
+String _$lastCompanyCodeHash() => r'ebf53817b1ce759a3072f8bae67292ecec8cf22a';
+
 @ProviderFor(LoginViewModel)
 final loginViewModelProvider = LoginViewModelProvider._();
 
