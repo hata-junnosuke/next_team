@@ -6,6 +6,8 @@
 // https://api.flutter.dev/flutter/widgets/runApp.html
 // ProviderScope と ProviderContainer: https://riverpod.dev/ja/docs/concepts2/containers
 
+// kReleaseMode（リリースのビルドかどうか）を使うために読み込む。
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -26,6 +28,13 @@ Future<void> main() async {
       'API_BASE_URL が空です。make mobile-run で起動するか、'
       'flutter run --dart-define=API_BASE_URL=http://localhost:8002 のように接続先を渡してください。',
     );
+  }
+
+  // リリースのビルド（ストアに出すもの）では https 以外の接続先を許さない。
+  // dio は dart:io で通信するので、iOS の App Transport Security（http を止める仕組み）が効かない（docs/01 の 13 章の 10）。
+  // 止めないと、パスワード・招待コード・トークンが暗号化されずに流れる。開発（flutter run）では http://localhost を使う。
+  if (kReleaseMode && Uri.parse(apiBaseUrl).scheme != 'https') {
+    throw StateError('リリースのビルドでは API_BASE_URL を https:// にしてください。');
   }
 
   // runApp の前にプラグイン（flutter_secure_storage）を使うときは、先に Flutter の土台を用意する決まり。

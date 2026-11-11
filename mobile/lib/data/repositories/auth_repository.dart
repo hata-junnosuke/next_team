@@ -130,6 +130,8 @@ class AuthRepository extends ChangeNotifier {
       // finally: 成功しても失敗しても最後に必ず動く（Ruby の ensure、JavaScript の finally）。
       // 401 のときは AuthInterceptor が理由（もう一度ログインしてください。）を入れているが、
       // 自分でログアウトしたのだから出さない。
+      // 間に合う理由: 理由を読むのはログイン画面を作るとき（次の描画のフレーム）で、ここは dio の失敗が
+      // 届いた直後に同じ非同期の流れで動く（フレームを待たない）ので、読まれる前に消せる。
       _signOutReason = null;
       await _signOut();
     }
@@ -138,8 +140,11 @@ class AuthRepository extends ChangeNotifier {
   // API が 401 を返したときに AuthInterceptor から呼ばれる（T10）。トークンを消して未ログインにする。
   // reason がなければ（Unauthenticated. の 401）決まりの文言にする（docs/01 の 7A.4。issue #46 の Q4）。
   // すでに未ログインなら何もしない（同時に飛んだ複数のリクエストが、続けて 401 を受け取ることがある）。
+  // そのために、Keychain を消すのを待つ（await）より前に _isLoggedIn を false にする。
+  // 待っている間に 2 つ目の 401 が来ても、ここで止まる。
   Future<void> expireSession(String? reason) async {
     if (!_isLoggedIn) return;
+    _isLoggedIn = false;
     _signOutReason = reason ?? 'もう一度ログインしてください。';
     await _signOut();
   }

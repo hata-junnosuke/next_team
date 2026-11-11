@@ -17,8 +17,21 @@ class TokenStorage {
   // 保存先を外から渡せるようにしておく（Step 9 のテストで偽物に替えられる）。
   // 省略したら本物の FlutterSecureStorage を使う。
   // ?? は「左が null なら右」（JavaScript の ??）。
+  //
+  // iOS の Keychain の「いつ読めるか」は unlocked_this_device にする（既定に頼らず明示する）。
+  // - unlocked: 端末のロックが解かれている間だけ読める（アプリを開いて使う間だけ要るので、これで足りる）
+  // - this_device: 暗号化したバックアップから別の端末に戻しても、トークンは移らない
+  //   （端末を買い替えたら、もう一度ログインしてもらう。前の端末のトークンを新しい端末で使わせない）
+  // Step 10 でアプリを開いていない間に通信するなら、first_unlock_this_device に変える。
+  // https://developer.apple.com/documentation/security/ksecattraccessiblewhenunlockedthisdeviceonly
   TokenStorage({FlutterSecureStorage? storage})
-    : _storage = storage ?? const FlutterSecureStorage();
+    : _storage =
+          storage ??
+          const FlutterSecureStorage(
+            iOptions: IOSOptions(
+              accessibility: KeychainAccessibility.unlocked_this_device,
+            ),
+          );
 
   final FlutterSecureStorage _storage;
 

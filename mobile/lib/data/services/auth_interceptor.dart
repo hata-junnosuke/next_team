@@ -16,7 +16,7 @@ import 'token_storage.dart';
 // reason: ログイン画面に出す理由（API の message）。理由を出さない 401 なら null（docs/01 の 7A.4。issue #46 の Q4）。
 typedef UnauthorizedCallback = Future<void> Function(String? reason);
 
-// extends Interceptor: dio のインターセプタの型を継承し、必要なメソッド（onRequest）だけを上書きする。
+// extends Interceptor: dio のインターセプタの型を継承し、必要なメソッド（onRequest と onError）だけを上書きする。
 class AuthInterceptor extends Interceptor {
   // onUnauthorized: 401 のときに呼ぶ関数を外から受け取る。
   // AuthRepository を直接持たないのは、AuthRepository が ApiClient を持ち、ApiClient がこのインターセプタを持つので、
@@ -30,6 +30,10 @@ class AuthInterceptor extends Interceptor {
   final TokenStorage _tokenStorage;
   final UnauthorizedCallback _onUnauthorized;
 
+  // このリクエストに付けたトークンを、応答が返るまで覚えておくための名前（options.extra のキー）。
+  // extra = dio のリクエストに付けて持ち回れる「ヘッダにならないメモ」。サーバーには送られない。
+  static const String _sentTokenKey = 'auth_interceptor.sent_token';
+
   // 送る前に毎回呼ばれる。options が送ろうとしているリクエスト（URL・ヘッダ・本文）。
   // handler.next(options) を呼ぶと、次（実際の送信）に進む。呼び忘れると、リクエストが止まったままになる。
   // async にして Keychain を読み終えてから next を呼ぶ（Express の middleware で await してから next() するのと同じ）。
@@ -39,9 +43,14 @@ class AuthInterceptor extends Interceptor {
     RequestInterceptorHandler handler,
   ) async {
     final token = await _tokenStorage.readToken();
-    // トークンがあれば付ける。ログインと初回登録の前はないので、付けずに送る。
-    if (token != null) {
+    // トークンがあり、送り先が API（API_BASE_URL と同じ scheme・host・port）のときだけ付ける。
+    // ログインと初回登録の前はトークンがないので、付けずに送る。
+    // dio は path に http:// から始まる URL を渡されると baseUrl を使わずにそこへ送るので、確かめないと
+    // 別のサイトにトークンを渡してしまう（Step 7 でページ送りの links.next の URL を使うときなど）。
+    // web で Cookie が自分のドメインにだけ送られるのを、ここでは自分で守っている。
+    if (token != null && _isApiOrigin(options)) {
       options.headers['Authorization'] = 'Bearer $token';
+      options.extra[_sentTokenKey] = token;
     }
     handler.next(options);
   }
@@ -55,11 +64,35 @@ class AuthInterceptor extends Interceptor {
     DioException err,
     ErrorInterceptorHandler handler,
   ) async {
-    if (err.response?.statusCode == 401) {
-      await _onUnauthorized(_reasonOf(err.response?.data));
+    if (err.response?.statusCode == 401 && await _sentWithCurrentToken(err)) {
+      // 未ログインにする処理が失敗しても（Keychain に書けない、など。まれ）、元の 401 はそのまま流す。
+      // ここで例外を外に出すと、dio が 401 の代わりに「応答なし」の失敗を流し、画面の文言がずれる。
+      try {
+        await _onUnauthorized(_reasonOf(err.response?.data));
+      } on Exception {
+        // 次の API の 401 でもう一度試す。
+      }
     }
     // handler.next(err): エラーをそのまま次へ流す（ApiClient が ApiError に変えて、呼んだ側に投げる）。
     handler.next(err);
+  }
+
+  // 送り先が API と同じ scheme・host・port か。options.uri は baseUrl と path を合わせた、実際に送る URL。
+  bool _isApiOrigin(RequestOptions options) {
+    final api = Uri.parse(options.baseUrl);
+    final target = options.uri;
+    return target.scheme == api.scheme &&
+        target.host == api.host &&
+        target.port == api.port;
+  }
+
+  // 401 を返したリクエストが、今保存しているトークンで送ったものか。
+  // 古いトークンで送ったリクエストの 401 が遅れて届いたとき（その間にログインし直していた）に、
+  // 新しいログインまで切ってしまわないようにする。トークンを付けずに送ったリクエストの 401 も無視する。
+  Future<bool> _sentWithCurrentToken(DioException err) async {
+    final sent = err.requestOptions.extra[_sentTokenKey];
+    if (sent == null) return false;
+    return sent == await _tokenStorage.readToken();
   }
 
   // ログイン画面に出す理由（issue #46 の Q4）。
