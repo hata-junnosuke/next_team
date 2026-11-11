@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { ActiveBadge } from "@/components/workers/ActiveBadge";
+import { InvitationStatus } from "@/components/workers/InvitationStatus";
+import { ResendInvitationButton } from "@/components/workers/ResendInvitationButton";
 import { ToggleWorkerActiveButton } from "@/components/workers/ToggleWorkerActiveButton";
 import { WorkerSearchForm } from "@/components/workers/WorkerSearchForm";
 import { Alert } from "@/components/ui/Alert";
@@ -7,12 +9,14 @@ import { buttonClassName } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { emptyText, Pagination } from "@/components/ui/Pagination";
 import { Table, Td } from "@/components/ui/Table";
-import { setWorkerActive } from "@/lib/actions/worker";
+import { resendWorkerInvitation, setWorkerActive } from "@/lib/actions/worker";
 import { ApiError, apiGet } from "@/lib/api";
+import { userResponse } from "@/lib/schemas/user";
 import { workerListResponse } from "@/lib/schemas/worker";
 
 // ワーカー一覧（F-02〜F-04）。GET /api/workers?q=&is_active=&page= をそのまま表示する。
-// 絞り込みの解釈（空白の除去・部分一致・is_active の値の妥当性）は API が行う
+// 絞り込みの解釈（空白の除去・部分一致・is_active の値の妥当性）は API が行う。
+// 一覧の上に企業コード（GET /api/user の company.code）を出す。管理者がワーカーに伝えるため（issue #38 の Q2）
 
 type Props = {
   searchParams: Promise<{
@@ -27,6 +31,21 @@ function first(value: string | string[] | undefined): string {
   return (Array.isArray(value) ? value[0] : value) ?? "";
 }
 
+/**
+ * ワーカー一覧を読む。URL を手で書き換えて is_active に不正な値を入れると API が 422 を返す。
+ * 判定は API に任せ、画面全体をエラーにせず message を出す
+ */
+async function fetchWorkers(query: URLSearchParams) {
+  try {
+    return await apiGet(`/api/workers?${query.toString()}`, workerListResponse);
+  } catch (e) {
+    if (!(e instanceof ApiError && e.status === 422)) {
+      throw e;
+    }
+    return { error: e.message };
+  }
+}
+
 export default async function WorkersPage({ searchParams }: Props) {
   const params = await searchParams;
   const q = first(params.q);
@@ -38,20 +57,10 @@ export default async function WorkersPage({ searchParams }: Props) {
   if (q !== "") query.set("q", q);
   if (isActive !== "") query.set("is_active", isActive);
 
-  let result;
-  try {
-    result = await apiGet(
-      `/api/workers?${query.toString()}`,
-      workerListResponse,
-    );
-  } catch (e) {
-    // URL を手で書き換えて is_active に不正な値を入れると API が 422 を返す。
-    // 判定は API に任せ、画面全体をエラーにせず message を出す
-    if (!(e instanceof ApiError && e.status === 422)) {
-      throw e;
-    }
-    result = { error: e.message };
-  }
+  const [{ data: user }, result] = await Promise.all([
+    apiGet("/api/user", userResponse),
+    fetchWorkers(query),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -62,6 +71,19 @@ export default async function WorkersPage({ searchParams }: Props) {
             ワーカーを登録
           </Link>
         }
+        description={
+          <>
+            <span className="block whitespace-nowrap">
+              企業コード:{" "}
+              <span className="text-ink font-mono text-base font-semibold tracking-wider select-all">
+                {user.company.code}
+              </span>
+            </span>
+            <span className="block">
+              ワーカーはアプリのログインでこのコードを入力します。
+            </span>
+          </>
+        }
       />
 
       <WorkerSearchForm q={q} isActive={isActive} />
@@ -71,7 +93,7 @@ export default async function WorkersPage({ searchParams }: Props) {
       ) : (
         <>
           <Table
-            head={["氏名", "メールアドレス", "電話番号", "状態", ""]}
+            head={["氏名", "メールアドレス", "電話番号", "状態", "招待", ""]}
             empty={emptyText(
               result.meta,
               result.data.length,
@@ -92,6 +114,11 @@ export default async function WorkersPage({ searchParams }: Props) {
                   </span>
                 </Td>
                 <Td>
+                  <span className="inline-flex h-8 items-center">
+                    <InvitationStatus worker={worker} />
+                  </span>
+                </Td>
+                <Td>
                   <div className="flex items-start gap-2">
                     <Link
                       href={`/workers/${worker.id}/edit`}
@@ -108,6 +135,12 @@ export default async function WorkersPage({ searchParams }: Props) {
                       )}
                       isActive={worker.is_active}
                     />
+                    {/* 出すかどうかは API の can.invite だけで決める（送れるかの最終的な判定は API の 422） */}
+                    {worker.can.invite && (
+                      <ResendInvitationButton
+                        action={resendWorkerInvitation.bind(null, worker.id)}
+                      />
+                    )}
                   </div>
                 </Td>
               </tr>

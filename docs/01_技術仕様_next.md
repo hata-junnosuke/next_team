@@ -783,7 +783,7 @@ export type FormState = { ok?: boolean; message?: string; errors?: Record<string
 - 422 のときは送った値を `values` に入れて返し、入力欄は `defaultValue={state.values?.[name] ?? 元の値}` にする（React 19 の `<form action>` は終了時にフォームをリセットするため。P1-03 のレビューで決定）。`password` と `$ACTION_` で始まるキーは返さない
 - 項目に紐づかないエラー（`errors` が空の 422、業務ルール違反）は `Alert`、項目エラーは `Field` に出す。判定は `Alert` の中の 1 箇所
 - 検証はサーバ（Laravel）を正とする。**クライアント側に同じ検証を二重に書かない**（HTML の `required` 程度は可）
-- 成功したら `revalidatePath()` して `redirect()`。状態ボタン（承認・却下など）は `redirect` せず同じページを再検証する
+- 成功したら `revalidatePath()` して `redirect()`。状態ボタン（承認・却下など）は `redirect` せず同じページを再検証する。成功を知らせたいときは `{ok: true, message}` を返して同じ `Alert` に出す（例: 招待の送り直しの「招待を送り直しました。」。issue #38 の Q4）
 - Server Action は公開エンドポイントと同じ扱い。認可は Laravel の 401 / 404 / 422 に任せ、Action 側で勝手に判定しない
 
 ### 7.4 画面と使う API
@@ -793,7 +793,7 @@ export type FormState = { ok?: boolean; message?: string; errors?: Record<string
 | ログイン | `/login` | csrf-cookie、login | 動線 1 |
 | ダッシュボード | `/dashboard` | dashboard | F-19 |
 | 拠点一覧・登録・編集 | `/locations` … | locations | F-01 |
-| ワーカー一覧・登録・編集 | `/workers` … | workers | F-02〜F-04 |
+| ワーカー一覧・登録・編集 | `/workers` … | workers（招待の送り直しを含む）、user（一覧の企業コード。issue #38） | F-02〜F-04、F-27 |
 | 募集一覧・登録・編集 | `/job-postings` … | job-postings、locations | F-05、F-06 |
 | 募集詳細 | `/job-postings/[id]` | job-postings、applications、applicable-workers、attendance | F-07〜F-16 |
 | 月次集計 | `/reports/monthly` | reports/monthly、report-exports（POST。非同期出力の依頼） | F-17、F-18、F-23 |
@@ -816,7 +816,9 @@ export type FormState = { ok?: boolean; message?: string; errors?: Record<string
 - 例外（P5-01 で決定）: 通知履歴の「種別」「状態」の絞り込みの選択肢（NotificationKind / NotificationStatus）のラベルも、同じ理由で web に置く。表の表示は API の label を出す
 - 例外（P5-02 で決定）: 通知履歴のエラー列だけは折り返す（`whitespace-pre-wrap` と幅の上限を中の要素に付け、空白のない長い語も切る）。共通部品の `Td` は折り返さないので、この列だけ `<td>` を直接書く
 - 例外（P3-03 で決定）: キャンセル理由の選択肢（company 企業都合 / worker ワーカー都合）のラベルも、状態の絞り込みと同じ理由で web に置く。表示は API の label を出す
-- 表の中の操作（承認・却下・キャンセル・勤怠・締切・中止）の 404 は not-found 画面にせず、行の Alert に API の message を出す
+- 例外（issue #38 で決定）: ワーカーの招待の状態のラベル（登録済み・未登録・期限・未登録（使える招待なし））は web に置く。API は `registered_at` と `invitation_expires_at` を返すだけで `{value, label}` を返さないため。出し分けはこの 2 つの値だけで決める（可否の判定は書かない。送り直しの可否は `can.invite`）
+- 例外（issue #38 で決定）: 「招待を送り直す」ボタンは、`can.invite` が false なら非活性ではなく出さない（登録済みのワーカーが大半の一覧で、押せないボタンが並ぶのを避けるため。計画の承認で決定）。判定は API の `can.invite` だけで、最終的には 422
+- 表の中の操作（承認・却下・キャンセル・勤怠・締切・中止・招待の送り直し）の 404 は not-found 画面にせず、行の Alert に API の message を出す。招待の送り直しの 429（同じワーカーに 1 分 1 回）も、共通の `toFormState` が投げ直す前に Action の中で受けて行の Alert に出す（issue #38）
 
 ---
 
@@ -1018,7 +1020,7 @@ B と C の境界: C の `AttendanceService::save()` は B の `Application`（�
 | 担当 | 所有ファイル |
 |---|---|
 | api（`implementer-api`） | 新しいマイグレーション（`companies.code`（既存の行を埋める）・workers の列・`worker_invitations`）、`app/Models/{Worker,WorkerInvitation,PersonalAccessToken}.php`、`app/Enums/NotificationKind.php`、`app/Http/Middleware/{AuthenticateWorker,SetCurrentCompany}.php`、`config/{auth,myteam}.php`、`bootstrap/app.php`（別名と優先順）、`routes/api.php`、`routes/console.php`（`sanctum:prune-expired`）、`app/Providers/AppServiceProvider.php`（morph map・レート制限・トークンのモデル）、`app/Http/Controllers/Worker/*`、`app/Http/Requests/Worker/*`、`app/Http/Resources/Worker/*`、`app/Services/{WorkerInvitationService,WorkerAuthService,WorkerPortalService}.php`、`app/Services/ApplicationService.php`（`applyAsWorker()` を足すだけ）、`app/Events/WorkerInvited.php`、`app/Jobs/SendWorkerInvitationMail.php`、`app/Mail/WorkerInvitationMail.php`、`app/Http/Controllers/Api/WorkerController.php` と `WorkerResource`（招待の発行と送り直し）、`app/Http/Controllers/Worker/Concerns/ResolvesWorker.php`、`app/Http/Resources/NotificationLogResource.php` と `app/Http/Controllers/Api/NotificationLogController.php`（通知履歴の招待）、`app/Listeners/QueueWorkerInvitationMail.php`、`resources/views/mail/worker-invitation.blade.php`、`app/Models/JobPosting.php`（ワーカーに見せる条件と残り枠）、`tests/Feature/{RouteMiddlewareTest,AsyncFoundationTest,LoginTest,DatabaseSeederTest,NotificationLogTest,WorkerFoundationTest,WorkerAcceptanceScenarioTest}.php`（issue #37 の決定 Q1）、`app/Services/WorkerService.php`（新規）、`app/Models/Company.php`（企業コード）、`app/Http/Resources/UserResource.php`（`company.code`）、`app/Providers/TelescopeServiceProvider.php`（隠す項目）、`database/factories/{Worker,WorkerInvitation}Factory.php`、`database/seeders/*`（企業コード）、`tests/Concerns/ActsAsWorker.php`、9.4 のテスト |
-| web（`implementer-web`。api の後） | `app/(admin)/workers/*` `components/workers/*` `lib/schemas/worker.ts` `lib/actions/worker.ts`（一覧と詳細に招待の状態、「招待を送り直す」ボタン）、`lib/schemas/user.ts` と画面のヘッダかワーカー一覧（企業コードを出す）、`components/notifications/NotificationFilters.tsx` と `lib/status.ts`（通知の種別「招待」） |
+| web（`implementer-web`。api の後） | `app/(admin)/workers/*` `components/workers/*` `lib/schemas/worker.ts` `lib/actions/worker.ts`（一覧と編集ページ（フォームの上。詳細ページは作らない。issue #38 の Q1）に招待の状態、「招待を送り直す」ボタン）、`lib/schemas/user.ts` と画面のヘッダかワーカー一覧（企業コードを出す。issue #38 の Q2 でワーカー一覧に決定）、`components/notifications/NotificationFilters.tsx` と `lib/status.ts`（通知の種別「招待」） |
 
 マイグレーションを足したら `database-reviewer` に見せます（非同期のテーブルを足したときと同じ）。
 

@@ -6,7 +6,7 @@ import { enumValueSchema, paginated } from "./common";
 
 export const notificationLogSchema = z.object({
   id: z.number().int(),
-  /** application_confirmed / posting_cancelled / shift_reminder / export_ready（docs/01 の Enum の NotificationKind） */
+  /** application_confirmed / posting_cancelled / shift_reminder / export_ready / worker_invitation（docs/01 の Enum の NotificationKind） */
   kind: enumValueSchema,
   recipient: z.object({
     /** value は morph の短い名前、label は「ワーカー」「管理者」 */
@@ -17,10 +17,10 @@ export const notificationLogSchema = z.object({
     email: z.string(),
   }),
   subject: z.object({
-    /** value は morph の短い名前、label は「応募」「集計出力」 */
+    /** value は morph の短い名前、label は「応募」「集計出力」「招待」 */
     type: enumValueSchema,
     id: z.number().int(),
-    /** 表示用の文字列（例: 「倉庫内作業 2026/10/10（土） / 山田 太郎」「削除された応募」） */
+    /** 表示用の文字列（例: 「倉庫内作業 2026/10/10（土） / 山田 太郎」「山田 太郎 への招待」「削除された応募」） */
     label: z.string(),
   }),
   /** pending / sent / failed（docs/01 の Enum の NotificationStatus） */

@@ -5,8 +5,9 @@ import { redirect } from "next/navigation";
 import { ApiError, apiSend, toFormState } from "@/lib/api";
 import { isValidId, toInPageFormState } from "@/lib/actions/helpers";
 import type { FormState } from "@/lib/form-state";
+import { type Worker, workerResponse } from "@/lib/schemas/worker";
 
-// ワーカーの登録・編集・有効/無効の切替（docs/01 の API 契約のワーカー、Server Action と FormState）。
+// ワーカーの登録・編集・有効/無効の切替・招待の送り直し（docs/01 の API 契約のワーカー、Server Action と FormState）。
 // Server Action は公開エンドポイントと同じ扱い。引数（bind した id を含む）は信用しない。
 // ここで見るのは引数の形だけで、存在しない・他社のワーカーは Laravel が 404 を返すのに任せる。
 // 検証も Laravel が正（氏名・メールの必須、メール形式など）
@@ -98,4 +99,40 @@ export async function setWorkerActive(
   }
   revalidatePath("/workers");
   return { ok: true };
+}
+
+/**
+ * 一覧と編集ページ（Server Component）で resendWorkerInvitation.bind(null, worker.id) にして渡す（F-27）。
+ * ボタンは API の can.invite が true のときだけ出すが、送れるかの最終的な判定は API（無効・登録済みは 422）。
+ * 同じページに留まるので redirect せず再検証して成功の文言を返す（issue #38 の Q4）
+ */
+export async function resendWorkerInvitation(
+  id: number,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  if (!isValidId(id)) {
+    return invalidTarget;
+  }
+  let worker: Worker;
+  try {
+    ({ data: worker } = await apiSend(
+      "POST",
+      `${workerPath(id)}/invitation`,
+      undefined,
+      workerResponse,
+    ));
+  } catch (e) {
+    // 429（同じワーカーに 1 分 1 回）は行の Alert に API の message を出す。
+    // 共通の toFormState は 429 を投げ直すので、ここで受ける（画面全体をエラーにしない）
+    if (e instanceof ApiError && e.status === 429) {
+      return { ok: false, message: e.message };
+    }
+    // 404（別のタブで消えた・他社）と 422（無効・登録済み）は行の Alert。それ以外は投げ直す
+    return toInPageFormState(e, formData);
+  }
+  revalidatePath("/workers");
+  // 再検証するパスは引数ではなく API が返した id で決める
+  revalidatePath(`/workers/${worker.id}/edit`);
+  return { ok: true, message: "招待を送り直しました。" };
 }

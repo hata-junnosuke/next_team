@@ -9,6 +9,8 @@ export const userSchema = z.object({
   company: z.object({
     id: z.number(),
     name: z.string(),
+    // 企業コード（ワーカーのアプリのログインで入力する。秘密ではない識別子）
+    code: z.string(),
   }),
 });
 export const userResponse = single(userSchema);

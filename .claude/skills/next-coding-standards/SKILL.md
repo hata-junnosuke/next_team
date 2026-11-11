@@ -87,14 +87,14 @@ description: next_team の Next.js 16 実装規約。Server Component でのデ�
 - 型は `z.infer` だけ。`type` や `interface` を手で書くのは props と `FormState` だけ
 - 検証を二重に書かない。必須チェックや範囲チェックは Laravel が 422 で返すものを表示する
 - 業務ルールを書かない。ボタンを使えるかどうかは API の `can`（拠点は `deletable`）を見る。定員に達したかどうかを web で計算しない
-- **状態ボタンは非表示ではなく非活性で出し分ける**: `can.*` / `deletable` が false なら `<Button disabled>`。最終的な判定は API の 422
-- 状態ボタン（承認・却下・キャンセル・削除）は小さなフォーム + Server Action。成功したら `revalidatePath` だけして同じページに留まる。表のセル内に Alert を出すときは包む要素に `whitespace-normal` と `max-w-*` を付ける
+- **状態ボタンは非表示ではなく非活性で出し分ける**: `can.*` / `deletable` が false なら `<Button disabled>`。最終的な判定は API の 422。例外は docs/01 の 7.5 に書いたものだけ（例: 招待の送り直しは `can.invite` が false なら出さない。issue #38）
+- 状態ボタン（承認・却下・キャンセル・削除）は小さなフォーム + Server Action。成功したら `revalidatePath` だけして同じページに留まる。成功を知らせたいときは `{ok: true, message}` を返して同じ Alert に出す（docs/01 の 7.3。例: 招待の送り直し）。表のセル内に Alert を出すときは包む要素に `whitespace-normal` と `max-w-*` を付ける
 - 必須項目に HTML の `required` を付けない（ブラウザが止めると API の 422 が入力欄の下に出ることを確かめられない）
 - 数値の入力は `FormData` では文字列で届く。Laravel 側の検証（`integer`）が数値文字列を受け付けるので、web で変換しない
 
 ## 画面で使う型
 - **スキーマ**: 日付・時刻は `z.iso.date()` / `z.iso.time({ precision: -1 })`（`HH:MM:SS`）/ `z.iso.datetime({ offset: true })`（`+09:00` 付き）。整数は `z.number().int()`（id・金額・分・件数）。`z.string()` で受けて形を見逃さない
-- **`lib/actions/helpers.ts`**（`"use server"` にしない）: `isValidId(id)`（bind の id の形）、`text(formData, name)`（文字列でなければ null）、`toInPageFormState(e, formData)`（同じページに留まる操作の catch。404 は API の message を Alert に、422 は `toFormState`、それ以外は投げ直す）。Action ごとに同じ関数を書かない
+- **`lib/actions/helpers.ts`**（`"use server"` にしない）: `isValidId(id)`（bind の id の形）、`text(formData, name)`（文字列でなければ null）、`toInPageFormState(e, formData)`（同じページに留まる操作の catch。404 は API の message を Alert に、422 は `toFormState`、それ以外は投げ直す。投げ直す前に受けたい状態があれば Action の中で先に受ける。例: 招待の送り直しの 429。docs/01 の 7.5）。Action ごとに同じ関数を書かない
 - **表の中の操作の 404**（別のタブで消えた・他社）は not-found 画面に飛ばさず、`toInPageFormState` で行の Alert に出す。画面全体を壊すのはページの `apiGet` の 404 だけ
 - **`Field` の `id`**: 同じ `name` の `Field` が 1 ページに並ぶとき（応募ごとの勤怠フォームなど）は `` id={`field-attendance-${application.id}-clock_in`} `` のように重ならない id を渡す（エラーの id は `${id}-error`）
 - **状態ボタンの `key`**: 再検証で行の状態が変わったら、`key` に状態（と確定数など他の行に効く値）を入れてフォームを作り直し、古い 422 の Alert を消す（例: `` key={`confirm-${application.status.value}-${confirmedCount}`} ``）
