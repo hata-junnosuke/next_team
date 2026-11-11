@@ -19,6 +19,7 @@
       "Bash(make verify:*)",
       "Bash(make fresh)",
       "Bash(make worktree-env:*)",
+      "Bash(make dev-stop:*)",
       "Bash(php artisan test:*)",
       "Bash(php artisan route:list:*)",
       "Bash(php artisan migrate:*)",

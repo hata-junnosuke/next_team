@@ -37,13 +37,14 @@ worktree（`issue/<番号>`）のコードを、開発（8002 / 3002。main の�
 6. 人に伝える: 「画面: http://localhost:<WEB>（`issue/<番号>` の worktree。admin@example.com / password）」。キュー・メール・キャッシュを見るなら `make up`（Redis / Mailpit）が要る。Horizon は人に聞いてから、同じ prefix で起動する（`make horizon` は使わない）
 
 ## 止める
-`/dev-refresh`（worktree を消す前）と、人に言われたときだけ。2 つのポートそれぞれで:
+`/dev-refresh`（worktree を消す前）と、人に言われたときだけ。生の `kill` は書かず、次のターゲットを使う（自動モードの安全判定はリードの直接の `kill <pid>` を通さないため。issue #23）
 ```bash
-pid=$(lsof -tiTCP:<port> -sTCP:LISTEN)
-lsof -a -p $pid -d cwd -Fn          # 場所が <WT> の中であることを確かめる。違えば止めずに報告
-kill $pid
+make dev-stop WT=<WT> N=<番号>
 ```
-web で listen しているのは `next dev`（node）の子プロセス。これを kill すると、親の `next dev` と `npm run dev` も終わる。終わったかは `ps -o pid=,command= -p <親の pid>` で見る（親の pid は kill の前に `ps -o ppid= -p $pid` で控える）。残っていれば、cwd が `<WT>` の中であることを確かめてから kill する
+- `cd` や `echo` とつなげず、このコマンドだけを 1 回の Bash で打つ（`.claude/settings.json` の `Bash(make dev-stop:*)` の許可に当てはまるように）。`WT` は `git worktree list` に出る worktree の場所そのもの（main と、親のフォルダは受け付けない）。`N` は先頭が 0 でない数字
+- API `8100 + N` と web `3100 + N` で listen している pid を、cwd が `<WT>` の中のときだけ止める。web は `next dev` の子が listen しているので、親の `next dev` / `npm run dev` が残っていれば、同じ確認をして止める
+- 何も listen していなければ「空き」と出して成功で終わる
+- 場所が違うもの（別の worktree・別のプロジェクト）は止めずに pid と cwd を出して失敗で終わる（レシピは 1 で終わり、make 自体の終了コードは 2）。そのときは止めずに人に報告する
 
 ## 注意
 - ログを見るときは `tail -f <WT>/api/storage/logs/dev-api.log`（web は `dev-web.log`）
