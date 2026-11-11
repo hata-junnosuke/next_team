@@ -38,13 +38,14 @@ make api-test FILTER=Foo          # 部分テスト
 make api-pint                     # 整形
 make web-typecheck && make web-lint
 make fresh                        # DB 作り直し（admin@example.com / password）
+make dev-up                       # まとめて起動: Redis・Mailpit・API・管理画面・Horizon・スケジューラ（ポートは場所で決まる。main 8002/3002、issue #N 8100+N/3100+N）。止めるのは make dev-down
 make up                           # redis / mailpit
 make api-serve                    # http://localhost:8002
 make web-dev                      # http://localhost:3002
 make horizon                      # キューワーカー
 make ports                        # 8002 / 3002 を誰が使っているか
 make mobile-analyze               # flutter analyze（issue #31 の T6 で足す。Step 9 までは verify に入らない）
-make mobile-run                   # redis / mailpit・API・管理画面・シミュレータをそろえて mobile/ を起動（同上。止めるのは make mobile-down）
+make mobile-run                   # dev-up とシミュレータをそろえ、その場所の API につないで mobile/ を起動（同上）
 ```
 
 ## この人と働くときの約束

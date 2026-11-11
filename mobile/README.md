@@ -13,8 +13,9 @@
 ## 動かし方（`next_team/` から）
 
 ```bash
-make mobile-run    # これ 1 つで、redis / mailpit・API（8002）・管理画面（3002）・シミュレータ（iPhone 17）をそろえてからアプリを起動
-                   # 起動済みのものはそのまま使う。r でホットリロード、R でホットリスタート、q で終了
-make mobile-down   # q の後も残る API と管理画面を止める（この作業ツリーのものだけ。redis / mailpit は make down）
+make mobile-run    # これ 1 つで、Redis・Mailpit・API・管理画面・Horizon・スケジューラ・シミュレータ（iPhone 17）をそろえてアプリを起動
+                   # ポートは場所で決まる（main 8002/3002、issue #N の worktree 8100+N/3100+N、review 8012/3012）。アプリもその API につなぐ
+                   # 起動済みのものはそのまま使う。ログインの情報も出る。r でホットリロード、R でホットリスタート、q で終了
+make dev-down      # q の後も残る API・管理画面・Horizon・スケジューラを止める（この場所のものだけ。Redis・Mailpit は make down）
 make mobile-analyze                                                    # 静的解析（警告 0 件）
 ```
