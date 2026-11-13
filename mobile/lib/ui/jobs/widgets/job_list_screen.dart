@@ -202,7 +202,7 @@ class _LocationDropdown extends ConsumerWidget {
             child: Text(location.name),
           ),
       ],
-      // 選んだら Provider に入れる。一覧はこの値を watch しているので、選び直すと取り直す。
+      // 選んだら Provider に入れる。一覧は（activeLocationIdProvider を通して）この値を watch しているので、選び直すと取り直す。
       onChanged: (id) => ref.read(selectedLocationProvider.notifier).select(id),
     );
   }

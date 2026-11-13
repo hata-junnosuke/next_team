@@ -46,7 +46,7 @@ T parseModel<T>(Object? json, T Function(Map<String, dynamic> json) fromJson) {
     // 例外の文言にはクラス名とキーだけを入れ、値（氏名・メールなど）は入れない（個人情報を例外やログに残さない）。
     // e.message は元の例外の文言で、値が入ることがある（DateTime.parse の失敗など）ので使わない。
     // className は生成側の private のクラス名（_JobPosting）なので、先頭の _ を外して読みやすくする。
-    final name = (e.className ?? '$T').replaceFirst('_', '');
+    final name = (e.className ?? '$T').replaceFirst(RegExp('^_'), '');
     throw FormatException('$name の形が違います（キー: ${e.key}）');
   }
 }
