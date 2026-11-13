@@ -837,13 +837,13 @@ mobile/
 ├── pubspec.yaml / pubspec.lock   依存（Rails の Gemfile / Gemfile.lock）
 ├── assets/jobs.json              偽データ（Step 3。Step 7 で使わなくなる）
 └── lib/
-    ├── main.dart                 起動するだけ
+    ├── main.dart                 起動する。その前に API_BASE_URL の検査と、保存したログインの状態の復元をする（Step 6）
     ├── app.dart                  MaterialApp.router とテーマ（Next.js の app/layout.tsx）
     ├── routing/router.dart       go_router の定義（Next.js の app/ フォルダの構造）
-    ├── config/dependencies.dart  どの実装を使うかを決める Provider（jobRepositoryProvider）。Step 6 から ApiClient なども
+    ├── config/dependencies.dart  どの実装を使うかを決める Provider（jobRepositoryProvider）。Step 6 から apiClientProvider・tokenStorageProvider・authRepositoryProvider
     ├── utils/format.dart         日付・時刻・金額の表示の形（web の lib/format.ts）
     ├── ui/
-    │   ├── core/ui/              複数の画面で使う Widget（scaffold_with_nav_bar.dart）
+    │   ├── core/ui/              複数の画面で使う Widget（scaffold_with_nav_bar.dart、Step 6 から error_banner.dart）
     │   ├── core/themes/          テーマ（theme.dart）
     │   ├── jobs/                 さがす（view_models/ 状態（Riverpod の Provider）、widgets/ 画面と Widget）
     │   ├── schedule/             よてい（自分の応募）
@@ -851,18 +851,20 @@ mobile/
     │   └── account/              マイページ・ログイン・初回登録（Step 6）
     ├── domain/models/            モデル（JobPosting）と値の定義（DateFilter・ApplyStatus）
     └── data/
-        ├── repositories/         リポジトリ（JobRepository と実装）
-        └── services/             Step 6: ApiClient（dio）・AuthInterceptor・TokenStorage・ApiError
+        ├── repositories/         リポジトリ（JobRepository と実装。Step 6 から auth_repository.dart）
+        └── services/             Step 6: ApiClient（dio）・AuthInterceptor・TokenStorage・ApiError・device_name.dart
 ```
 
 - `domain/models/` はモデル（`JobPosting`）と、画面に依存しない値の定義（`DateFilter`・`ApplyStatus` などの enum）。Flutter（`package:flutter`）も Riverpod も import しない
 - `data/repositories/` のリポジトリは抽象（`JobRepository`）と実装（Step 3〜5 は `FakeJobRepository`、Step 7 から `ApiJobRepository`）に分ける。`data/services/` は API との通信だけを持つ（Step 6）。`data/` は Riverpod を import しない（Flutter の `rootBundle` などの読み込みには使ってよい）。公式のサンプル（compass_app）は API の型を `data/services/api/model/` に分けて置くが、ここでは Step 7 で `domain/models/` のモデルに `fromJson` を持たせる（分けるかは Step 7 で決める）
 - `config/dependencies.dart` は、どの実装を使うかを決める Provider（`jobRepositoryProvider`。Step 4）と、その生成物。差し替えはこの Provider の 1 行だけ。Riverpod を `data/` に持ち込まないために、`data/` の外に置く
-- `ui/<機能>/view_models/` は、その機能の画面の状態を持つ Riverpod の Provider（`@riverpod` の関数と Notifier）と、その生成物（`*.g.dart`）だけ。リポジトリは `config/dependencies.dart` の Provider 経由で使う。公式の ViewModel に当たる（公式は ChangeNotifier が前提なので、Riverpod の Provider を当てはめている。React の hooks のフォルダに近い）。Provider でない部品（変換の関数など）は置かず、`domain/models/` か `utils/` に置く
+- `ui/<機能>/view_models/` は、その機能の画面の状態を持つ Riverpod の Provider（`@riverpod` の関数と Notifier）と、その生成物（`*.g.dart`）だけ。リポジトリは `config/dependencies.dart` の Provider 経由で使う。公式の ViewModel に当たる（公式は ChangeNotifier が前提なので、Riverpod の Provider を当てはめている。React の hooks のフォルダに近い）。Provider でない部品（変換の関数など）は置かず、`domain/models/` か `utils/` に置く。例外は、その Provider の状態の型（`typedef`。ログインと初回登録の `AuthFormState`）と、その Provider だけが使う private なメソッド。`data/services/api_error.dart` の `ApiError` は、失敗を受け止める `on ApiError` のためだけに import してよい（Step 6）
 - `ui/<機能>/widgets/` は画面（`<機能>_screen.dart`）と Widget だけ。`view_models/` の Provider を `ref.watch` / `ref.read` で読む。`config/` と `data/` を直接読まない（1 件の取得も `jobDetailProvider(id)` のような引数つきの Provider を通す）
 - 機能をまたいで使う状態は `view_models/` に置かない。今の `appliedJobsProvider` は jobs の中だけで使うので `ui/jobs/view_models/` に置く。Step 8 で schedule からも使うようになったら、状態の持ち主を `data/repositories/` のリポジトリ（Riverpod を知らない）にし、それを返す Provider を `config/dependencies.dart` に置いて、jobs と schedule の `view_models/` がそれぞれ読む（公式の「共有する状態はリポジトリに持つ」。issue #35 の Q4=A）
 - `ui/core/` は複数の画面で使う Widget（`ui/`）とテーマ（`themes/`）だけ。状態は置かない
-- 依存の向きは一方通行: `app.dart → routing・ui/core/themes`、`routing → ui/*/widgets・ui/core/ui`、`ui/*/widgets → ui/*/view_models → config → data → domain`（`ui` は `domain` のモデルと `utils` を使ってよい）。`domain` は誰にも依存しない
+- **ログインの状態**（Step 6。issue #46 の Q1）は `data/repositories/auth_repository.dart` の `AuthRepository` が持つ。`ChangeNotifier`（Flutter の `foundation`。Riverpod ではない）を継承し、トークンの有無が変わったら `notifyListeners()` する。go_router は `refreshListenable` でこれを聞き、`redirect` で行き先を決める（公式の compass_app と同じ形）。`AuthRepository` は `config/dependencies.dart` の `authRepositoryProvider` が 1 つだけ作り（`keepAlive`）、`ApiClient`（`apiClientProvider`）と `TokenStorage`（`tokenStorageProvider`）を渡す。画面は `ui/account/view_models/` の Provider を通して使う
+- `device_name`（ログインと初回登録で送るトークンの名前。issue #46 の Q3）は `data/services/device_name.dart` が `dart:io` の `Platform`（`operatingSystem` と `operatingSystemVersion`）から作る（例: `ios Version 18.2 (Build 22C150)`。255 文字で切る）。パッケージは足さない
+- 依存の向きは一方通行: `main.dart → app.dart・config・data/services`（`config` は起動前の `restore()`、`data/services` は `apiBaseUrl` の検査のためだけ。Step 6）、`app.dart → routing・ui/core/themes`、`routing → ui/*/widgets・ui/core/ui・config`（`config` は `redirect` でログインの状態を読むためだけ。Step 6）、`ui/*/widgets → ui/*/view_models・ui/core/ui`、`ui/*/view_models → config → data → domain`（`ui` は `domain` のモデルと `utils` を使ってよい。`view_models` は上の `ApiError` の例外がある）。`domain` は誰にも依存しない
 - 公式のサンプルにある `main_development.dart` / `main_staging.dart`（環境ごとの入口）と `testing/`（テスト用の偽物）は、今は作らない。接続先は `--dart-define`（7A.2）で切り替え、テスト用の置き場は Step 9 で決める
 - テストは Step 9 から `mobile/test/`（`lib/` と同じ形。`rules/common/testing.md`）
 
@@ -871,10 +873,11 @@ mobile/
 | 項目 | 内容 |
 |---|---|
 | 接続先 | `--dart-define=API_BASE_URL=...` で渡し、コードでは `String.fromEnvironment('API_BASE_URL')` で読む。既定値は置かない（渡し忘れに気づけるように、**Step 6 で `ApiClient` を作ってから**は空なら起動時にエラーを出す。API を使わない Step 3〜5 では渡さなくても起動できる） |
-| iOS シミュレータ | `http://localhost:8002`（Mac の API にそのまま届く）。`http://` に繋がらないときは、Info.plist の App Transport Security にローカル開発だけの例外を足す（Step 6 で確かめる。13 章の 10） |
+| iOS シミュレータ | `http://localhost:8002`（Mac の API にそのまま届く。issue の worktree から `make mobile-run` すると、その worktree の API `http://localhost:{8100 + 番号}` につなぐ）。App Transport Security の例外は要らない（Info.plist に足していない。issue #46 の T6 で確認。13 章の 10） |
 | Android エミュレータ | `http://10.0.2.2:8002`（エミュレータから見た Mac の localhost） |
-| 起動 | `make mobile-run`（`flutter run -d iPhone --dart-define=API_BASE_URL=http://localhost:8002`。`-d` は機種名の前方一致で、`MOBILE_DEVICE=` で変えられる）。静的解析は `make mobile-analyze`（`flutter analyze`）。**この 2 つは Step 3 で足す**。`make mobile-test` と、`make verify`・CI・Stop フックへの組み込みは Step 9 |
+| 起動 | `make mobile-run`（issue #46 から `scripts/dev.sh`。Redis・Mailpit・API・管理画面・Horizon・スケジューラ（`make dev-up` と同じ）とシミュレータをそろえ、起動済みのものはそのまま使う。そのあと `flutter run -d iPhone --dart-define=API_BASE_URL=<その場所の API>`。ポートは場所で決まる（main 8002/3002、issue #N の worktree 8100+N/3100+N、review 8012/3012）。止めるのは `make dev-down`。`-d` は機種名の前方一致で、`MOBILE_DEVICE=` で変えられる）。静的解析は `make mobile-analyze`（`flutter analyze`）。**この 2 つは Step 3 で足す**。`make mobile-test` と、`make verify`・CI・Stop フックへの組み込みは Step 9 |
 | 秘密 | `--dart-define` に秘密を入れない（ビルドに埋め込まれる。`rules/common/security.md`） |
+| リリースの接続先 | `https://` だけ（`main.dart` がリリースのビルドで `http` なら止める）。dio は `dart:io` で通信するので iOS の ATS が効かず、平文の `http` を止めてくれない（13 章の 10。issue #46 のレビュー） |
 
 ### 7A.3 ルート（go_router）
 
@@ -898,11 +901,12 @@ mobile/
 | 業務ルールと検証 | **アプリに書かない**（CLAUDE.md の絶対ルール 1）。定員・二重応募・状態遷移・応募できるかは API が判定し、アプリは 422 の `message` を表示する。入力欄の下には `errors` の同じキーの文言を出す。ボタンを出すかどうかは `can.apply` を見る |
 | 残り枠 | API の `remaining` をそのまま出す。Step 3 の偽データの画面だけは学習のためアプリで計算してよいが、Step 7 で API の値に置き換える |
 | 状態の文言 | API が返す `{value, label}` の `label` を出す。色だけアプリが持つ（web の `lib/status.ts` と同じ考え方） |
-| API の呼び出し | `data/services/` の `ApiClient` だけが `dio` を持つ（web の `lib/api.ts` と同じ。Step 6）。リポジトリは `ApiClient` を通す |
+| API の呼び出し | `dio` を import するのは `data/services/` だけ（`ApiClient` と、それに差し込む `AuthInterceptor`）。API を呼ぶのは `ApiClient` だけで（web の `lib/api.ts` と同じ。Step 6）、リポジトリは `ApiClient` を通す。リダイレクトは追わない（`followRedirects: false`） |
 | レスポンスの型 | JSON を `Map` のまま使わず、モデルの `fromJson` で型に変えてから使う（Step 3 は手書き、Step 7 から `freezed` + `json_serializable`）。形が合わなければ例外にして、契約のずれとして報告する（web で zod の parse が落ちるのと同じ） |
-| 401 | トークンを消して `/login` へ戻す（`AuthInterceptor`）。無効にされたワーカーは 401 の `message` を出す |
-| トークン | `flutter_secure_storage` にだけ置く。ログに出さない（`rules/common/security.md`） |
-| 企業コード | ログイン後に `WorkerMeResource.company.code` を覚えておき、次のログインの入力欄に入れておく（秘密ではない） |
+| 401 | トークンを消して `/login` へ戻す（`AuthInterceptor`。インターセプタは画面を移さず、ログインの状態を未ログインにするだけで、行き先は `redirect` が決める）。ログイン画面に出す文言（issue #46 の Q4）: 応答に `errors` があれば `message`（無効にされたワーカーの 5.3 の文言）、なければ「もう一度ログインしてください。」（`Unauthenticated.` は英語なので出さない） |
+| トークン | `flutter_secure_storage` にだけ置く。iOS の Keychain は `unlocked_this_device`（バックアップから別の端末に移さない）。ログに出さない（`rules/common/security.md`）。`Authorization` は送り先が `API_BASE_URL` と同じ scheme・host・port のときだけ付ける（`AuthInterceptor`）。**残るリスク**（issue #46 のレビュー。受け入れる）: iOS の Keychain はアプリを消しても残るので、入れ直した直後は前のトークンでログインした状態で始まる（失効していれば最初の API の 401 でログイン画面に戻る）。消すにはアプリの領域に「初回起動の印」を置くパッケージが要るので、Step 6 ではしない |
+| エラーの表示 | 画面は `ApiError` の型を見ず、文字列にした値を出す（`ApiError.toString()` は `message` を返す）。応答の形が契約と違うときは `FormatException`（モデルの `fromJson` は `as` ではなく switch のパターンで確かめる。`as` の `TypeError` は `on FormatException` で受けられない）で、画面は決まりの日本語を出す |
+| 企業コード | ログイン後と初回登録の後に `WorkerMeResource.company.code`（入力した値ではなく API が返した値）を覚えておき、次のログインの入力欄に入れておく（秘密ではない）。保存先は `flutter_secure_storage` の、トークンとは別のキー（issue #46 の Q2。パッケージを足さないため）。ログアウトしても消さない |
 | 日付と時刻 | 6.1 の形（`"2026-09-20"` `"09:00"` ISO 8601）を受け取り、表示は `2026/09/20（日）` `09:00〜17:00` の形にする（web の 7.5 と揃える） |
 
 ## 8. 非同期の契約（P4。詳細は [`03_非同期処理の設計.md`](03_非同期処理の設計.md)）
@@ -1104,4 +1108,4 @@ B と C の境界: C の `AttendanceService::save()` は B の `Application`（�
 | 7 | **確認済み（issue #37 の T3）: 前提どおり。** `WorkerAuthTest::test_ワーカーのトークンで管理者のapi_userを叩くと401`（`assertGuest('sanctum')` で provider の効き目も確認）。 guard `sanctum` に `provider: users` を付けると、ワーカー（`Worker`）のトークンは管理者の API で拒否される（Sanctum の `Guard::hasValidProvider()`）。Cookie（stateful）での管理者のログインには影響しない | ワーカー Step 5 の最初のテスト（`WorkerAuthTest` の「ワーカーのトークンで `/api/user` が 401」と、既存の `LoginTest` が緑のまま） |
 | 8 | **確認済み（issue #37 の T3）: 前提どおり。** `WorkerAuthTest::test_企業が決まる前でもトークンから他社のワーカーを読めてその企業の情報が返る`（スコープを外さないと 500 になることも確認）。 `PersonalAccessToken::tokenable()` で `withoutGlobalScope('company')` にすれば、企業が決まる前でもトークンから `Worker` を読める（外さないと `CurrentCompany::id()` が例外） | 同上（`actingAsWorker()` ではなく、本物のトークンを `withToken()` で付けたテストを 1 本書く） |
 | 9 | **確認済み（issue #37 の T3）: 前提どおり。** `WorkerAuthTest::test_管理者のcookieでワーカーの自分の情報を叩くと401`。 管理者の Cookie（stateful）で `/api/worker/me` を叩くと、Sanctum の guard `worker` は web ガードの `User` を返す（`Guard::__invoke` の stateful の分岐は provider を見ない。T3 の security-reviewer がソースで確認）。`worker` ミドルウェアの型の確認で 401 になる | 同上（`actingAsAdmin()` してから `/api/worker/me` が 401） |
-| 10 | iOS シミュレータのアプリから `http://localhost:8002` に、App Transport Security の例外なしで繋がるか | Step 6 で `ApiClient` を作ったとき、最初のリクエストで確かめる。繋がらなければ Info.plist に `NSAllowsLocalNetworking` を足し、7A.2 を直す |
+| 10 | **確認済み（issue #46 の T6）: 例外なしで繋がる。** iOS 27.0 の iPhone 17 シミュレータから `ApiClient`（dio）で `http://localhost:8146/api/worker/login` に送り、422 と日本語の `message` を受け取った（`localhost` は `::1` で届いた）。dio は `dart:io` の `HttpClient` を使い、ATS が見る iOS の URL 読み込み（`URLSession`）を通らないためと考えられる。Info.plist は変えていない。 iOS シミュレータのアプリから `http://localhost:8002` に、App Transport Security の例外なしで繋がるか | Step 6 で `ApiClient` を作ったとき、最初のリクエストで確かめる。繋がらなければ Info.plist に `NSAllowsLocalNetworking` を足し、7A.2 を直す |

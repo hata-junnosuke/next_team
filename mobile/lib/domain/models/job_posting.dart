@@ -16,7 +16,7 @@ class JobLocation {
   const JobLocation({required this.id, required this.name});
 
   // factory コンストラクタ: 決まった手順で値を作って返すコンストラクタ（Ruby のクラスメソッド self.from_json に近い）。
-  // Map<String, dynamic>: キーが文字列、値は何でも入る Map（jsonDecode が返す形。TypeScript の Record<string, unknown>）。
+  // Map<String, dynamic>: キーが文字列、値は何でも入る Map（jsonDecode が返す形。TypeScript の Record<string, any>）。
   // dynamic は「型が分からない値」。analysis_options.yaml の strict-casts があるので、
   // json['id'] をそのまま int に入れられず、as int と書いて「int のはず」と確かめる必要がある。
   // 違う型（例: "1" という文字列）が来たら、as のところで例外になる（zod の parse が落ちるのと同じ）。

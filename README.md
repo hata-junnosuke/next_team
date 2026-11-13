@@ -103,6 +103,8 @@ issue ごとの worktree は `/issue-start <番号>` が作ります（依存・
 
 ### 毎回
 
+まとめて起動するなら `make dev-up` だけです（Redis・Mailpit・API・管理画面・Horizon・スケジューラ。起動済みのものはそのまま使い、ログインの情報も出します。止めるのは `make dev-down`、様子は `make dev-status`）。ポートは場所で決まり、main の作業ツリーなら API 8002・管理画面 3002、issue #N の worktree なら 8100+N・3100+N、review の worktree なら 8012・3012 です。ワーカーアプリまで動かすなら `make mobile-run`（`dev-up` とシミュレータもそろえます）。1 つずつ起動するなら次のとおりです。
+
 ```bash
 make up            # redis / mailpit（Docker。起動済みなら不要。make ps で確認）
 make fresh         # 初回とデータを作り直したいときだけ。DB を作り直してシード

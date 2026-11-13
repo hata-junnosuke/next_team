@@ -10,7 +10,7 @@
 1. **業務ルールと検証をアプリに書かない**。定員・二重応募・状態遷移・応募できるかは API が判定し、アプリは 422 の `message` を表示する（docs/01 の 7A.4）。Step 3 の偽データの画面では残り枠を計算せず `remaining` を表示する。満員・応募済みの判定は学習のためだけにアプリに置き、Step 7 で API の `can.apply` と `my_application` に置き換える
 2. **`api/` のコードを読まない**。境界は docs/01 の 6.11 と 7A だけ。形がずれていたらアプリで吸収せず報告する
 3. **パッケージは docs/01 の 1 章の表にあるものだけ**を、表の「いつ」の Step から使う。足したくなったら、メリットとデメリットの表を作って人に確認する。バージョンは導入時に固定し、`pubspec.lock` をコミットする
-4. API は `data/services/` の `ApiClient` だけが `dio` で呼ぶ。レスポンスはモデルの `fromJson` で型にしてから使う（Step 6 から）
+4. API は `data/services/` の `ApiClient` だけが `dio` で呼ぶ（`dio` を import するのは `data/services/` の `ApiClient` と `AuthInterceptor` だけ）。レスポンスはモデルの `fromJson` で型にしてから使う（Step 6 から）
 5. トークン・パスワード・招待コードをログに出さない。`print` は `flutter analyze` が止める（`avoid_print`）。`debugPrint` は止まらないので、使わない（`rules/common/security.md`）
 6. `make mobile-analyze`（`flutter analyze`）が `No issues found!` でなければコミットしない。テストは Step 9 から `mobile/test/` に書く
 
@@ -72,17 +72,17 @@ class JobListScreen extends ConsumerWidget {
 
 ```
 lib/
-  main.dart                 起動するだけ
+  main.dart                 起動する（その前に API_BASE_URL の検査とログインの状態の復元。Step 6）
   app.dart                  MaterialApp.router とテーマ（Next.js の app/layout.tsx）
   routing/router.dart       go_router
-  config/dependencies.dart  どの実装を使うかを決める Provider（jobRepositoryProvider）
+  config/dependencies.dart  どの実装を使うかを決める Provider（jobRepositoryProvider。Step 6 から apiClientProvider・tokenStorageProvider・authRepositoryProvider）
   utils/                    表示の形（format.dart）
-  ui/core/                  共通の Widget（ui/）とテーマ（themes/）
+  ui/core/                  共通の Widget（ui/。error_banner など）とテーマ（themes/）
   ui/<機能>/view_models/    その機能の Riverpod の Provider だけ
   ui/<機能>/widgets/        画面と Widget だけ
   domain/models/            モデルと enum（Flutter も Riverpod も import しない）
-  data/repositories/        リポジトリ（Riverpod を import しない）
-  data/services/            ApiClient など（Step 6）
+  data/repositories/        リポジトリ（Riverpod を import しない。Step 6 からログインの状態を持つ AuthRepository）
+  data/services/            ApiClient・AuthInterceptor・TokenStorage・ApiError・device_name（Step 6）
 ```
 
-依存の向き: `routing → widgets → view_models → config → data → domain`（一方通行。widgets は config と data を直接読まない）。`ui` は `domain` のモデルと `utils` を直接使ってよい。`routing` は `ui/core/ui` も使う（docs/01 の 7A.1）
+依存の向き: `routing → widgets → view_models → config → data → domain`（一方通行。widgets は config と data を直接読まない）。`routing` は `redirect` でログインの状態（`authRepositoryProvider`）を読むためだけに `config` も使う（Step 6）。`ui` は `domain` のモデルと `utils` を直接使ってよい。`routing` と `widgets` は `ui/core/ui` も使う。`main.dart` は起動前の検査と復元のために `config` と `data/services`（`apiBaseUrl`）を使う。`view_models` は `on ApiError` のためだけに `data/services/api_error.dart` を import してよい（docs/01 の 7A.1）

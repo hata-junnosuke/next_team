@@ -41,6 +41,19 @@ dependencies:
   # @riverpod という印（アノテーション）。これを付けた関数やクラスから、下の riverpod_generator が Provider を作る。
   riverpod_annotation: ^4.0.7
 
+  # API の呼び出し（Step 6）。Next.js で言うと fetch を包んだ lib/api.ts の中身、Rails で言うと Faraday。
+  # インターセプタ（送る前・受け取った後に毎回はさむ処理）でトークンを付けたり、401 を拾ったりできる。
+  # 使ってよいのは data/services/ の ApiClient だけ（docs/01 の 7A.4）。
+  # https://pub.dev/packages/dio
+  dio: ^5.11.1
+
+  # トークンの保存（Step 6）。iOS では Keychain、Android では暗号化した保存先に入れる。
+  # web で言うと httpOnly の Cookie に当たる「アプリの中のほかのコードやファイルから読みにくい置き場所」。
+  # SharedPreferences（ただの設定ファイル。web の localStorage）には置かない（rules/common/security.md）。
+  # 使ってよいのは data/services/token_storage.dart だけ。
+  # https://pub.dev/packages/flutter_secure_storage
+  flutter_secure_storage: ^11.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

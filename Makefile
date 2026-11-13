@@ -4,20 +4,32 @@
 
 .PHONY: help up down ps api-serve web-dev horizon schedule fresh \
         api-test api-pint api-pint-test api-routes web-typecheck web-lint web-format web-format-check web-build \
-        verify verify-full worktree-env dev-stop ports mobile-analyze mobile-run
+        verify verify-full worktree-env dev-stop ports mobile-analyze mobile-run sim-paste dev-up dev-down dev-status
 
 help: ## ターゲット一覧
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
 
 # --- 周辺サービス ---
-up: ## redis / mailpit を起動
-	docker compose up -d
+# compose のプロジェクト名を next_team に固定する。省くとフォルダ名（worktree なら issue-46 など）になり、
+# main が起動したコンテナと別物として 6379 / 8025 を取り合って失敗する（issue #46）。Redis と Mailpit は全 worktree で共有する
+COMPOSE := docker compose -p next_team
+up: ## redis / mailpit を起動（起動済みなら何もしない。どの worktree からでも同じコンテナを使う）
+	$(COMPOSE) up -d
 down: ## redis / mailpit を停止（ボリュームは残す）
-	docker compose down
+	$(COMPOSE) down
 ps: ## コンテナの状態
-	docker compose ps
+	$(COMPOSE) ps
 
-# --- 起動（それぞれ別ターミナルで） ---
+# --- まとめて起動（issue #46）。今いる場所（main / issue の worktree / review）に合わせたポートで、
+#     Redis・Mailpit・API・管理画面・キューのワーカー（Horizon）をそろえる。起動済みのものはそのまま使う ---
+dev-up: ## 開発環境をまとめて起動（Redis・Mailpit・API・管理画面・Horizon。ポートは場所で決まる。make dev-status で確認）
+	@scripts/dev.sh up
+dev-down: ## dev-up で起動したこの場所の API・管理画面・Horizon を止める（Redis・Mailpit は make down）
+	@scripts/dev.sh down
+dev-status: ## この場所のポートと、動いているものを出す
+	@scripts/dev.sh status
+
+# --- 1 つずつ起動（それぞれ別ターミナルで。main の作業ツリー向け） ---
 api-serve: ## Laravel API を http://localhost:8002 で起動
 	cd api && php artisan serve --port=8002
 web-dev: ## Next.js を http://localhost:3002 で起動
@@ -57,8 +69,12 @@ verify-full: verify web-format-check web-build ## + 整形チェックと本番�
 MOBILE_DEVICE ?= iPhone
 mobile-analyze: ## flutter analyze（警告 0 件がコミットの条件）
 	cd mobile && flutter analyze
-mobile-run: ## iOS シミュレータで mobile/ を起動（先にシミュレータを起動しておく。r でホットリロード）
-	cd mobile && flutter run -d "$(MOBILE_DEVICE)" --dart-define=API_BASE_URL=http://localhost:8002
+# 環境をそろえる・アプリを起動するのは scripts/dev.sh（場所でポートを決める。main 8002/3002、issue #N 8100+N/3100+N、review 8012/3012）
+mobile-run: ## 環境（dev-up）をそろえ、シミュレータを起動して、その場所の API につないでアプリを起動（r でホットリロード、q で終了）
+	@MOBILE_DEVICE="$(MOBILE_DEVICE)" scripts/dev.sh mobile
+# DeviceHub（Xcode 27）が Mac のクリップボードをシミュレータに渡さないときに、手で送る
+sim-paste: ## Mac のクリップボードをシミュレータに送る（そのあとシミュレータで ⌘V か、欄を長押し → ペースト）
+	@pbpaste | xcrun simctl pbcopy booted && echo "シミュレータのクリップボードに送りました。シミュレータで ⌘V（または欄を長押し → ペースト）"
 
 # --- worktree ---
 # main の作業ツリー（git worktree list の先頭）の .env / .env.local を WT にコピーする。中身は表示しない。
