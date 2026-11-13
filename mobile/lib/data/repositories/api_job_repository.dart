@@ -1,4 +1,4 @@
-// 本物の API から募集を取るリポジトリ（Step 7）。FakeJobRepository（assets/jobs.json を読む偽物）と入れ替える。
+// 本物の API から募集を取るリポジトリ（Step 7）。Step 3〜6 の偽物（同梱した JSON を読む）と入れ替えた。
 // 差し替えは config/dependencies.dart の jobRepositoryProvider の 1 行だけで、画面と view_models は変えない
 // （JobRepository という約束（型）に対して書いてあるため。docs/01 の 7A.1）。
 // Next.js で言うと、web/ の lib/api.ts の上に「募集を取る関数」を並べたファイル（lib/jobs.ts のようなもの）。
@@ -60,7 +60,7 @@ class ApiJobRepository implements JobRepository {
       body = await _apiClient.get('/api/worker/job-postings/$id');
     } on ApiError catch (e) {
       // 404 は「見つからない」（他社の募集・存在しない・中止や締切で見られない。6.11）。失敗ではなく null を返す。
-      // 画面は null を見て「募集が見つかりません」を出す（FakeJobRepository のときと同じ約束）。
+      // 画面は null を見て「募集が見つかりません」を出す（偽物のときと同じ約束）。
       if (e.statusCode == 404) return null;
       // それ以外（通信の失敗・500 など）はそのまま投げ直す。rethrow は受けた例外をそのまま投げる（Ruby の raise）。
       rethrow;

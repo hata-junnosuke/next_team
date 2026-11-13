@@ -96,12 +96,6 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # アプリに同梱するファイル（Next.js の public/ に当たる）。ここに書いたものだけが rootBundle で読める。
-  # https://docs.flutter.dev/ui/assets/assets-and-images
-  # 偽データの募集（Step 3）。Step 7 で API に替えたら消す。
-  assets:
-    - assets/jobs.json
-
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg
