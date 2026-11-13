@@ -12,6 +12,8 @@
 // DioException: https://pub.dev/documentation/dio/latest/dio/DioException-class.html
 
 import 'package:dio/dio.dart';
+// CheckedFromJsonException（生成した fromJson が形の違いで投げる例外）を受けるために使う。
+import 'package:json_annotation/json_annotation.dart';
 
 import 'api_error.dart';
 
@@ -24,6 +26,31 @@ const String apiBaseUrl = String.fromEnvironment('API_BASE_URL');
 
 // サーバーに届かなかったとき（接続できない・時間切れ）の文言。API の message がないので、アプリで作る。
 // 業務の判定ではなく「通信の失敗」の表示なので、アプリに置いてよい。
+// API の JSON を、生成した fromJson でモデルに変える（Step 7。docs/01 の 7A.4、issue #48 の Q1）。
+// リポジトリは JobPosting.fromJson(json) を直に呼ばず、parseModel(json, JobPosting.fromJson) と書く。
+// 形が違うと、生成した fromJson は CheckedFromJsonException（build.yaml の checked: true）を投げる。
+// それを FormatException にそろえるのがこの関数の役目。画面は「応答の形が違う」を on FormatException だけで受けられる
+// （手書きの WorkerMe.fromJson と同じ例外になる）。web で zod の parse が落ちたときの ZodError に当たる。
+//
+// <T>: 型引数（TypeScript のジェネリクス <T> と同じ）。返す型を、渡した fromJson の戻り値の型にそろえる。
+// T Function(Map<String, dynamic>): 「Map を受け取って T を返す関数」の型。JobPosting.fromJson をそのまま渡せる
+// （コンストラクタも関数として渡せる。Dart では「tear-off」と呼ぶ）。
+// https://dart.dev/language/generics
+// https://pub.dev/documentation/json_annotation/latest/json_annotation/CheckedFromJsonException-class.html
+T parseModel<T>(Object? json, T Function(Map<String, dynamic> json) fromJson) {
+  // is!: 「その型ではない」（TypeScript の !(x instanceof Y)）。オブジェクトでなければ、fromJson に渡す前に止める。
+  if (json is! Map<String, dynamic>) {
+    throw FormatException('$T の応答が JSON のオブジェクトではありません');
+  }
+  try {
+    return fromJson(json);
+  } on CheckedFromJsonException catch (e) {
+    // 例外の文言にはクラス名とキーだけを入れ、値（氏名・メールなど）は入れない（個人情報を例外やログに残さない）。
+    // e.message は元の例外の文言で、値が入ることがある（DateTime.parse の失敗など）ので使わない。
+    throw FormatException('${e.className ?? T} の形が違います（キー: ${e.key}）');
+  }
+}
+
 const String _networkErrorMessage = 'サーバーに接続できません。通信環境を確かめて、もう一度お試しください。';
 
 class ApiClient {
