@@ -836,7 +836,6 @@ mobile/
 ├── analysis_options.yaml         flutter_lints ＋ 厳しめのルール（strict-casts / strict-raw-types / strict-inference、avoid_print など）
 ├── pubspec.yaml / pubspec.lock   依存（Rails の Gemfile / Gemfile.lock）
 ├── build.yaml                    コード生成の設定（Step 7。json_serializable の checked・snake_case・toJson を作らない）
-├── assets/jobs.json              偽データ（Step 3。Step 7 で消す）
 └── lib/
     ├── main.dart                 起動する。その前に API_BASE_URL の検査と、保存したログインの状態の復元をする（Step 6）
     ├── app.dart                  MaterialApp.router とテーマ（Next.js の app/layout.tsx）
@@ -846,18 +845,18 @@ mobile/
     ├── ui/
     │   ├── core/ui/              複数の画面で使う Widget（scaffold_with_nav_bar.dart、Step 6 から error_banner.dart）
     │   ├── core/themes/          テーマ（theme.dart）
-    │   ├── jobs/                 さがす（view_models/ 状態（Riverpod の Provider）、widgets/ 画面と Widget）
+    │   ├── jobs/                 さがす（view_models/ 状態（Riverpod の Provider と、Step 7 の応募の mutation apply_mutation.dart）、widgets/ 画面と Widget（Step 7 から apply_confirm_dialog.dart））
     │   ├── schedule/             よてい（自分の応募）
     │   ├── notices/              おしらせ（Step 10 まで中身なし）
     │   └── account/              マイページ・ログイン・初回登録（Step 6）
-    ├── domain/models/            モデル（JobPosting・WorkerMe など。Step 7 から freezed）と値の定義（DateFilter・ApplyStatus）
+    ├── domain/models/            モデル（Step 7 から freezed: JobPosting・JobPostingPage・LabeledValue・WorkerApplication・WorkerMe）と値の定義（DateFilter・ApplyStatus）
     └── data/
-        ├── repositories/         リポジトリ（JobRepository と実装。Step 6 から auth_repository.dart）
-        └── services/             Step 6: ApiClient（dio）・AuthInterceptor・TokenStorage・ApiError・device_name.dart
+        ├── repositories/         リポジトリ（JobRepository と、Step 7 からの実装 api_job_repository.dart。Step 6 から auth_repository.dart）
+        └── services/             Step 6: ApiClient（dio。Step 7 から parseModel()）・AuthInterceptor・TokenStorage・ApiError（Step 7 から freezed）・device_name.dart
 ```
 
 - `domain/models/` はモデル（`JobPosting`）と、画面に依存しない値の定義（`DateFilter`・`ApplyStatus` などの enum）。Flutter（`package:flutter`）も Riverpod も import しない。Step 7 からモデルは `freezed` + `json_serializable` で生成する（`@freezed` と生成した `fromJson`。生成物の `*.freezed.dart` `*.g.dart` もコミットする）。import してよいパッケージは `freezed_annotation` と `json_annotation` だけ。`toJson` は使わないので作らない（`build.yaml`）
-- `data/repositories/` のリポジトリは抽象（`JobRepository`）と実装（Step 3〜5 は `FakeJobRepository`、Step 7 から `ApiJobRepository`）に分ける。`data/services/` は API との通信だけを持つ（Step 6）。`data/` は Riverpod を import しない（Flutter の `rootBundle` などの読み込みには使ってよい）。公式のサンプル（compass_app）は API の型を `data/services/api/model/` に分けて置くが、ここでは分けず、`domain/models/` のモデルに生成した `fromJson` を持たせる（issue #48 で決定。API の形と画面で使う形がほぼ同じで、分けると同じ項目を 2 回書くことになるため）。例外は `ApiError`（API の失敗の形と状態コード）で、`data/services/` に置いたまま freezed にする
+- `data/repositories/` のリポジトリは抽象（`JobRepository`）と実装（Step 3〜6 は `FakeJobRepository`、Step 7 から `ApiJobRepository`）に分ける。`data/services/` は API との通信だけを持つ（Step 6）。`data/` は Riverpod を import しない（Flutter の `rootBundle` などの読み込みには使ってよい）。公式のサンプル（compass_app）は API の型を `data/services/api/model/` に分けて置くが、ここでは分けず、`domain/models/` のモデルに生成した `fromJson` を持たせる（issue #48 で決定。API の形と画面で使う形がほぼ同じで、分けると同じ項目を 2 回書くことになるため）。例外は `ApiError`（API の失敗の形と状態コード）で、`data/services/` に置いたまま freezed にする
 - Step 7 で、偽のリポジトリ `FakeJobRepository` と偽データ `assets/jobs.json`（と `pubspec.yaml` の `assets` の登録）を消す。Step 9 のテスト用の偽物は、そのとき `mobile/test/` に作る
 - **募集の一覧のページ**（issue #48 の Q3）: 一覧は `per_page=100` の 1 ページ目だけを読む（無限スクロールはしない）。`meta.total` が出した件数より多ければ、一覧の下に「ほかに N 件あります。日付や拠点で絞り込んでください。」を出す。`meta` も `fromJson` で型にしてから使う
 - **応募の送信と、その後の更新**（issue #48 の Q4）: 送信中・成功・失敗の状態は `ui/jobs/view_models/` の Riverpod の mutation（`Mutation<WorkerApplication>`。募集の id をキーにして、募集ごとに別の状態を持つ。https://riverpod.dev/ja/docs/concepts2/mutations ）が持つ。成功したら、その募集の詳細（`jobDetailProvider(id)`）と一覧（`jobListProvider` のすべての絞り込み）を `invalidate` して API から取り直す。応答で手元の値（残り枠など）を書き換えない（残り枠をアプリで計算することになり、7A.4 の「残り枠」に反する）。送信中はボタンを押せなくし、2 回押しても 1 回しか送らない
