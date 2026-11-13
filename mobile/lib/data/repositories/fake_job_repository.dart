@@ -17,6 +17,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 
 import '../../domain/models/job_posting.dart';
+import '../../domain/models/worker_application.dart';
 import 'job_repository.dart';
 
 // implements JobRepository: 「JobRepository の約束（メソッド）を全部持つ」と宣言する（TypeScript の implements）。
@@ -41,7 +42,10 @@ class FakeJobRepository implements JobRepository {
   // ファイルの読み込みも API の呼び出しも時間がかかるので、どちらも Future を返す形にそろえておく。
   // @override: JobRepository の約束を、ここで中身を書いて果たしている印。
   @override
-  Future<List<JobPosting>> fetchJobPostings({DateTime? from, DateTime? to}) async {
+  Future<List<JobPosting>> fetchJobPostings({
+    DateTime? from,
+    DateTime? to,
+  }) async {
     // 本物の API は返事に時間がかかるので、偽物でも 1 秒待たせて、読み込み中の表示が見えるようにする。
     // Future.delayed: 指定した時間がたったら終わる Future（JavaScript の await new Promise(r => setTimeout(r, 1000))）。
     // <void> は「終わったことだけを知らせ、値は返さない」という型。
@@ -81,9 +85,11 @@ class FakeJobRepository implements JobRepository {
     // 今日が基準の日から何日あとか。UTC の 0 時どうしで引く（ローカル時刻のままだと、
     // 間に夏時間の切り替えがあると 23 時間 × n になり、inDays の切り捨てで 1 日少なくなる）。
     final now = DateTime.now();
-    final shiftDays = DateTime.utc(now.year, now.month, now.day)
-        .difference(_baseDate)
-        .inDays;
+    final shiftDays = DateTime.utc(
+      now.year,
+      now.month,
+      now.day,
+    ).difference(_baseDate).inDays;
 
     // map: 1 件ずつ変換する（JavaScript の map）。最後に toList() でリストにする。
     return data.map((item) {
@@ -107,6 +113,11 @@ class FakeJobRepository implements JobRepository {
     final jobs = await _loadAll();
     return jobs.where((job) => job.id == id).firstOrNull;
   }
+
+  // 偽物は応募を送れない（JobRepository の約束を満たすためだけの空の実装。T6 でこのファイルごと消す）。
+  @override
+  Future<WorkerApplication> apply(int jobPostingId) =>
+      throw UnimplementedError('偽のリポジトリは応募を送れません');
 
   // "2026-01-05" を days 日ずらして、同じ形の文字列で返す。
   // DateTime(年, 月, 日 + days) は、日があふれても月をくり上げてくれる（1 月 35 日 → 2 月 4 日）。

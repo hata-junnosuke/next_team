@@ -8,6 +8,7 @@
 // クラスの修飾子（interface など）: https://dart.dev/language/class-modifiers
 
 import '../../domain/models/job_posting.dart';
+import '../../domain/models/worker_application.dart';
 
 // abstract interface class = 「このメソッドを持つこと」という約束だけを書いた型（TypeScript の interface）。
 // - abstract: 中身のないメソッドを持てる。この型そのものは new（作成）できない
@@ -23,4 +24,9 @@ abstract interface class JobRepository {
 
   // id で 1 件。見つからなければ null（API なら 404）。
   Future<JobPosting?> findJobPosting(int id);
+
+  // 募集に応募する（Step 7）。成功したら自分の応募（WorkerApplication）を返す。
+  // 応募できないとき（満員・二重応募・締切など）は API の 422 で ApiError を投げる。可否の判定はアプリでしない
+  // （CLAUDE.md の絶対ルール 1）。見つからない募集は 404 の ApiError（一覧・詳細と違い null にしない。送る操作なので失敗として出す）。
+  Future<WorkerApplication> apply(int jobPostingId);
 }

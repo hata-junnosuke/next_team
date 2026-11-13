@@ -10,8 +10,10 @@
 // 使う API（docs/01 の 6.11）:
 // - GET /api/worker/job-postings?date_from=&date_to=&per_page=100  一覧（ページあり）
 // - GET /api/worker/job-postings/{id}                                1 件（ほかは 404）
+// - POST /api/worker/job-postings/{id}/applications                 応募（本文は空。201 で自分の応募）
 
 import '../../domain/models/job_posting.dart';
+import '../../domain/models/worker_application.dart';
 import '../services/api_client.dart';
 import '../services/api_error.dart';
 import 'job_repository.dart';
@@ -27,7 +29,10 @@ class ApiJobRepository implements JobRepository {
   static const int _perPage = 100;
 
   @override
-  Future<List<JobPosting>> fetchJobPostings({DateTime? from, DateTime? to}) async {
+  Future<List<JobPosting>> fetchJobPostings({
+    DateTime? from,
+    DateTime? to,
+  }) async {
     final body = await _apiClient.get(
       '/api/worker/job-postings',
       // Map の中の if: 条件が true のときだけ、その組を入れる（collection if。JSX の {cond && <X />} に近い）。
@@ -64,6 +69,24 @@ class ApiJobRepository implements JobRepository {
     return switch (body) {
       {'data': final Object? data} => parseModel(data, JobPosting.fromJson),
       _ => throw const FormatException('募集の応答に data がありません'),
+    };
+  }
+
+  @override
+  Future<WorkerApplication> apply(int jobPostingId) async {
+    // 本文は送らない（6.11 の入力は空）。誰が応募するかは、API がトークンのワーカーで決める。
+    // 失敗（422 の「残り枠がないため応募できません。」など）は ApiClient が ApiError にして投げるので、
+    // ここでは受けずに、そのまま呼んだ側（view_models の mutation）に渡す。
+    final body = await _apiClient.post(
+      '/api/worker/job-postings/$jobPostingId/applications',
+    );
+    // 201 の応答は {"data": WorkerApplicationResource}。本文がない（null）のも契約のずれ。
+    return switch (body) {
+      {'data': final Object? data} => parseModel(
+        data,
+        WorkerApplication.fromJson,
+      ),
+      _ => throw const FormatException('応募の応答に data がありません'),
     };
   }
 
