@@ -22,7 +22,7 @@ final class JobListProvider
     with $FutureModifier<List<JobPosting>>, $FutureProvider<List<JobPosting>> {
   JobListProvider._({
     required JobListFamily super.from,
-    required DateFilter super.argument,
+    required (DateFilter, int?) super.argument,
   }) : super(
          retry: _noRetry,
          name: r'jobListProvider',
@@ -38,7 +38,7 @@ final class JobListProvider
   String toString() {
     return r'jobListProvider'
         ''
-        '($argument)';
+        '$argument';
   }
 
   @$internal
@@ -49,8 +49,8 @@ final class JobListProvider
 
   @override
   FutureOr<List<JobPosting>> create(Ref ref) {
-    final argument = this.argument as DateFilter;
-    return jobList(ref, argument);
+    final argument = this.argument as (DateFilter, int?);
+    return jobList(ref, argument.$1, argument.$2);
   }
 
   @override
@@ -64,10 +64,14 @@ final class JobListProvider
   }
 }
 
-String _$jobListHash() => r'0d140a78a49f72d5e4af96e1d15311435ec1853e';
+String _$jobListHash() => r'281502459ac2eb849b6ef2c06181cb13275c0ef4';
 
 final class JobListFamily extends $Family
-    with $FunctionalFamilyOverride<FutureOr<List<JobPosting>>, DateFilter> {
+    with
+        $FunctionalFamilyOverride<
+          FutureOr<List<JobPosting>>,
+          (DateFilter, int?)
+        > {
   JobListFamily._()
     : super(
         retry: _noRetry,
@@ -77,8 +81,8 @@ final class JobListFamily extends $Family
         isAutoDispose: true,
       );
 
-  JobListProvider call(DateFilter filter) =>
-      JobListProvider._(argument: filter, from: this);
+  JobListProvider call(DateFilter filter, int? locationId) =>
+      JobListProvider._(argument: (filter, locationId), from: this);
 
   @override
   String toString() => r'jobListProvider';

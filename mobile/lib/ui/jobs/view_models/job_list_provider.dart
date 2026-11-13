@@ -40,7 +40,10 @@ part 'job_list_provider.g.dart';
 // だから自動のやり直しを切る（_noRetry）。やり直すかは人が「再読み込み」か引っ張って更新で決める
 // （Step 7 で決め直した。422 はやり直しても同じ、通信の切断はいつ直るか分からない）。
 @Riverpod(retry: _noRetry)
-Future<List<JobPosting>> jobList(Ref ref, DateFilter filter) {
+// Step 7 で拠点（locationId。null なら「すべての拠点」）も引数に足した。引数が 2 つでも family は同じで、
+// (日付のチップ, 拠点) の組ごとに別の値を持つ（useQuery の queryKey: ['jobs', filter, locationId]）。
+// 応募の後に ref.invalidate(jobListProvider) と引数なしで捨てると、どの組も全部捨てる（apply_mutation.dart）。
+Future<List<JobPosting>> jobList(Ref ref, DateFilter filter, int? locationId) {
   // ref.watch: ほかの Provider の値を読み、それが変わったらこの Provider も作り直す（React の useEffect の依存配列に近い）。
   final repository = ref.watch(jobRepositoryProvider);
   // チップを日付の範囲（から・まで）に変える。「すべて」なら null で、絞り込まない。
@@ -48,7 +51,11 @@ Future<List<JobPosting>> jobList(Ref ref, DateFilter filter) {
   final now = DateTime.now();
   final range = filter.range(DateTime(now.year, now.month, now.day));
   // ?. は「左が null なら、右を読まずに null」（JavaScript のオプショナルチェーン range?.from と同じ）。
-  return repository.fetchJobPostings(from: range?.from, to: range?.to);
+  return repository.fetchJobPostings(
+    from: range?.from,
+    to: range?.to,
+    locationId: locationId,
+  );
 }
 
 // 自動でやり直さない、という retry の関数。

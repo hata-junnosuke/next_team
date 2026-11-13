@@ -1,5 +1,5 @@
 // 募集一覧の画面（さがす タブ）。パスは /jobs。
-// Next.js で言うと app/jobs/page.tsx に当たる。上に日付のチップ、下に募集を並べる。
+// Next.js で言うと app/jobs/page.tsx に当たる。上に拠点のドロップダウンと日付のチップ、下に募集を並べる。
 //
 // ListView.builder: https://api.flutter.dev/flutter/widgets/ListView/ListView.builder.html
 // 長いリストの作例: https://docs.flutter.dev/cookbook/lists/long-lists
@@ -8,6 +8,7 @@
 // 引っ張って更新: https://riverpod.dev/ja/docs/how_to/pull_to_refresh
 // RefreshIndicator: https://api.flutter.dev/flutter/material/RefreshIndicator-class.html
 // 引数つきの Provider（family）: https://riverpod.dev/ja/docs/concepts2/family
+// DropdownButton: https://api.flutter.dev/flutter/material/DropdownButton-class.html
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../domain/models/date_filter.dart';
 import '../view_models/date_filter_provider.dart';
 import '../view_models/job_list_provider.dart';
+import '../view_models/location_filter_provider.dart';
 import 'job_list_tile.dart';
 
 // 自分では状態を持たず、選んでいるチップ（selectedDateFilterProvider）と一覧（jobListProvider）を
@@ -33,14 +35,21 @@ class JobListScreen extends ConsumerWidget {
     // チップを「今日」に変えると jobListProvider(DateFilter.today) を読むことになり、まだ値がないので取りに行く
     // （React の useQuery({ queryKey: ['jobs', filter] }) で、キーが変わると取り直すのと同じ）。
     // Step 3 では全部を取ってから画面で絞り込んでいたが、今は絞り込みを Provider とリポジトリに任せる。
-    // Step 7 では、この条件がそのまま API の date_from / date_to になる。
-    final jobsAsync = ref.watch(jobListProvider(filter));
+    // Step 7 から、この条件がそのまま API の date_from / date_to になる。
+    // 選んでいる拠点（null なら「すべての拠点」）。API の location_id になる（Step 7）。
+    final locationId = ref.watch(selectedLocationProvider);
+    final jobsAsync = ref.watch(jobListProvider(filter, locationId));
 
     // 下タブは外枠（ScaffoldWithNavBar）の Scaffold が持つ。ここの Scaffold は上のバーと本文だけを持つ。
     return Scaffold(
       appBar: AppBar(title: const Text('さがす')),
       body: Column(
         children: [
+          // 拠点のドロップダウン（Step 7）。日付のチップと組み合わせて絞り込める。
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: _LocationDropdown(),
+          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
             // Wrap: 横に並べ、入りきらなければ折り返す（CSS の flex-wrap: wrap）。
@@ -81,8 +90,9 @@ class JobListScreen extends ConsumerWidget {
                 // ボタンを押せなくしてくるくるを出し、押したことが伝わるようにする。
                 isRetrying: jobsAsync.isLoading,
                 // ボタンを押した瞬間に 1 回だけなので read の仲間の invalidate（issue #33 の T5 と同じ）。
-                // 今のチップの分（jobListProvider(filter)）だけを捨てて取り直す。
-                onRetry: () => ref.invalidate(jobListProvider(filter)),
+                // 今の条件の分（jobListProvider(filter, locationId)）だけを捨てて取り直す。
+                onRetry: () =>
+                    ref.invalidate(jobListProvider(filter, locationId)),
               ),
               // 届いたとき。jobs は List<JobPosting>（null ではない）。絞り込み済み。
               // 引っ張って更新している間は、loading ではなく data のまま（前の一覧を出したまま）になる。
@@ -92,7 +102,7 @@ class JobListScreen extends ConsumerWidget {
                 // RefreshIndicator: 中のリストを下に引っ張ると、上にくるくるを出して onRefresh を呼ぶ。
                 // onRefresh が返す Future が終わるまでくるくるを出し続け、終わったら閉じる。
                 return RefreshIndicator(
-                  onRefresh: () => _refresh(ref, filter),
+                  onRefresh: () => _refresh(ref, filter, locationId),
                   // 該当なしのときも引っ張れるように、文言も ListView に入れる（RefreshIndicator は
                   // 中身がスクロールできるものでないと反応しない。Center と Text だけでは引っ張れない）。
                   child: jobs.isEmpty
@@ -133,8 +143,12 @@ class JobListScreen extends ConsumerWidget {
   // 「終わったら閉じて」と伝えたいので、.future（作り直した値が届く Future）を返して、届くまで待たせる。
   // ボタンや引っ張る操作の中なので watch ではなく read（詳細の画面の「応募する」と同じ考え方）。
   // ref.refresh(jobListProvider(filter).future) と書くと、この 2 行を 1 行にできる（invalidate して読む、の短縮）。
-  Future<void> _refresh(WidgetRef ref, DateFilter filter) async {
-    ref.invalidate(jobListProvider(filter));
+  Future<void> _refresh(
+    WidgetRef ref,
+    DateFilter filter,
+    int? locationId,
+  ) async {
+    ref.invalidate(jobListProvider(filter, locationId));
     // 取り直しが失敗すると、.future も失敗する（例外が飛んでくる）。ここで受け止めないと、
     // RefreshIndicator の中で「誰も受け取らなかった例外」になる。失敗したことは、jobListProvider の値が
     // AsyncError になって when の error が画面に出すので、ここでは受け止めるだけでよい。
@@ -142,10 +156,46 @@ class JobListScreen extends ConsumerWidget {
     // Exception（通信の失敗など、起こりうる失敗）だけを受け止め、Error（プログラムのバグ）は受け止めずに
     // そのまま表に出す（黙って隠すと、バグに気づけない）。
     try {
-      await ref.read(jobListProvider(filter).future);
+      await ref.read(jobListProvider(filter, locationId).future);
     } on Exception catch (_) {
       // 画面の表示は when の error に任せる。
     }
+  }
+}
+
+// 拠点で絞り込むドロップダウン。選択肢は API から取り（locationOptionsProvider）、選んだ値は selectedLocationProvider に入れる。
+// Provider を読むので ConsumerWidget。自分では状態を持たない。
+class _LocationDropdown extends ConsumerWidget {
+  const _LocationDropdown();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = ref.watch(selectedLocationProvider);
+    // 選択肢。読み込み中・失敗のときは空にし、「すべての拠点」だけを出す（一覧の表示は止めない）。
+    // value: AsyncValue の今のデータ（読み込み中・失敗なら null）。?? は「左が null なら右」（JavaScript の ??）。
+    final locations = ref.watch(locationOptionsProvider).value ?? const [];
+    // 選んでいる拠点が選択肢にないとき（読み込み直しで消えたなど）は「すべての拠点」として描く。
+    // DropdownButton は value に当たる項目がちょうど 1 つないと例外になるため。
+    // any: 1 つでも条件に合えば true（JavaScript の some）。
+    final value = locations.any((l) => l.id == selected) ? selected : null;
+
+    // DropdownButton<int?>: 選ぶ値の型が int?（拠点の id、null は「すべての拠点」）の選択肢（HTML の <select>）。
+    return DropdownButton<int?>(
+      value: value,
+      isExpanded: true,
+      // value が null のときに出す文言。「すべての拠点」の項目（value: null）と同じ文言にする。
+      hint: const Text('すべての拠点'),
+      items: [
+        const DropdownMenuItem<int?>(value: null, child: Text('すべての拠点')),
+        for (final location in locations)
+          DropdownMenuItem<int?>(
+            value: location.id,
+            child: Text(location.name),
+          ),
+      ],
+      // 選んだら Provider に入れる。一覧はこの値を watch しているので、選び直すと取り直す。
+      onChanged: (id) => ref.read(selectedLocationProvider.notifier).select(id),
+    );
   }
 }
 

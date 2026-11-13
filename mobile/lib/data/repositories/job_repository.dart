@@ -21,7 +21,15 @@ abstract interface class JobRepository {
   // ApiJobRepository は、これをそのまま API の date_from / date_to（YYYY-MM-DD）にして渡す（docs/01 の 6.11）。
   // {DateTime? from, DateTime? to}: { } で囲んだ引数は「名前付き引数」で、呼ぶ側は fetchJobPostings(from: …, to: …)
   // と名前を書く（TypeScript で引数を 1 つのオブジェクト { from, to } にするのに近い）。省略すると null になる。
-  Future<List<JobPosting>> fetchJobPostings({DateTime? from, DateTime? to});
+  // locationId を渡すと、その拠点の募集だけを返す（API の location_id。Step 7）。null なら絞り込まない。
+  Future<List<JobPosting>> fetchJobPostings({
+    DateTime? from,
+    DateTime? to,
+    int? locationId,
+  });
+
+  // 絞り込みの選択肢にする自社の拠点すべて（GET /api/worker/locations。Step 7）。
+  Future<List<JobLocation>> fetchLocations();
 
   // id で 1 件。見つからなければ null（API なら 404）。
   Future<JobPosting?> findJobPosting(int id);

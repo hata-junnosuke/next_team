@@ -10,6 +10,7 @@
 // 使う API（docs/01 の 6.11）:
 // - GET /api/worker/job-postings?date_from=&date_to=&per_page=100  一覧（ページあり）
 // - GET /api/worker/job-postings/{id}                                1 件（ほかは 404）
+// - GET /api/worker/locations                                       拠点の一覧（ページなし。絞り込みの選択肢）
 // - POST /api/worker/job-postings/{id}/applications                 応募（本文は空。201 で自分の応募）
 
 import '../../domain/models/job_posting.dart';
@@ -32,6 +33,7 @@ class ApiJobRepository implements JobRepository {
   Future<List<JobPosting>> fetchJobPostings({
     DateTime? from,
     DateTime? to,
+    int? locationId,
   }) async {
     final body = await _apiClient.get(
       '/api/worker/job-postings',
@@ -41,6 +43,9 @@ class ApiJobRepository implements JobRepository {
         'per_page': _perPage,
         if (from != null) 'date_from': _ymd(from),
         if (to != null) 'date_to': _ymd(to),
+        // 'key': ?value は「value が null でなければ入れる」（null-aware 要素。上の if (x != null) の短縮で、Dart 3.8 から）。
+        // 日付は形を変える（_ymd）ので if のまま、拠点の id はそのまま送るのでこちらで書ける。
+        'location_id': ?locationId,
       },
     );
     // 一覧の応答は {"data": [...], "meta": {...}, "links": {...}}（6.1）。data の配列を 1 件ずつモデルにする。
@@ -51,6 +56,17 @@ class ApiJobRepository implements JobRepository {
     };
     // [for (...) 式]: 配列を作りながら 1 件ずつ変換する（collection for。JavaScript の data.map(...)）。
     return [for (final item in data) parseModel(item, JobPosting.fromJson)];
+  }
+
+  @override
+  Future<List<JobLocation>> fetchLocations() async {
+    final body = await _apiClient.get('/api/worker/locations');
+    // ページなしの一覧 {"data": [{id, name}, ...]}（6.1）。
+    final data = switch (body) {
+      {'data': final List<dynamic> data} => data,
+      _ => throw const FormatException('拠点の一覧の応答に data の配列がありません'),
+    };
+    return [for (final item in data) parseModel(item, JobLocation.fromJson)];
   }
 
   @override
