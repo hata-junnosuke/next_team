@@ -7,26 +7,25 @@
 
 ## ルール
 
-1. **業務ルールと検証をアプリに書かない**。定員・二重応募・状態遷移・応募できるかは API が判定し、アプリは 422 の `message` を表示する（docs/01 の 7A.4）。Step 3 の偽データの画面では残り枠を計算せず `remaining` を表示する。満員・応募済みの判定は学習のためだけにアプリに置き、Step 7 で API の `can.apply` と `my_application` に置き換える
+1. **業務ルールと検証をアプリに書かない**。定員・二重応募・状態遷移・応募できるかは API が判定し、アプリは 422 の `message` を表示する（docs/01 の 7A.4）。残り枠は計算せず `remaining` を表示する。応募のボタンと「応募済み」「満員」の表示は、API の `can.apply`・`my_application`・`remaining` だけで出し分ける（Step 7 から。Step 3〜6 の偽データの画面は学習のためアプリで判定していた）
 2. **`api/` のコードを読まない**。境界は docs/01 の 6.11 と 7A だけ。形がずれていたらアプリで吸収せず報告する
 3. **パッケージは docs/01 の 1 章の表にあるものだけ**を、表の「いつ」の Step から使う。足したくなったら、メリットとデメリットの表を作って人に確認する。バージョンは導入時に固定し、`pubspec.lock` をコミットする
-4. API は `data/services/` の `ApiClient` だけが `dio` で呼ぶ（`dio` を import するのは `data/services/` の `ApiClient` と `AuthInterceptor` だけ）。レスポンスはモデルの `fromJson` で型にしてから使う（Step 6 から）
+4. API は `data/services/` の `ApiClient` だけが `dio` で呼ぶ（`dio` を import するのは `data/services/` の `ApiClient` と `AuthInterceptor` だけ）。レスポンスはモデルの `fromJson` で型にしてから使う（Step 6 から）。モデルは Step 7 から `freezed` + `json_serializable` で生成し（`build.yaml` で `checked: true`）、生成した `fromJson` の失敗（`CheckedFromJsonException`）は `data/services/api_client.dart` の `parseModel()` で `FormatException` にそろえる（docs/01 の 7A.4）。生成物（`*.freezed.dart` `*.g.dart`）もコミットする
 5. トークン・パスワード・招待コードをログに出さない。`print` は `flutter analyze` が止める（`avoid_print`）。`debugPrint` は止まらないので、使わない（`rules/common/security.md`）
 6. `make mobile-analyze`（`flutter analyze`）が `No issues found!` でなければコミットしない。テストは Step 9 から `mobile/test/` に書く
 
-## 進め方（1 機能 = 1 コミット。docs/05 の 1 章）
+## 進め方（まとめて実装し、解説を 1 枚の HTML に。docs/05 の 1 章）
 
 | 手順 | 誰が | 何をするか |
 |---|---|---|
-| ① 宣言 | Claude | 次に足す機能を 1 つだけ示す。画面で何が変わるかと、新しく出てくる概念を先に言う（公式 URL つき） |
-| ② 実装・コミット | Claude | コメント多めで実装し、`flutter analyze` が 0 件であることを確かめて 1 コミットにする |
-| ③ 動かす | 人 | シミュレータで `r`（ホットリロード）か `R`（ホットリスタート）を押し、「確認」を通す |
-| ④ 変更点の案内 | Claude | そのコミットの差分を案内する（下の書き方） |
-| ⑤ 質問・説明 | 人 | わからない所を聞く。「説明できるか」に答える。済んだら「次」と言う |
+| ① 実装・コミット | Claude | issue のタスク表の順に、コメント多めで 1 機能ずつ実装し、`flutter analyze` が 0 件であることを確かめて 1 コミットにする。止まらずに次の機能へ進む |
+| ② 解説の HTML | Claude | 機能がそろったら、機能ごとの「何を実装したか」と「学ぶこと」を 1 枚の HTML にまとめて Orca で開く（下の書き方） |
+| ③ 動かす | 人 | HTML の確認の手順にそって、シミュレータと管理画面で確かめる |
+| ④ 質問・説明 | 人 | わからない所を聞く。「説明できるか」に答える |
 
-- **「次」と言われるまで、次の機能に進まない**。1 機能は 15〜30 分で回る大きさにする
-- push・PR・CI は、そのステップの機能がそろってから止まらずに進める（ルートの `CLAUDE.md` の絶対ルール 8）
-- 変更点の案内は **ファイルと行 → 何が新しいか → なぜこう書くか → React / Rails で言うと何か → 公式 URL** の順。新しい概念は初めて出たときだけ詳しく、2 回目からは一言。最後に「説明できるか」を 1〜2 問出す
+- 1 機能は 15〜30 分で回る大きさにし、1 機能 = 1 コミットに分ける。**機能ごとに止まって人の返事を待たない**（issue #48 で変えた）。人が「1 機能ずつ止まって」と言ったときだけ、その形に戻す
+- push・PR・CI も止まらずに進める（ルートの `CLAUDE.md` の絶対ルール 8）。PR の前に `spec-reviewer` ∥ `code-reviewer` を通す
+- 解説の HTML の各節は **何を実装したか（ファイルと行、コミット）→ 何が新しいか → なぜこう書くか → React / Rails で言うと何か → 公式 URL** の順。新しい概念は初めて出たときだけ詳しく、2 回目からは一言。目次を付け、各節の最後に「説明できるか」を 1〜2 問、回答例（`<details>`）つきで出す。最後に、人が確かめる項目を確認の手順としてまとめる。レビューの周回などの作業の過程は載せない
 - 公式 URL（docs.flutter.dev / api.flutter.dev / dart.dev / pub.dev / riverpod.dev/ja）は、開けることを確かめてから出す
 
 ## コメントの書き方（docs/05 の 2 章）
@@ -80,9 +79,9 @@ lib/
   ui/core/                  共通の Widget（ui/。error_banner など）とテーマ（themes/）
   ui/<機能>/view_models/    その機能の Riverpod の Provider だけ
   ui/<機能>/widgets/        画面と Widget だけ
-  domain/models/            モデルと enum（Flutter も Riverpod も import しない）
-  data/repositories/        リポジトリ（Riverpod を import しない。Step 6 からログインの状態を持つ AuthRepository）
+  domain/models/            モデルと enum（Flutter も Riverpod も import しない。Step 7 から freezed のモデル。import してよいのは freezed_annotation と json_annotation だけ）
+  data/repositories/        リポジトリ（Riverpod を import しない。Step 6 からログインの状態を持つ AuthRepository、Step 7 から ApiJobRepository）
   data/services/            ApiClient・AuthInterceptor・TokenStorage・ApiError・device_name（Step 6）
 ```
 
-依存の向き: `routing → widgets → view_models → config → data → domain`（一方通行。widgets は config と data を直接読まない）。`routing` は `redirect` でログインの状態（`authRepositoryProvider`）を読むためだけに `config` も使う（Step 6）。`ui` は `domain` のモデルと `utils` を直接使ってよい。`routing` と `widgets` は `ui/core/ui` も使う。`main.dart` は起動前の検査と復元のために `config` と `data/services`（`apiBaseUrl`）を使う。`view_models` は `on ApiError` のためだけに `data/services/api_error.dart` を import してよい（docs/01 の 7A.1）
+依存の向き: `routing → widgets → view_models → config → data → domain`（一方通行。widgets は config と data を直接読まない）。`routing` は `redirect` でログインの状態（`authRepositoryProvider`）を読むためだけに `config` も使う（Step 6）。`ui` は `domain` のモデルと `utils` を直接使ってよい。`routing` と `widgets` は `ui/core/ui` も使う。`main.dart` は起動前の検査と復元のために `config` と `data/services`（`apiBaseUrl`）を使う。`view_models` は `on ApiError` のためだけに `data/services/api_error.dart` を import してよい（docs/01 の 7A.1）。`view_models` には Provider のほか、Riverpod の mutation（`Mutation`。Step 7 の応募の送信）も置く
