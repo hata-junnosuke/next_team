@@ -1,7 +1,8 @@
 // 募集の詳細の画面。パスは /jobs/:id（例: /jobs/3）。
 // Next.js で言うと app/jobs/[id]/page.tsx に当たる。下に「応募する」ボタンを置く。
 // ボタンの文言と押せるかは、API の my_application・can.apply・remaining から ApplyStatus.of で決める（Step 7）。
-// 「応募する」で POST /api/worker/job-postings/{id}/applications を送る（Step 7。apply_mutation.dart）。
+// 「応募する」で確認ダイアログ（apply_confirm_dialog.dart）を出し、「応募する」を選んだら
+// POST /api/worker/job-postings/{id}/applications を送る（Step 7。apply_mutation.dart）。
 // 成功したらスナックバーを出し、詳細と一覧は API から取り直す（「応募中」に変わる）。
 // 失敗したら API の message（422 の「この募集にはすでに応募しています。」など）をボタンの上に出す。
 // 募集の取得は jobDetailProvider(id) に任せ、この画面はリポジトリを直接読まない（issue #35 の T4。docs/01 の 7A.1）。
@@ -24,6 +25,7 @@ import '../../../domain/models/job_posting.dart';
 import '../../../utils/format.dart';
 import '../view_models/apply_mutation.dart';
 import '../view_models/job_detail_provider.dart';
+import 'apply_confirm_dialog.dart';
 
 // 自分では状態を持たないので ConsumerWidget（Provider を読める StatelessWidget）にする。
 // issue #35 の T4 の前は、募集の Future を 1 回だけ作って持ち続けるために ConsumerStatefulWidget にし、
@@ -163,7 +165,7 @@ class JobDetailScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
-              _buildApplyButton(ref, job, status, applying),
+              _buildApplyButton(context, ref, job, status, applying),
             ],
           ),
         ),
@@ -174,6 +176,7 @@ class JobDetailScreen extends ConsumerWidget {
   // 「応募する」のボタン。押せるのは、API の can.apply が true（ApplyAvailable）で、送信中でないときだけ。
   // 最後の判定は API の 422 に任せる（ボタンが押せても、その間に満員になっていれば 422 の文言が出る）。
   Widget _buildApplyButton(
+    BuildContext context,
     WidgetRef ref,
     JobPosting job,
     ApplyStatus status,
@@ -185,7 +188,7 @@ class JobDetailScreen extends ConsumerWidget {
       // onPressed に null を渡すと、ボタンは押せない見た目（灰色）になる（HTML の disabled）。
       // 送信中も null にして、2 回押しても 1 回しか送らない（applyToJobPosting の中でも確かめている）。
       onPressed: status is ApplyAvailable && !isSending
-          ? () => _apply(ref, job.id)
+          ? () => _apply(context, ref, job)
           : null,
       // switch 式で状態ごとの文言を返す。ApplyStatus は sealed なので、子を 1 つでも書き漏らすと
       // コンパイルエラーになる（状態を足したときに、文言を決め忘れた所を全部コンパイラが教えてくれる）。
@@ -205,12 +208,21 @@ class JobDetailScreen extends ConsumerWidget {
     );
   }
 
-  // 押したら応募を送る。結果（成功・失敗）の表示は mutation の状態が受け持つので、ここでは例外を受け止めるだけ。
+  // 押したら、まず確認ダイアログを出す。「やめる」なら何もしない（API に送らない）。
+  // 「応募する」なら応募を送る。結果（成功・失敗）の表示は mutation の状態が受け持つので、ここでは例外を受け止めるだけ。
   // 受け止めないと「誰も受け取らなかった例外」になる。Exception（通信・422・形の違い）だけを受け、
   // Error（プログラムのバグ）は受けずに表に出す（job_list_screen.dart の _refresh と同じ考え方）。
-  Future<void> _apply(WidgetRef ref, int jobPostingId) async {
+  Future<void> _apply(
+    BuildContext context,
+    WidgetRef ref,
+    JobPosting job,
+  ) async {
+    if (!await showApplyConfirmDialog(context, job)) return;
+    // ダイアログを開いている間に、この画面が閉じられていることがある（戻るボタンなど）。
+    // context.mounted: この Widget がまだ画面にあるか。なければ ref も使えないので、送らずに終わる。
+    if (!context.mounted) return;
     try {
-      await applyToJobPosting(ref, jobPostingId);
+      await applyToJobPosting(ref, job.id);
     } on Exception {
       // 表示は MutationError に任せる。
     }
