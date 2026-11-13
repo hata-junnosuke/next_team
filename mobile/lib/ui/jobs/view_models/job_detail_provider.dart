@@ -23,13 +23,16 @@ part 'job_detail_provider.g.dart';
 // - 中で ref.watch している jobRepositoryProvider が変わったとき（Step 7 で API に差し替えても、ここはそのまま）
 // - keepAlive を付けていないので、詳細の画面を閉じて誰も読まなくなると捨てられ、
 //   もう一度開くと取り直す（前は画面の State と一緒に捨てていたので、動きは issue #35 の T4 の前と同じ）
+// - ref.invalidate(jobDetailProvider(id)) されたとき（応募の後に取り直す。T5）
 //
-// retry は既定のまま（Exception で失敗したら自動でやり直す）。偽のリポジトリの findJobPosting は失敗しない。
-// やり直している間、値は AsyncLoading のままなので、画面は読み込み中（くるくる）を出し続ける。
-// エラーの表示が出るのは、やり直しをやめた後（既定では最大 10 回。issue #35 の T4 の前の FutureBuilder はすぐエラーを出していた）。
-// 見つからないのは失敗ではなく null なので、やり直しの対象にならない。
-// Step 7 で API につなぐとき、jobListProvider と一緒にやり直しの方針を決め直す。
-@riverpod
+// retry: 自動でやり直さない（Step 7。jobListProvider と同じ）。既定のままだと、API が止まっているときに
+// 最大 10 回やり直す間ずっと読み込み中（くるくる）が出て、エラーと「再読み込み」がなかなか出ない。
+// 通信の切断はやり直せば直ることもあるが、いつ直るかは分からないので、やり直すかは人が「再読み込み」で決める。
+// 見つからない（404）は失敗ではなく null なので、そもそもやり直しの対象にならない。
+@Riverpod(retry: _noRetry)
 Future<JobPosting?> jobDetail(Ref ref, int id) {
   return ref.watch(jobRepositoryProvider).findJobPosting(id);
 }
+
+// 自動でやり直さない、という retry の関数（job_list_provider.dart と同じ）。
+Duration? _noRetry(int retryCount, Object error) => null;

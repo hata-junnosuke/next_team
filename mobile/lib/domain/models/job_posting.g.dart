@@ -39,6 +39,20 @@ _JobPosting _$JobPostingFromJson(Map<String, dynamic> json) => $checkedCreate(
       ),
       capacity: $checkedConvert('capacity', (v) => (v as num).toInt()),
       remaining: $checkedConvert('remaining', (v) => (v as num).toInt()),
+      status: $checkedConvert(
+        'status',
+        (v) => LabeledValue.fromJson(v as Map<String, dynamic>),
+      ),
+      myApplication: $checkedConvert(
+        'my_application',
+        (v) => v == null
+            ? null
+            : MyApplication.fromJson(v as Map<String, dynamic>),
+      ),
+      can: $checkedConvert(
+        'can',
+        (v) => JobPostingCan.fromJson(v as Map<String, dynamic>),
+      ),
     );
     return val;
   },
@@ -49,5 +63,26 @@ _JobPosting _$JobPostingFromJson(Map<String, dynamic> json) => $checkedCreate(
     'endTime': 'end_time',
     'hourlyWage': 'hourly_wage',
     'transportAllowance': 'transport_allowance',
+    'myApplication': 'my_application',
   },
 );
+
+_MyApplication _$MyApplicationFromJson(Map<String, dynamic> json) =>
+    $checkedCreate('_MyApplication', json, ($checkedConvert) {
+      final val = _MyApplication(
+        id: $checkedConvert('id', (v) => (v as num).toInt()),
+        status: $checkedConvert(
+          'status',
+          (v) => LabeledValue.fromJson(v as Map<String, dynamic>),
+        ),
+      );
+      return val;
+    });
+
+_JobPostingCan _$JobPostingCanFromJson(Map<String, dynamic> json) =>
+    $checkedCreate('_JobPostingCan', json, ($checkedConvert) {
+      final val = _JobPostingCan(
+        apply: $checkedConvert('apply', (v) => v as bool),
+      );
+      return val;
+    });

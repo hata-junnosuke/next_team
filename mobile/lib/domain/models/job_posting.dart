@@ -1,6 +1,6 @@
 // 募集のモデル（データの型）。画面とリポジトリの両方がこの型でやりとりする。
 // TypeScript で言うと web/ の zod スキーマから作る型（type JobPosting = z.infer<...>）に当たる。
-// 項目の名前と形は docs/01 の 6.11 の WorkerJobPostingResource に合わせる。
+// 項目の名前と形は docs/01 の 6.11 の WorkerJobPostingResource に合わせる（Step 7 で status・my_application・can を足した）。
 //
 // Step 7 から freezed + json_serializable で生成する（docs/01 の 7A.4）。Step 3〜6 は手書きだった。
 // 手で書くのは「どんな項目があるか」だけ。次のものは build_runner が job_posting.freezed.dart と
@@ -16,6 +16,8 @@
 // JSON の手書きとコード生成の比較: https://docs.flutter.dev/data-and-backend/serialization/json
 
 import 'package:freezed_annotation/freezed_annotation.dart';
+
+import 'labeled_value.dart';
 
 // part: 生成されたファイルを、このファイルの一部として取り込む（riverpod の .g.dart と同じ仕組み）。
 // .freezed.dart は freezed が、.g.dart は json_serializable が作る。
@@ -34,7 +36,7 @@ abstract class JobLocation with _$JobLocation {
       _JobLocation;
 
   // fromJson は 1 行だけ書き、中身は生成された _$JobLocationFromJson に任せる。
-  // 手書きのときの `json['id'] as int` が、生成側に移った。
+  // 手書きのときに 1 項目ずつ書いていた型の確かめ（as int など）が、生成側に移った。
   // 呼ぶ側（リポジトリ）は直に呼ばず、data/services/api_client.dart の parseModel() を通す（7A.4。issue #48 の Q1）。
   factory JobLocation.fromJson(Map<String, dynamic> json) =>
       _$JobLocationFromJson(json);
@@ -62,8 +64,38 @@ abstract class JobPosting with _$JobPosting {
     // アプリで「定員 − 確定数」を計算しないのは、数え方（どの状態の応募を数えるか）が業務ルールだから。
     required int capacity,
     required int remaining,
+    // 募集の状態（{value: "open", label: "募集中"}）。一覧に出るのは募集中だけ（6.11）だが、
+    // 自分が応募した募集は、中止・締切の後も詳細を開ける（6.11 の GET job-postings/{id}）。
+    required LabeledValue status,
+    // 自分の応募（なければ null）。JSON では my_application。
+    // 型の後ろの ?: null を許す（TypeScript の MyApplication | null）。null を許した項目は、キーが null でも通る。
+    required MyApplication? myApplication,
+    // この募集に対して、自分ができること（{apply: true}）。表示の出し分けにだけ使い、最後の判定は API の 422（6.11）。
+    required JobPostingCan can,
   }) = _JobPosting;
 
   factory JobPosting.fromJson(Map<String, dynamic> json) =>
       _$JobPostingFromJson(json);
+}
+
+// 自分の応募（WorkerJobPostingResource の my_application: {id, status}）。
+// status.label（応募中・確定・却下など）を、そのまま「応募済み」のバッジに出す（T4）。
+@freezed
+abstract class MyApplication with _$MyApplication {
+  const factory MyApplication({required int id, required LabeledValue status}) =
+      _MyApplication;
+
+  factory MyApplication.fromJson(Map<String, dynamic> json) =>
+      _$MyApplicationFromJson(json);
+}
+
+// 自分ができること（WorkerJobPostingResource の can: {apply}）。
+// apply は「募集中・勤務日が今日以降・残り枠がある・自分の応募がない」を API がまとめて判定した結果（6.11）。
+// アプリはこの 4 つを自分で組み立てない（業務ルールを二重に書かない。CLAUDE.md の絶対ルール 1）。
+@freezed
+abstract class JobPostingCan with _$JobPostingCan {
+  const factory JobPostingCan({required bool apply}) = _JobPostingCan;
+
+  factory JobPostingCan.fromJson(Map<String, dynamic> json) =>
+      _$JobPostingCanFromJson(json);
 }

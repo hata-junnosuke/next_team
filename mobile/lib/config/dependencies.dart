@@ -12,7 +12,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../data/repositories/auth_repository.dart';
-import '../data/repositories/fake_job_repository.dart';
+import '../data/repositories/api_job_repository.dart';
 import '../data/repositories/job_repository.dart';
 import '../data/services/api_client.dart';
 import '../data/services/auth_interceptor.dart';
@@ -40,7 +40,7 @@ part 'dependencies.g.dart';
 JobRepository jobRepository(Ref ref) {
   // Step 7 で本物の API に替えるときは、この 1 行を `ApiJobRepository(...)` にするだけ（docs/01 の 7A.1）。
   // FakeJobRepository は呼ばれた回数を数えるので const ではない。keepAlive なので 1 つだけ作られる。
-  return FakeJobRepository();
+  return ApiJobRepository(apiClient: ref.watch(apiClientProvider));
 }
 
 // トークンの保存先（Keychain）。

@@ -72,7 +72,7 @@ class JobListScreen extends ConsumerWidget {
             child: jobsAsync.when(
               // 読み込み中。くるくる回る印を出す。起動直後と、まだ開いていないチップに切り替えたときに出る。
               loading: () => const Center(child: CircularProgressIndicator()),
-              // 読み込みに失敗したとき（偽のリポジトリの 3 回に 1 回のエラー、JSON の形が契約と違うなど）。
+              // 読み込みに失敗したとき（API に届かない・500・JSON の形が契約と違うなど）。
               // (error, stackTrace) のうち stackTrace は使わないので _ にする。
               error: (error, _) => _ErrorView(
                 error: error,
@@ -177,9 +177,13 @@ class _ErrorView extends StatelessWidget {
             const SizedBox(height: 12),
             const Text('募集を読み込めませんでした'),
             const SizedBox(height: 4),
-            // 今は原因を見るために例外の中身も出す。Step 6 で ApiError を作り、利用者向けの文言に替える。
+            // ApiError は toString() が利用者向けの文言（API の message か、接続できないときの文言）を返す。
+            // 応答の形が契約と違う（FormatException）ときは、英語やキーの名前を出さずに決まりの文言にする
+            // （account_screen.dart と同じ）。画面は ApiError の型を見ない（7A.4 の「エラーの表示」）。
             Text(
-              '$error',
+              error is FormatException
+                  ? '応答の形が想定と違います。管理者にお問い合わせください。'
+                  : '$error',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodySmall,
             ),
