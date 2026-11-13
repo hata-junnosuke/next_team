@@ -30,7 +30,7 @@ const String apiBaseUrl = String.fromEnvironment('API_BASE_URL');
 // リポジトリは JobPosting.fromJson(json) を直に呼ばず、parseModel(json, JobPosting.fromJson) と書く。
 // 形が違うと、生成した fromJson は CheckedFromJsonException（build.yaml の checked: true）を投げる。
 // それを FormatException にそろえるのがこの関数の役目。画面は「応答の形が違う」を on FormatException だけで受けられる
-// （手書きの WorkerMe.fromJson と同じ例外になる）。web で zod の parse が落ちたときの ZodError に当たる。
+// （Step 6 の手書きの fromJson と同じ例外になる）。web で zod の parse が落ちたときの ZodError に当たる。
 //
 // <T>: 型引数（TypeScript のジェネリクス <T> と同じ）。返す型を、渡した fromJson の戻り値の型にそろえる。
 // T Function(Map<String, dynamic>): 「Map を受け取って T を返す関数」の型。JobPosting.fromJson をそのまま渡せる
@@ -130,8 +130,14 @@ class ApiClient {
     final statusCode = response.statusCode ?? 0;
     final data = response.data;
     // 6.1 の形 {message, errors} なら、それを使う（422 の項目ごとの文言もここに入る）。
+    // 状態コードは JSON の外にあるので、fromJson で作ったあと copyWith で足す。
+    // copyWith: 一部の項目だけを替えた新しい値を作る（freezed が生成する。JavaScript の {...error, statusCode}）。
+    // 形が違えば parseModel が FormatException を投げ、それが ApiError の代わりに呼んだ側へ届く（契約のずれ。7A.4）。
     if (data is Map<String, dynamic>) {
-      return ApiError.fromJson(statusCode, data);
+      return parseModel(
+        data,
+        ApiError.fromJson,
+      ).copyWith(statusCode: statusCode);
     }
     // JSON でない応答（Laravel が落ちて HTML を返した、など）。中身は画面に出さない。
     return ApiError(
