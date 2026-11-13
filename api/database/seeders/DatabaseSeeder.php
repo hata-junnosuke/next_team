@@ -20,7 +20,8 @@ use Illuminate\Database\Seeder;
  * - 自社: 管理者 admin@example.com / password、拠点 4、ワーカー 7（うち無効 1、ワーカーアプリに登録済み 1: worker@example.com / password）、
  *   今日以降の募集（募集中・締切・中止）と応募（応募中・確定・却下・キャンセル）、先月と今日の勤怠（月次集計・深夜跨ぎの例）
  * - 他社: 管理者 other@example.com / password と拠点・ワーカー・募集・勤怠を少し（分離の手動確認用。自社の画面に出ないこと）
- * - 企業コード（ワーカーのログインに使う）は Company の creating で自動で入る。値は make fresh のたびに変わるので、/api/user の company.code で確かめる
+ * - 企業コード（ワーカーのログインに使う）は、自社 NEXT22・他社 XYZ789 に固定する（make fresh や worktree ごとの DB でも同じ値でログインできるように）。
+ *   creating はコードが入っていれば作らない。開発用のデータだけの決めごとで、本番の企業は今までどおり乱数で作る
  *
  * BelongsToCompany が company_id を CurrentCompany::id() で埋めるので、企業ごとに runAs() の中で作る。
  * 状態はファクトリの state で直接作る（シードは「その状態のデータ」を置くだけ。アプリの操作では必ずサービスを通る）。
@@ -30,6 +31,11 @@ use Illuminate\Database\Seeder;
  */
 class DatabaseSeeder extends Seeder
 {
+    // 開発用の企業コード（docs/01 の 3.1 の文字だけを使う: 0 O 1 I L を含めない）
+    public const OWN_COMPANY_CODE = 'NEXT22';
+
+    public const OTHER_COMPANY_CODE = 'XYZ789';
+
     public function run(): void
     {
         // 固定パスワードの管理者を本番に作らない
@@ -39,7 +45,7 @@ class DatabaseSeeder extends Seeder
             return;
         }
 
-        $company = Company::factory()->create(['name' => '株式会社サンプル']);
+        $company = Company::factory()->create(['name' => '株式会社サンプル', 'code' => self::OWN_COMPANY_CODE]);
         User::factory()->for($company)->create([
             'name' => '管理者 太郎',
             'email' => 'admin@example.com',
@@ -47,7 +53,7 @@ class DatabaseSeeder extends Seeder
 
         CurrentCompany::runAs($company->id, fn () => $this->seedOwnCompany());
 
-        $other = Company::factory()->create(['name' => '他社株式会社']);
+        $other = Company::factory()->create(['name' => '他社株式会社', 'code' => self::OTHER_COMPANY_CODE]);
         User::factory()->for($other)->create([
             'name' => '他社 管理者',
             'email' => 'other@example.com',

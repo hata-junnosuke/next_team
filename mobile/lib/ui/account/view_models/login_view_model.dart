@@ -98,7 +98,8 @@ class LoginViewModel extends _$LoginViewModel {
   // - 422 で、入力欄のないキー（device_name など）の文言がある: 項目の下に出せない分が消えないよう、その文言を上に出す
   // - それ以外（429・500・接続できない など）: 上に出す
   // 初回登録の view model にも同じ形のメソッドがある。7A.1 で view_models/ には Provider 以外の部品（共有の関数）を
-  // 置かないと決めているので、小さな重複として残す（Step 7 で ApiError の扱いを見直すときに、まとめるか決める）。
+  // 置かないと決めているので、小さな重複として残す（Step 7 で ApiError を freezed に移したが、公開の形は変えなかったので、
+  // ここは分けたままにした。まとめるかは Step 9 でテストを書くときに決め直す）。
   AuthFormState _fromApiError(ApiError e) {
     if (e.statusCode == 422 && e.errors.isNotEmpty) {
       // 入力欄のないキーの文言（device_name など。アプリが自動で送る値なので、ふつうは起きない）。

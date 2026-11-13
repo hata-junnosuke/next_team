@@ -50,7 +50,8 @@ class AuthInterceptor extends Interceptor {
     // トークンがあり、送り先が API（API_BASE_URL と同じ scheme・host・port）のときだけ付ける。
     // ログインと初回登録の前はトークンがないので、付けずに送る。
     // dio は path に http:// から始まる URL を渡されると baseUrl を使わずにそこへ送るので、確かめないと
-    // 別のサイトにトークンを渡してしまう（Step 7 でページ送りの links.next の URL を使うときなど）。
+    // 別のサイトにトークンを渡してしまう（将来、応答の links.next のような URL をそのまま path に渡したときなど。
+    // Step 7 の一覧は 1 ページ目だけを読み、links は使っていない）。
     // web で Cookie が自分のドメインにだけ送られるのを、ここでは自分で守っている。
     if (token != null && _isApiOrigin(options)) {
       options.headers['Authorization'] = 'Bearer $token';

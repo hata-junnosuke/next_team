@@ -48,7 +48,7 @@ final class JobRepositoryProvider
   }
 }
 
-String _$jobRepositoryHash() => r'fdb1e77aa03eae58d79a426204f5640554b47e6b';
+String _$jobRepositoryHash() => r'4676f48969e6b9f9de9e971fcdcf33e417be85f4';
 
 @ProviderFor(tokenStorage)
 final tokenStorageProvider = TokenStorageProvider._();

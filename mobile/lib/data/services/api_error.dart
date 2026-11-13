@@ -5,74 +5,45 @@
 // 画面は dio の例外（DioException）を見ずに、これだけを見る。
 // dio を知っているのは data/services/ だけにしたいので（docs/01 の 7A.4）、ApiClient が変換して投げる。
 //
+// Step 6 は手書きだった。Step 7 で freezed + json_serializable の生成に移した（issue #48 の Q2）。
+// 公開の形（statusCode・message・errors・firstErrorOf()・toString()）は変えていないので、使う側（ui/）は変わらない。
+// モデル（domain/models/）ではなく API の失敗の形なので、data/services/ に置いたまま（7A.1）。
+//
 // 例外のクラスを作る: https://dart.dev/language/error-handling
+// freezed にメソッドを足す（private コンストラクタ）: https://pub.dev/packages/freezed （「Adding getters and methods to our models」）
+
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'api_error.freezed.dart';
+part 'api_error.g.dart';
 
 // implements Exception: 「これは例外として投げてよいもの」という印（Java の implements と同じ）。
-// Dart は何でも throw できるが、Exception を実装しておくと、catch (e) で受けた側が種類で見分けやすい。
-class ApiError implements Exception {
-  // コンストラクタ。{} の中は名前付き引数（呼ぶ側が ApiError(message: '…') のように名前で渡す）。
-  // required = 省略できない名前付き引数（TypeScript で ? を付けないプロパティ）。
-  // this.message = 受け取った値を、そのまま同じ名前のフィールドに入れる短い書き方。
-  // const: 中身が変わらないので、コンパイル時に作れる（同じ値なら使い回される）。
-  const ApiError({
-    required this.statusCode,
-    required this.message,
-    // = const {} は「渡されなかったときの値」（空のマップ）。
-    this.errors = const {},
-  });
+// Dart は何でも throw できるが、Exception を実装しておくと、on Exception で受けられる（Error = バグとは分けられる）。
+//
+// @Freezed(toStringOverride: false): freezed は既定で toString（ApiError(statusCode: 422, message: …)）を作る。
+// 自分で toString を書けば freezed は作らないが、「message だけを返す toString を使う」という意図をはっきりさせるため明示する。
+@Freezed(toStringOverride: false)
+abstract class ApiError with _$ApiError implements Exception {
+  // const ApiError._(): 中身のない private のコンストラクタ。freezed のクラスに自分のメソッド（firstErrorOf・toString）を
+  // 足すときに必要になる決まりごと（生成された _ApiError が、これを呼んで親のメソッドを受け継ぐ）。
+  const ApiError._();
 
-  // 6.1 のエラーの形 {message, errors} の JSON から作る。
-  // factory: 新しく作るとは限らないコンストラクタ（ここでは JSON を調べてから作るために使う）。
-  // Step 7 からは freezed と json_serializable で生成するが、Step 6 は手書き（docs/01 の 7A.4）。
-  //
-  // 形が合わなければ FormatException を投げる（web で zod の parse が落ちるのと同じ。7A.4）。
-  // 黙って空の文言にすると、契約のずれに気づけない。
-  factory ApiError.fromJson(int statusCode, Map<String, dynamic> json) {
-    // switch のパターンマッチ: json の形が「message が String」なら、その値を message という変数に入れる。
-    // TypeScript で言うと、typeof json.message === 'string' で絞り込むのを 1 行で書く書き方。
-    // https://dart.dev/language/patterns
-    final message = switch (json['message']) {
-      final String m => m,
-      _ => throw FormatException('API のエラーに message がありません（キー: ${json.keys.toList()}）'),
-    };
+  const factory ApiError({
+    // 状態コード（401 / 404 / 422 / 429 / 500 など）。null は「サーバーに届かなかった」（接続できない・時間切れ）。
+    // JSON の中にはないので、fromJson では読まない（includeFromJson: false）。ApiClient が copyWith で入れる。
+    @JsonKey(includeFromJson: false) int? statusCode,
+    // 画面にそのまま出せる日本語の文言（API の message。接続できないときは ApiClient が作った文言）。
+    required String message,
+    // 422 の項目ごとの文言（{"email": ["…"]}）。入力欄の下に出す（docs/01 の 7A.4）。
+    // @Default: 省略されたとき（JSON にキーがない・null。401 の「Unauthenticated.」など）の値。空のマップにする。
+    // 形が違う（配列でない・文字列でないものが混ざる）ときは、生成した fromJson が例外にする（parseModel で FormatException）。
+    @Default(<String, List<String>>{}) Map<String, List<String>> errors,
+  }) = _ApiError;
 
-    // errors は省略されることがある（401 の「Unauthenticated.」など。6.11）。
-    // ある場合は {"email": ["…"]} の形（項目名 → 文言の配列）。
-    final errors = <String, List<String>>{};
-    final raw = json['errors'];
-    // is: 型を確かめる（TypeScript の instanceof / typeof）。確かめた後の raw は Map として使える。
-    if (raw is Map<String, dynamic>) {
-      // for (final MapEntry(:key, :value) in ...) は、マップの 1 組をキーと値に分けて取り出す書き方。
-      for (final MapEntry(:key, :value) in raw.entries) {
-        if (value is! List) {
-          throw FormatException('API のエラーの errors.$key が配列ではありません');
-        }
-        // List<dynamic> を List<String> にそろえる。文字列でないものが混ざっていたら契約のずれ。
-        errors[key] = [
-          for (final item in value)
-            if (item is String)
-              item
-            else
-              throw FormatException('API のエラーの errors.$key に文字列でないものがあります'),
-        ];
-      }
-    } else if (raw != null) {
-      throw const FormatException('API のエラーの errors がオブジェクトではありません');
-    }
-
-    return ApiError(statusCode: statusCode, message: message, errors: errors);
-  }
-
-  // 状態コード（401 / 404 / 422 / 429 / 500 など）。
-  // int? は「int か null」。null は「サーバーに届かなかった」（接続できない・時間切れ）を表す。
-  final int? statusCode;
-
-  // 画面にそのまま出せる日本語の文言（API の message。接続できないときは ApiClient が作った文言）。
-  final String message;
-
-  // 422 の項目ごとの文言（{"email": ["…"]}）。入力欄の下に出す（docs/01 の 7A.4）。
-  // 他の状態コードでは空のことが多い。
-  final Map<String, List<String>> errors;
+  // 6.1 のエラーの形 {message, errors} の JSON から作る（状態コードは含まない）。
+  // ApiClient は parseModel(json, ApiError.fromJson).copyWith(statusCode: …) と呼ぶ。
+  factory ApiError.fromJson(Map<String, dynamic> json) =>
+      _$ApiErrorFromJson(json);
 
   // その項目の最初の文言（なければ null）。入力欄の下に 1 行だけ出すために使う。
   // ?. は「左が null なら null を返し、そうでなければ続ける」（JavaScript の ?. と同じ）。

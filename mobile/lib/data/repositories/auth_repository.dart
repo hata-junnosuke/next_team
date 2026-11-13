@@ -109,7 +109,7 @@ class AuthRepository extends ChangeNotifier {
   // 自分の情報（GET /api/worker/me）。応答は {"data": WorkerMeResource}。
   Future<WorkerMe> fetchMe() async {
     final body = await _apiClient.get('/api/worker/me');
-    return WorkerMe.fromJson(_dataOf(body));
+    return parseModel(_dataOf(body), WorkerMe.fromJson);
   }
 
   // ログアウト（POST /api/worker/logout）。今の端末のトークンだけを API 側で消す（5.3）。
@@ -154,7 +154,7 @@ class AuthRepository extends ChangeNotifier {
 
   // ログイン・初回登録の応答 {"data": {"token", "worker"}} を読み、トークンを保存してログイン済みにする。
   Future<WorkerMe> _signIn(Map<String, dynamic>? body) async {
-    // 形が違えば FormatException（契約のずれ。7A.4）。as を使わない理由は worker_me.dart。
+    // 形が違えば FormatException（契約のずれ。7A.4）。as を使わずパターンで確かめる理由は 7A.4 の「エラーの表示」（as の TypeError は on FormatException で受けられない）。
     final (token, worker) = switch (_dataOf(body)) {
       {
         'token': final String token,
@@ -162,7 +162,7 @@ class AuthRepository extends ChangeNotifier {
       } =>
         // ( , ) はレコード: 2 つの値を 1 つにまとめて返し、左の final (token, worker) で分けて受け取る
         // （TypeScript で [a, b] を返して const [a, b] = ... と分ける、のに近い）。
-        (token, WorkerMe.fromJson(worker)),
+        (token, parseModel(worker, WorkerMe.fromJson)),
       _ => throw const FormatException('ログインの応答に token か worker がありません'),
     };
 

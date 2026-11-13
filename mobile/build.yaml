@@ -1,0 +1,25 @@
+# コード生成（build_runner）の設定（Step 7。docs/01 の 7A.4）。
+# pubspec.yaml の隣に置くと、dart run build_runner build がこの設定で .freezed.dart / .g.dart を作る。
+# Rails で言うと config/initializers で gem の既定の動きを変えるのに近い（全部のモデルに一度で効く）。
+#
+# json_serializable の設定: https://pub.dev/packages/json_serializable#build-configuration
+# freezed の設定: https://pub.dev/packages/freezed （「Changing the behavior for the entire project」）
+targets:
+  $default:
+    builders:
+      json_serializable:
+        options:
+          # 形の違う JSON を渡したときに、どのキーで失敗したかを持つ CheckedFromJsonException を投げる。
+          # 既定（false）だと、生成した fromJson の中の `as int` が TypeError（Error = バグの扱い）になり、
+          # どのキーかも分からず、画面の `on FormatException` でも受けられない。
+          # リポジトリは data/services/api_client.dart の parseModel() を通し、FormatException にそろえる（issue #48 の Q1）。
+          checked: true
+          # Dart のフィールド名（jobTitle）を JSON のキー（job_title）に、snake_case で対応させる。
+          # API は snake_case（docs/01 の 6.1）。フィールドごとに @JsonKey(name: 'job_title') と書かずに済む。
+          field_rename: snake
+          # アプリから JSON を送らない（応募の POST も本文は空。6.11）ので、toJson は作らない（使わないコードを増やさない）。
+          create_to_json: false
+      freezed:
+        options:
+          # freezed も toJson を足さない（上の create_to_json と合わせる）。
+          to_json: false

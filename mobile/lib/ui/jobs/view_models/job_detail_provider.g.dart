@@ -24,7 +24,7 @@ final class JobDetailProvider
     required JobDetailFamily super.from,
     required int super.argument,
   }) : super(
-         retry: null,
+         retry: _noRetry,
          name: r'jobDetailProvider',
          isAutoDispose: true,
          dependencies: null,
@@ -64,13 +64,13 @@ final class JobDetailProvider
   }
 }
 
-String _$jobDetailHash() => r'8c114db55627265c5a480324fb7cbbcd6bdabacf';
+String _$jobDetailHash() => r'9a61d169221910da29818952f883d63472d4c6bc';
 
 final class JobDetailFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<JobPosting?>, int> {
   JobDetailFamily._()
     : super(
-        retry: null,
+        retry: _noRetry,
         name: r'jobDetailProvider',
         dependencies: null,
         $allTransitiveDependencies: null,

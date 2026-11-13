@@ -15,14 +15,14 @@ final jobListProvider = JobListFamily._();
 final class JobListProvider
     extends
         $FunctionalProvider<
-          AsyncValue<List<JobPosting>>,
-          List<JobPosting>,
-          FutureOr<List<JobPosting>>
+          AsyncValue<JobPostingPage>,
+          JobPostingPage,
+          FutureOr<JobPostingPage>
         >
-    with $FutureModifier<List<JobPosting>>, $FutureProvider<List<JobPosting>> {
+    with $FutureModifier<JobPostingPage>, $FutureProvider<JobPostingPage> {
   JobListProvider._({
     required JobListFamily super.from,
-    required DateFilter super.argument,
+    required (DateFilter, int?) super.argument,
   }) : super(
          retry: _noRetry,
          name: r'jobListProvider',
@@ -38,19 +38,19 @@ final class JobListProvider
   String toString() {
     return r'jobListProvider'
         ''
-        '($argument)';
+        '$argument';
   }
 
   @$internal
   @override
-  $FutureProviderElement<List<JobPosting>> $createElement(
+  $FutureProviderElement<JobPostingPage> $createElement(
     $ProviderPointer pointer,
   ) => $FutureProviderElement(pointer);
 
   @override
-  FutureOr<List<JobPosting>> create(Ref ref) {
-    final argument = this.argument as DateFilter;
-    return jobList(ref, argument);
+  FutureOr<JobPostingPage> create(Ref ref) {
+    final argument = this.argument as (DateFilter, int?);
+    return jobList(ref, argument.$1, argument.$2);
   }
 
   @override
@@ -64,10 +64,14 @@ final class JobListProvider
   }
 }
 
-String _$jobListHash() => r'0d140a78a49f72d5e4af96e1d15311435ec1853e';
+String _$jobListHash() => r'b3c96a76fe2a3240404948262a54ff525989c359';
 
 final class JobListFamily extends $Family
-    with $FunctionalFamilyOverride<FutureOr<List<JobPosting>>, DateFilter> {
+    with
+        $FunctionalFamilyOverride<
+          FutureOr<JobPostingPage>,
+          (DateFilter, int?)
+        > {
   JobListFamily._()
     : super(
         retry: _noRetry,
@@ -77,8 +81,8 @@ final class JobListFamily extends $Family
         isAutoDispose: true,
       );
 
-  JobListProvider call(DateFilter filter) =>
-      JobListProvider._(argument: filter, from: this);
+  JobListProvider call(DateFilter filter, int? locationId) =>
+      JobListProvider._(argument: (filter, locationId), from: this);
 
   @override
   String toString() => r'jobListProvider';

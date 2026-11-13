@@ -12,7 +12,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../data/repositories/auth_repository.dart';
-import '../data/repositories/fake_job_repository.dart';
+import '../data/repositories/api_job_repository.dart';
 import '../data/repositories/job_repository.dart';
 import '../data/services/api_client.dart';
 import '../data/services/auth_interceptor.dart';
@@ -31,16 +31,14 @@ part 'dependencies.g.dart';
 // 何を持つか: リポジトリの実体 1 つ。
 // いつ作り直されるか: 作り直さない。keepAlive: true にすると、誰も読んでいない間も捨てずに持ち続ける。
 // 既定（keepAlive なし）だと、読む画面がなくなったときに捨てられ、次に読まれたときに作り直される。
-// リポジトリは画面に出す状態を持たない道具なので、アプリが動いている間 1 つを使い回せばよい
-// （Step 6 で ApiClient を持つようになると、作り直さないことに意味が出てくる）。
-// 偽のリポジトリは「3 回に 1 回失敗」のために呼ばれた回数を持つ。作り直すと数え直しになる。
+// リポジトリは画面に出す状態を持たない道具なので、アプリが動いている間 1 つを使い回せばよい。
 //
 // Ref: Provider の中からほかの Provider を読むための入口（下の authRepositoryProvider で ref.watch を使う）。
 @Riverpod(keepAlive: true)
 JobRepository jobRepository(Ref ref) {
-  // Step 7 で本物の API に替えるときは、この 1 行を `ApiJobRepository(...)` にするだけ（docs/01 の 7A.1）。
-  // FakeJobRepository は呼ばれた回数を数えるので const ではない。keepAlive なので 1 つだけ作られる。
-  return FakeJobRepository();
+  // Step 3〜6 は偽物（assets の JSON を読む）を返していた。Step 7 で本物の API に替えたのは、この 1 行だけ（docs/01 の 7A.1）。
+  // Step 9 のテストでは、この Provider を偽物に差し替える（overrides）。
+  return ApiJobRepository(apiClient: ref.watch(apiClientProvider));
 }
 
 // トークンの保存先（Keychain）。

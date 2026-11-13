@@ -12,6 +12,8 @@
 // DioException: https://pub.dev/documentation/dio/latest/dio/DioException-class.html
 
 import 'package:dio/dio.dart';
+// CheckedFromJsonException（生成した fromJson が形の違いで投げる例外）を受けるために使う。
+import 'package:json_annotation/json_annotation.dart';
 
 import 'api_error.dart';
 
@@ -21,6 +23,33 @@ import 'api_error.dart';
 // 既定値は置かない。渡し忘れたら空文字になり、main.dart が起動時に止める（docs/01 の 7A.2）。
 // https://api.dart.dev/dart-core/String/String.fromEnvironment.html
 const String apiBaseUrl = String.fromEnvironment('API_BASE_URL');
+
+// API の JSON を、生成した fromJson でモデルに変える（Step 7。docs/01 の 7A.4、issue #48 の Q1）。
+// リポジトリは JobPosting.fromJson(json) を直に呼ばず、parseModel(json, JobPosting.fromJson) と書く。
+// 形が違うと、生成した fromJson は CheckedFromJsonException（build.yaml の checked: true）を投げる。
+// それを FormatException にそろえるのがこの関数の役目。画面は「応答の形が違う」を on FormatException だけで受けられる
+// （Step 6 の手書きの fromJson と同じ例外になる）。web で zod の parse が落ちたときの ZodError に当たる。
+//
+// <T>: 型引数（TypeScript のジェネリクス <T> と同じ）。返す型を、渡した fromJson の戻り値の型にそろえる。
+// T Function(Map<String, dynamic>): 「Map を受け取って T を返す関数」の型。JobPosting.fromJson をそのまま渡せる
+// （コンストラクタも関数として渡せる。Dart では「tear-off」と呼ぶ）。
+// https://dart.dev/language/generics
+// https://pub.dev/documentation/json_annotation/latest/json_annotation/CheckedFromJsonException-class.html
+T parseModel<T>(Object? json, T Function(Map<String, dynamic> json) fromJson) {
+  // is!: 「その型ではない」（TypeScript の !(x instanceof Y)）。オブジェクトでなければ、fromJson に渡す前に止める。
+  if (json is! Map<String, dynamic>) {
+    throw FormatException('$T の応答が JSON のオブジェクトではありません');
+  }
+  try {
+    return fromJson(json);
+  } on CheckedFromJsonException catch (e) {
+    // 例外の文言にはクラス名とキーだけを入れ、値（氏名・メールなど）は入れない（個人情報を例外やログに残さない）。
+    // e.message は元の例外の文言で、値が入ることがある（DateTime.parse の失敗など）ので使わない。
+    // className は生成側の private のクラス名（_JobPosting）なので、先頭の _ を外して読みやすくする。
+    final name = (e.className ?? '$T').replaceFirst(RegExp('^_'), '');
+    throw FormatException('$name の形が違います（キー: ${e.key}）');
+  }
+}
 
 // サーバーに届かなかったとき（接続できない・時間切れ）の文言。API の message がないので、アプリで作る。
 // 業務の判定ではなく「通信の失敗」の表示なので、アプリに置いてよい。
@@ -103,8 +132,14 @@ class ApiClient {
     final statusCode = response.statusCode ?? 0;
     final data = response.data;
     // 6.1 の形 {message, errors} なら、それを使う（422 の項目ごとの文言もここに入る）。
+    // 状態コードは JSON の外にあるので、fromJson で作ったあと copyWith で足す。
+    // copyWith: 一部の項目だけを替えた新しい値を作る（freezed が生成する。JavaScript の {...error, statusCode}）。
+    // 形が違えば parseModel が FormatException を投げ、それが ApiError の代わりに呼んだ側へ届く（契約のずれ。7A.4）。
     if (data is Map<String, dynamic>) {
-      return ApiError.fromJson(statusCode, data);
+      return parseModel(
+        data,
+        ApiError.fromJson,
+      ).copyWith(statusCode: statusCode);
     }
     // JSON でない応答（Laravel が落ちて HTML を返した、など）。中身は画面に出さない。
     return ApiError(
