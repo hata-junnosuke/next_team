@@ -269,8 +269,8 @@ flutter run     # シミュレータにカウンタのアプリが出る</pre><d
     <div class="gate">関門 2：Step 0 の完了（flutter doctor が ✓）<span>— これが済むまで Claude は flutter create できない</span></div>
 
     <div class="ph">Step 3<small>T6 mobile/ の雛形</small></div>
-    <div class="lc y"><span class="it">③ 1 機能ごとにシミュレータで動かす（下タブ・一覧 → 詳細・残り枠…）</span><span class="it">⑤ 案内を読んで質問し、「次」と言う</span><span class="it">説明：ShellRoute は何のためにある？ なぜ偽のリポジトリを挟む？</span></div>
-    <div class="lc c"><span class="it">② <b>T6</b> <code>flutter create</code>、analysis_options.yaml、mobile/CLAUDE.md（コメントのルール）</span><span class="it">1 機能 = 1 コミットで、下タブ → 偽データの一覧 → 詳細 → 応募ボタン → 残り枠・日付チップ・JSON・応募済みの保持・状態の文言。毎回 ④ 変更点を案内して止まる</span><span class="it"><code>flutter analyze</code> 0 件・<code>make verify</code> 緑 → push → PR → CI を確認</span></div>
+    <div class="lc y"><span class="it">③ 1 機能ごとにシミュレータで動かす（下タブ・一覧 → 詳細・残り枠…）</span><span class="it">⑤ 案内を読んで質問し、「次」と言う（当時の進め方）</span><span class="it">説明：ShellRoute は何のためにある？ なぜ偽のリポジトリを挟む？</span></div>
+    <div class="lc c"><span class="it">② <b>T6</b> <code>flutter create</code>、analysis_options.yaml、mobile/CLAUDE.md（コメントのルール）</span><span class="it">1 機能 = 1 コミットで、下タブ → 偽データの一覧 → 詳細 → 応募ボタン → 残り枠・日付チップ・JSON・応募済みの保持・状態の文言。毎回 ④ 変更点を案内して止まる（当時の進め方）</span><span class="it"><code>flutter analyze</code> 0 件・<code>make verify</code> 緑 → push → PR → CI を確認</span></div>
 
     <div class="gate">関門 3：PR を確かめて main にマージする <span>（あなた）→ issue #31 が閉じる</span></div>
 
@@ -298,14 +298,13 @@ flutter run     # シミュレータにカウンタのアプリが出る</pre><d
 </div>
 
 <h2><span class="n">2</span>1 機能の回し方（全ステップ共通）</h2>
-<p class="desc">1 機能 = 1 コミット。Claude が書き、あなたは動かして読み、聞く。「次」と言うまで次へ進まない。1 機能は 15〜30 分。</p>
+<p class="desc">1 機能 = 1 コミット。Claude が止まらずに続けて書き、そろったら解説を 1 枚の HTML にする。あなたはそれを読み、動かして確かめ、聞く（issue #48 から。それまでは 1 機能ごとに止まっていた）。</p>
 <div class="card">
   <div class="loop">
-    <div class="st c"><div class="r">Claude</div><div class="k">①</div><div class="t">宣言</div><div class="d">次に足す機能を 1 つ<br>新しい概念と公式 URL</div></div>
-    <div class="st c"><div class="r">Claude</div><div class="k">②</div><div class="t">実装・コミット</div><div class="d">コメント多め<br>analyze 0 件で 1 コミット</div></div>
-    <div class="st y"><div class="r">あなた</div><div class="k">③</div><div class="t">動かす</div><div class="d">シミュレータで r / R<br>「確認」を通す</div></div>
-    <div class="st c"><div class="r">Claude</div><div class="k">④</div><div class="t">変更点の案内</div><div class="d">ファイルと行ごとに<br>何が新しい・なぜ・React で言うと</div></div>
-    <div class="st y"><div class="r">あなた</div><div class="k">⑤</div><div class="t">質問・説明</div><div class="d">わからない所を聞く<br>2〜3 行で答えて「次」</div></div>
+    <div class="st c"><div class="r">Claude</div><div class="k">①</div><div class="t">実装・コミット</div><div class="d">タスク表の順に 1 機能ずつ<br>analyze 0 件で 1 コミット。止まらない</div></div>
+    <div class="st c"><div class="r">Claude</div><div class="k">②</div><div class="t">解説の HTML</div><div class="d">機能ごとに何を実装したか・学ぶこと<br>説明できるか（回答例つき）・確認の手順</div></div>
+    <div class="st y"><div class="r">あなた</div><div class="k">③</div><div class="t">動かす</div><div class="d">HTML の確認の手順で<br>シミュレータと管理画面</div></div>
+    <div class="st y"><div class="r">あなた</div><div class="k">④</div><div class="t">質問・説明</div><div class="d">わからない所を聞く<br>説明できるかに答える</div></div>
   </div>
   <div class="legend"><span><span class="dot" style="background:var(--you)"></span>あなた（動かす・読む・聞く）</span><span><span class="dot" style="background:var(--mob)"></span>Claude（書く・案内する）</span><span>差分は Orca（orca file diff）か Cursor で横に並べて見る</span></div>
 </div>

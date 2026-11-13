@@ -19,7 +19,7 @@
 | 手順 | 誰が | 何をするか |
 |---|---|---|
 | ① 実装・コミット | Claude | issue のタスク表の順に、コメント多めで 1 機能ずつ実装し、`flutter analyze` が 0 件であることを確かめて 1 コミットにする。止まらずに次の機能へ進む |
-| ② 解説の HTML | Claude | 機能がそろったら、機能ごとの「何を実装したか」と「学ぶこと」を 1 枚の HTML にまとめて Orca で開く（下の書き方） |
+| ② 解説の HTML | Claude | 機能がそろい、PR の前のレビュー（`spec-reviewer` ∥ `code-reviewer`）の指摘も直したら、機能ごとの「何を実装したか」と「学ぶこと」を 1 枚の HTML にまとめて Orca で開く（下の書き方） |
 | ③ 動かす | 人 | HTML の確認の手順にそって、シミュレータと管理画面で確かめる |
 | ④ 質問・説明 | 人 | わからない所を聞く。「説明できるか」に答える |
 
@@ -84,4 +84,4 @@ lib/
   data/services/            ApiClient・AuthInterceptor・TokenStorage・ApiError・device_name（Step 6）
 ```
 
-依存の向き: `routing → widgets → view_models → config → data → domain`（一方通行。widgets は config と data を直接読まない）。`routing` は `redirect` でログインの状態（`authRepositoryProvider`）を読むためだけに `config` も使う（Step 6）。`ui` は `domain` のモデルと `utils` を直接使ってよい。`routing` と `widgets` は `ui/core/ui` も使う。`main.dart` は起動前の検査と復元のために `config` と `data/services`（`apiBaseUrl`）を使う。`view_models` は `on ApiError` のためだけに `data/services/api_error.dart` を import してよい（docs/01 の 7A.1）。`view_models` には Provider のほか、Riverpod の mutation（`Mutation`）と、それを動かす送信の関数も置く（Step 7 の応募の `apply_mutation.dart`）
+依存の向き: `routing → widgets → view_models → config → data → domain`（一方通行。widgets は config と data を直接読まない）。`routing` は `redirect` でログインの状態（`authRepositoryProvider`）を読むためだけに `config` も使う（Step 6）。`ui` は `domain` のモデルと `utils` を直接使ってよい。`routing` と `widgets` は `ui/core/ui` も使う。`main.dart` は起動前の検査と復元のために `config` と `data/services`（`apiBaseUrl`）を使う。`view_models` は、失敗を `on ApiError` で受け止めて、その `statusCode`・`message`・`errors` を読むためだけに `data/services/api_error.dart` を import してよい（docs/01 の 7A.1）。`view_models` には Provider のほか、Riverpod の mutation（`Mutation`）と、それを動かす送信の関数、およびそれらだけが使う private な関数も置く（Step 7 の応募の `apply_mutation.dart`）
