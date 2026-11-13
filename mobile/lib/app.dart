@@ -1,7 +1,7 @@
 // アプリ全体の外枠。テーマと画面遷移（go_router）をつなぐ。
 // Next.js で言うと app/layout.tsx（全ページに共通の外側）に当たる。
-// Step 3 では「応募済み」の状態をここまで持ち上げて持っていたが、Step 4 で Riverpod の
-// appliedJobsProvider に移したので、ここは状態を持たない。
+// Step 3 では「応募済み」の状態をここまで持ち上げて持っていたが、Step 4 で Riverpod の Provider に移し、
+// Step 7 からは API の my_application で出すので、ここは状態を持たない。
 //
 // MaterialApp.router: https://api.flutter.dev/flutter/material/MaterialApp/MaterialApp.router.html
 // ConsumerWidget: https://riverpod.dev/ja/docs/concepts2/consumers

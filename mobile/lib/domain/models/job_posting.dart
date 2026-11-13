@@ -19,7 +19,7 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 
 import 'labeled_value.dart';
 
-// part: 生成されたファイルを、このファイルの一部として取り込む（riverpod の .g.dart と同じ仕組み）。
+// part: 生成されたファイルを、このファイルの一部として取り込む（Provider の .g.dart と同じ仕組み）。
 // .freezed.dart は freezed が、.g.dart は json_serializable が作る。
 part 'job_posting.freezed.dart';
 part 'job_posting.g.dart';

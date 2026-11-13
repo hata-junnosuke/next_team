@@ -1,7 +1,7 @@
 // 募集の詳細の画面。パスは /jobs/:id（例: /jobs/3）。
 // Next.js で言うと app/jobs/[id]/page.tsx に当たる。下に「応募する」ボタンを置く。
-// 応募は、まだどこにも保存しない（押すと「応募済み」に変わるだけ）。Step 7 で API の応募（POST）に替える。
-// 「応募済み」は appliedJobsProvider に入れるので、一覧に戻っても、開き直しても残る。
+// ボタンの文言と押せるかは、API の my_application・can.apply・remaining から ApplyStatus.of で決める（Step 7）。
+// 応募の送信（POST）は T5 で足す。それまでは「応募する」も押せない。
 // 募集の取得は jobDetailProvider(id) に任せ、この画面はリポジトリを直接読まない（issue #35 の T4。docs/01 の 7A.1）。
 //
 // パスの引数: https://pub.dev/documentation/go_router/latest/topics/Configuration-topic.html
@@ -16,7 +16,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../domain/models/apply_status.dart';
 import '../../../domain/models/job_posting.dart';
 import '../../../utils/format.dart';
-import '../view_models/applied_jobs_provider.dart';
 import '../view_models/job_detail_provider.dart';
 
 // 自分では状態を持たないので ConsumerWidget（Provider を読める StatelessWidget）にする。
@@ -24,7 +23,6 @@ import '../view_models/job_detail_provider.dart';
 // initState で Future を作って FutureBuilder で描き分けていた。
 // 「1 回だけ取る」「取った結果を持ち続ける」は jobDetailProvider(id) が引き受けるので、State も initState も要らない
 // （React で言うと、useState + useEffect の fetch を、useQuery 1 行に置き換えたのと同じ）。
-// 「応募したか」も、画面と一緒に捨てられないように appliedJobsProvider（keepAlive）に置いている。
 class JobDetailScreen extends ConsumerWidget {
   const JobDetailScreen({required this.jobId, super.key});
 
@@ -51,9 +49,35 @@ class JobDetailScreen extends ConsumerWidget {
             appBar: AppBar(),
             body: const Center(child: CircularProgressIndicator()),
           ),
+          // 読み込みに失敗したとき（API に届かない・500 など）。jobDetailProvider は自動でやり直さないので、
+          // 「再読み込み」で invalidate して取り直す（一覧の画面と同じ）。
+          // 応答の形が違う（FormatException）ときは、英語やキーの名前を出さずに決まりの文言にする。
           error: (error, _) => Scaffold(
             appBar: AppBar(),
-            body: Center(child: Text('募集を読み込めませんでした\n$error')),
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('募集を読み込めませんでした'),
+                    const SizedBox(height: 4),
+                    Text(
+                      error is FormatException
+                          ? '応答の形が想定と違います。管理者にお問い合わせください。'
+                          : '$error',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      onPressed: () => ref.invalidate(jobDetailProvider(id)),
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('再読み込み'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
           // 届いた結果が null（見つからない）でも data に来る。null かどうかは _buildJob が見る。
           data: (job) => _buildJob(context, ref, job),
@@ -74,11 +98,8 @@ class JobDetailScreen extends ConsumerWidget {
     // ここから下では job は null でないと Dart が分かっている（上の if で return したため）。
     // これを「型の絞り込み（promotion）」と言う。TypeScript の if (!job) return と同じ。
 
-    // build の中で描く値なので ref.watch。apply() で state が入れ替わると、この画面の build がやり直される。
-    final status = ApplyStatus.of(
-      job,
-      applied: ref.watch(appliedJobsProvider).contains(job.id),
-    );
+    // ボタンの出し分けに使う状態。API の値（my_application・can.apply・remaining）だけで決まる。
+    final status = ApplyStatus.of(job);
 
     return Scaffold(
       appBar: AppBar(title: Text(job.jobTitle)),
@@ -107,21 +128,17 @@ class JobDetailScreen extends ConsumerWidget {
           // FilledButton: 塗りつぶしのボタン（いちばん目立たせたい操作に使う）。
           child: FilledButton(
             // onPressed に null を渡すと、ボタンは押せない見た目（灰色）になる（HTML の disabled）。
-            // 押したら appliedJobsProvider の apply() を呼ぶ。setState は要らない（state が入れ替わると描き直される）。
-            // .notifier: Provider の値（Set<int>）ではなく、Notifier そのもの（AppliedJobs のインスタンス）を取る。
-            // メソッドを呼びたいときはこちら。押した瞬間に 1 回呼ぶだけなので watch ではなく read。
-            // 押せるのは未応募のときだけ。満員は一覧からは入れないが、/jobs/4 を直に開いたとき用。
-            // Step 7 では、押せるかどうかを API の can.apply で決め、最後の判定は API の 422 に任せる。
-            onPressed: status == ApplyStatus.notApplied
-                ? () => ref.read(appliedJobsProvider.notifier).apply(job.id)
-                : null,
-            // switch 式で状態ごとの文言を返す。ApplyStatus の値を 1 つでも書き漏らすとコンパイルエラーになる
-            // （状態を足したときに、文言を決め忘れた所を全部コンパイラが教えてくれる）。
-            // 値の前の . は「ApplyStatus.」の省略（switch の対象の型から分かるので書かなくてよい）。
+            // 応募の送信は T5 で足すので、今はどの状態でも押せない。
+            // 押せるかは API の can.apply（ApplyAvailable）で決め、最後の判定は API の 422 に任せる。
+            onPressed: null,
+            // switch 式で状態ごとの文言を返す。ApplyStatus は sealed なので、子を 1 つでも書き漏らすと
+            // コンパイルエラーになる（状態を足したときに、文言を決め忘れた所を全部コンパイラが教えてくれる）。
+            // 「応募済み」の文言は API の my_application.status.label（応募中・確定など）をそのまま出す。
             child: Text(switch (status) {
-              .notApplied => '応募する',
-              .applied => '応募済み',
-              .full => '満員',
+              ApplyAvailable() => '応募する',
+              ApplyApplied(:final label) => label,
+              ApplyFull() => '満員',
+              ApplyUnavailable() => '応募できません',
             }),
           ),
         ),
