@@ -20,8 +20,8 @@ part 'api_error.g.dart';
 // implements Exception: 「これは例外として投げてよいもの」という印（Java の implements と同じ）。
 // Dart は何でも throw できるが、Exception を実装しておくと、on Exception で受けられる（Error = バグとは分けられる）。
 //
-// @Freezed(toStringOverride: false): freezed は既定で toString（ApiError(statusCode: 422, message: …)）を作るが、
-// 下で自分で書いた toString（message だけを返す）を使いたいので、作らせない。
+// @Freezed(toStringOverride: false): freezed は既定で toString（ApiError(statusCode: 422, message: …)）を作る。
+// 自分で toString を書けば freezed は作らないが、「message だけを返す toString を使う」という意図をはっきりさせるため明示する。
 @Freezed(toStringOverride: false)
 abstract class ApiError with _$ApiError implements Exception {
   // const ApiError._(): 中身のない private のコンストラクタ。freezed のクラスに自分のメソッド（firstErrorOf・toString）を

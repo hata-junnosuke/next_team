@@ -22,6 +22,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../domain/models/apply_status.dart';
 import '../../../domain/models/job_posting.dart';
+import '../../../domain/models/worker_application.dart';
 import '../../../utils/format.dart';
 import '../view_models/apply_mutation.dart';
 import '../view_models/job_detail_provider.dart';
@@ -180,14 +181,16 @@ class JobDetailScreen extends ConsumerWidget {
     WidgetRef ref,
     JobPosting job,
     ApplyStatus status,
-    MutationState<Object?> applying,
+    MutationState<WorkerApplication> applying,
   ) {
     final isSending = applying is MutationPending;
+    // 成功した後も押せなくする（取り直しが届くまで、詳細は前の値の can.apply を見せたままのため）。
+    final isDone = applying is MutationSuccess;
     // FilledButton: 塗りつぶしのボタン（いちばん目立たせたい操作に使う）。
     return FilledButton(
       // onPressed に null を渡すと、ボタンは押せない見た目（灰色）になる（HTML の disabled）。
-      // 送信中も null にして、2 回押しても 1 回しか送らない（applyToJobPosting の中でも確かめている）。
-      onPressed: status is ApplyAvailable && !isSending
+      // 送信中と成功の後も null にして、2 回押しても 1 回しか送らない（applyToJobPosting の中でも確かめている）。
+      onPressed: status is ApplyAvailable && !isSending && !isDone
           ? () => _apply(context, ref, job)
           : null,
       // switch 式で状態ごとの文言を返す。ApplyStatus は sealed なので、子を 1 つでも書き漏らすと

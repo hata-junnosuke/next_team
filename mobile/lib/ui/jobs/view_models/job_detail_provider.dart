@@ -13,7 +13,7 @@ import '../../../domain/models/job_posting.dart';
 part 'job_detail_provider.g.dart';
 
 // id で 1 件。見つからなければ null（API なら 404）。
-// jobListProvider(filter) と同じ引数つきの Provider で、画面からは jobDetailProvider(3) のように読む。
+// jobListProvider(filter, locationId) と同じ引数つきの Provider で、画面からは jobDetailProvider(3) のように読む。
 // id ごとに別の Provider になるので、/jobs/3 と /jobs/5 の結果が混ざらない
 // （issue #35 の T4 の前は、画面の State に Future を持ち、router.dart の key で id ごとに State を作り直していた）。
 //

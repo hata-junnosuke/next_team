@@ -68,7 +68,8 @@ abstract class JobPosting with _$JobPosting {
     // 自分が応募した募集は、中止・締切の後も詳細を開ける（6.11 の GET job-postings/{id}）。
     required LabeledValue status,
     // 自分の応募（なければ null）。JSON では my_application。
-    // 型の後ろの ?: null を許す（TypeScript の MyApplication | null）。null を許した項目は、キーが null でも通る。
+    // 型の後ろの ?: null を許す（TypeScript の MyApplication | null）。null を許した項目は、キーが null でも、キーがなくても通る
+    // （checked: true でもキーの欠けは検出しない。null を許さない項目は、キーが欠けると例外になる）。
     required MyApplication? myApplication,
     // この募集に対して、自分ができること（{apply: true}）。表示の出し分けにだけ使い、最後の判定は API の 422（6.11）。
     required JobPostingCan can,

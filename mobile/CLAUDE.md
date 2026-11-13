@@ -77,11 +77,11 @@ lib/
   config/dependencies.dart  どの実装を使うかを決める Provider（jobRepositoryProvider。Step 6 から apiClientProvider・tokenStorageProvider・authRepositoryProvider）
   utils/                    表示の形（format.dart）
   ui/core/                  共通の Widget（ui/。error_banner など）とテーマ（themes/）
-  ui/<機能>/view_models/    その機能の Riverpod の Provider だけ
+  ui/<機能>/view_models/    その機能の Riverpod の Provider（Step 7 から応募の mutation と送信の関数も）
   ui/<機能>/widgets/        画面と Widget だけ
   domain/models/            モデルと enum（Flutter も Riverpod も import しない。Step 7 から freezed のモデル。import してよいのは freezed_annotation と json_annotation だけ）
   data/repositories/        リポジトリ（Riverpod を import しない。Step 6 からログインの状態を持つ AuthRepository、Step 7 から ApiJobRepository）
   data/services/            ApiClient・AuthInterceptor・TokenStorage・ApiError・device_name（Step 6）
 ```
 
-依存の向き: `routing → widgets → view_models → config → data → domain`（一方通行。widgets は config と data を直接読まない）。`routing` は `redirect` でログインの状態（`authRepositoryProvider`）を読むためだけに `config` も使う（Step 6）。`ui` は `domain` のモデルと `utils` を直接使ってよい。`routing` と `widgets` は `ui/core/ui` も使う。`main.dart` は起動前の検査と復元のために `config` と `data/services`（`apiBaseUrl`）を使う。`view_models` は `on ApiError` のためだけに `data/services/api_error.dart` を import してよい（docs/01 の 7A.1）。`view_models` には Provider のほか、Riverpod の mutation（`Mutation`。Step 7 の応募の送信）も置く
+依存の向き: `routing → widgets → view_models → config → data → domain`（一方通行。widgets は config と data を直接読まない）。`routing` は `redirect` でログインの状態（`authRepositoryProvider`）を読むためだけに `config` も使う（Step 6）。`ui` は `domain` のモデルと `utils` を直接使ってよい。`routing` と `widgets` は `ui/core/ui` も使う。`main.dart` は起動前の検査と復元のために `config` と `data/services`（`apiBaseUrl`）を使う。`view_models` は `on ApiError` のためだけに `data/services/api_error.dart` を import してよい（docs/01 の 7A.1）。`view_models` には Provider のほか、Riverpod の mutation（`Mutation`）と、それを動かす送信の関数も置く（Step 7 の応募の `apply_mutation.dart`）

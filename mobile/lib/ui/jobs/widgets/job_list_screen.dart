@@ -31,13 +31,14 @@ class JobListScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // 選んでいるチップ。変わるとこの build がやり直される。
     final filter = ref.watch(selectedDateFilterProvider);
-    // jobListProvider(filter): 引数つきの Provider（family）。引数ごとに別の Provider として、別々に値を持つ。
-    // チップを「今日」に変えると jobListProvider(DateFilter.today) を読むことになり、まだ値がないので取りに行く
-    // （React の useQuery({ queryKey: ['jobs', filter] }) で、キーが変わると取り直すのと同じ）。
+    // jobListProvider(filter, locationId): 引数つきの Provider（family）。引数の組ごとに別の Provider として、別々に値を持つ。
+    // チップを「今日」に変えると jobListProvider(DateFilter.today, locationId) を読むことになり、まだ値がないので取りに行く
+    // （React の useQuery({ queryKey: ['jobs', filter, locationId] }) で、キーが変わると取り直すのと同じ）。
     // Step 3 では全部を取ってから画面で絞り込んでいたが、今は絞り込みを Provider とリポジトリに任せる。
     // Step 7 から、この条件がそのまま API の date_from / date_to になる。
-    // 選んでいる拠点（null なら「すべての拠点」）。API の location_id になる（Step 7）。
-    final locationId = ref.watch(selectedLocationProvider);
+    // 絞り込みに使う拠点（null なら「すべての拠点」）。API の location_id になる（Step 7）。
+    // 選んだ値そのもの（selectedLocationProvider）ではなく、選択肢にあるかを確かめた値を読む（ドロップダウンの表示とそろえる）。
+    final locationId = ref.watch(activeLocationIdProvider);
     final jobsAsync = ref.watch(jobListProvider(filter, locationId));
 
     // 下タブは外枠（ScaffoldWithNavBar）の Scaffold が持つ。ここの Scaffold は上のバーと本文だけを持つ。
@@ -63,7 +64,7 @@ class JobListScreen extends ConsumerWidget {
                     selected: value == filter,
                     // チップを押したら、選んだものを Provider に入れる。setState は要らない
                     // （Provider の state が変わると、watch しているこの build がやり直される）。
-                    // 押した瞬間に 1 回だけなので read。メソッドを呼ぶので .notifier（詳細の画面の「応募する」と同じ）。
+                    // 押した瞬間に 1 回だけなので read。メソッドを呼ぶので .notifier（拠点のドロップダウンと同じ）。
                     // (_) は「引数を受け取るが使わない」印（ここでは選ばれたかどうかの bool）。
                     onSelected: (_) => ref
                         .read(selectedDateFilterProvider.notifier)
@@ -153,7 +154,7 @@ class JobListScreen extends ConsumerWidget {
   // invalidate は「捨てて」と頼むだけで、取り直しが終わるのは待たない。RefreshIndicator には
   // 「終わったら閉じて」と伝えたいので、.future（作り直した値が届く Future）を返して、届くまで待たせる。
   // ボタンや引っ張る操作の中なので watch ではなく read（詳細の画面の「応募する」と同じ考え方）。
-  // ref.refresh(jobListProvider(filter).future) と書くと、この 2 行を 1 行にできる（invalidate して読む、の短縮）。
+  // ref.refresh(jobListProvider(filter, locationId).future) と書くと、この 2 行を 1 行にできる（invalidate して読む、の短縮）。
   Future<void> _refresh(
     WidgetRef ref,
     DateFilter filter,
@@ -181,21 +182,18 @@ class _LocationDropdown extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final selected = ref.watch(selectedLocationProvider);
     // 選択肢。読み込み中・失敗のときは空にし、「すべての拠点」だけを出す（一覧の表示は止めない）。
     // value: AsyncValue の今のデータ（読み込み中・失敗なら null）。?? は「左が null なら右」（JavaScript の ??）。
     final locations = ref.watch(locationOptionsProvider).value ?? const [];
-    // 選んでいる拠点が選択肢にないとき（読み込み直しで消えたなど）は「すべての拠点」として描く。
-    // DropdownButton は value に当たる項目がちょうど 1 つないと例外になるため。
-    // any: 1 つでも条件に合えば true（JavaScript の some）。
-    final value = locations.any((l) => l.id == selected) ? selected : null;
+    // 選んでいる拠点。選択肢にないときは null（すべての拠点）になっている（activeLocationIdProvider）。
+    // DropdownButton は value に当たる項目がちょうど 1 つないと例外になるので、選択肢にある値だけを渡す。
+    final value = ref.watch(activeLocationIdProvider);
 
     // DropdownButton<int?>: 選ぶ値の型が int?（拠点の id、null は「すべての拠点」）の選択肢（HTML の <select>）。
     return DropdownButton<int?>(
       value: value,
       isExpanded: true,
-      // value が null のときに出す文言。「すべての拠点」の項目（value: null）と同じ文言にする。
-      hint: const Text('すべての拠点'),
+      // value: null の項目が「すべての拠点」。value が null のときは、この項目が選ばれた見た目になる。
       items: [
         const DropdownMenuItem<int?>(value: null, child: Text('すべての拠点')),
         for (final location in locations)

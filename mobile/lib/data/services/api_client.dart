@@ -24,8 +24,6 @@ import 'api_error.dart';
 // https://api.dart.dev/dart-core/String/String.fromEnvironment.html
 const String apiBaseUrl = String.fromEnvironment('API_BASE_URL');
 
-// サーバーに届かなかったとき（接続できない・時間切れ）の文言。API の message がないので、アプリで作る。
-// 業務の判定ではなく「通信の失敗」の表示なので、アプリに置いてよい。
 // API の JSON を、生成した fromJson でモデルに変える（Step 7。docs/01 の 7A.4、issue #48 の Q1）。
 // リポジトリは JobPosting.fromJson(json) を直に呼ばず、parseModel(json, JobPosting.fromJson) と書く。
 // 形が違うと、生成した fromJson は CheckedFromJsonException（build.yaml の checked: true）を投げる。
@@ -47,10 +45,14 @@ T parseModel<T>(Object? json, T Function(Map<String, dynamic> json) fromJson) {
   } on CheckedFromJsonException catch (e) {
     // 例外の文言にはクラス名とキーだけを入れ、値（氏名・メールなど）は入れない（個人情報を例外やログに残さない）。
     // e.message は元の例外の文言で、値が入ることがある（DateTime.parse の失敗など）ので使わない。
-    throw FormatException('${e.className ?? T} の形が違います（キー: ${e.key}）');
+    // className は生成側の private のクラス名（_JobPosting）なので、先頭の _ を外して読みやすくする。
+    final name = (e.className ?? '$T').replaceFirst('_', '');
+    throw FormatException('$name の形が違います（キー: ${e.key}）');
   }
 }
 
+// サーバーに届かなかったとき（接続できない・時間切れ）の文言。API の message がないので、アプリで作る。
+// 業務の判定ではなく「通信の失敗」の表示なので、アプリに置いてよい。
 const String _networkErrorMessage = 'サーバーに接続できません。通信環境を確かめて、もう一度お試しください。';
 
 class ApiClient {

@@ -101,3 +101,44 @@ abstract class _$SelectedLocation extends $Notifier<int?> {
     return element.handleCreate(ref, build);
   }
 }
+
+@ProviderFor(activeLocationId)
+final activeLocationIdProvider = ActiveLocationIdProvider._();
+
+final class ActiveLocationIdProvider
+    extends $FunctionalProvider<int?, int?, int?>
+    with $Provider<int?> {
+  ActiveLocationIdProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'activeLocationIdProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$activeLocationIdHash();
+
+  @$internal
+  @override
+  $ProviderElement<int?> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  int? create(Ref ref) {
+    return activeLocationId(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(int? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<int?>(value),
+    );
+  }
+}
+
+String _$activeLocationIdHash() => r'4767fa46665f526d1ce229919aa0cdc4c0b624f5';

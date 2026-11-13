@@ -20,7 +20,7 @@ part 'job_list_provider.g.dart';
 // AsyncValue = 「読み込み中 / エラー / データ」のどれかを表す値（TanStack Query の isLoading / error / data を 1 つにしたもの）。
 //
 // 引数つきの Provider（family）: 関数に Ref のほかの引数（filter）を足すと、引数ごとに別の Provider になる。
-// 画面からは jobListProvider(DateFilter.today) のように、関数を呼ぶ形で読む。
+// 画面からは jobListProvider(DateFilter.today, null) のように、関数を呼ぶ形で読む。
 // 「すべて」と「今日」は別々に値を持ち、別々に取りに行き、別々に捨てられる
 // （React の useQuery で queryKey: ['jobs', filter] とキーに条件を入れるのと同じ）。
 // 引数は == で同じかを比べるので、enum のように「同じ値なら == が true」のものを渡す。
@@ -29,9 +29,9 @@ part 'job_list_provider.g.dart';
 // いつ作られるか: 画面が初めて ref.watch したとき（それまでは取りに行かない）。
 // いつ作り直されるか:
 // - 中で ref.watch している jobRepositoryProvider が変わったとき（Step 7 で API に差し替えても、ここはそのまま）
-// - ref.invalidate(jobListProvider(filter)) されたとき（issue #33 の T5 の引っ張って更新、T6 の再読み込み）
+// - ref.invalidate(jobListProvider(filter, locationId)) されたとき（issue #33 の T5 の引っ張って更新、T6 の再読み込み）
 // - keepAlive を付けていないので、読む画面がなくなると捨てられ、次に読まれたときに取り直す。
-//   チップを「すべて」から「今日」に変えると、誰も読まなくなった jobListProvider(DateFilter.all) は捨てられる。
+//   チップを「すべて」から「今日」に変えると、誰も読まなくなった jobListProvider(DateFilter.all, locationId) は捨てられる。
 //   だから「すべて」に戻すと、もう一度取りに行く（auto dispose が目に見える所）
 //
 // retry: 失敗したときに自動でやり直すかどうか。Riverpod 3 は既定で、Exception で失敗すると 200ms 後から

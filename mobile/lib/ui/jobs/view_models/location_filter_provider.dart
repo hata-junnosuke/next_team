@@ -33,3 +33,14 @@ class SelectedLocation extends _$SelectedLocation {
     state = locationId;
   }
 }
+
+// 実際に絞り込みに使う拠点の id。選んだ拠点が選択肢にない（読み込み直しで消えた・選択肢を読めなかった）ときは null（すべての拠点）。
+// ドロップダウンの表示と一覧の絞り込みの両方がこれを読むので、「表示はすべての拠点なのに、一覧は前の拠点で絞り込んだまま」がなくなる。
+// 何を持つか: int?。いつ作り直されるか: 選んだ拠点か選択肢が変わったとき（両方を ref.watch しているため）。
+// any: 1 つでも条件に合えば true（JavaScript の some）。
+@riverpod
+int? activeLocationId(Ref ref) {
+  final selected = ref.watch(selectedLocationProvider);
+  final options = ref.watch(locationOptionsProvider).value ?? const [];
+  return options.any((l) => l.id == selected) ? selected : null;
+}
