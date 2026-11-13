@@ -15,11 +15,11 @@ final jobListProvider = JobListFamily._();
 final class JobListProvider
     extends
         $FunctionalProvider<
-          AsyncValue<List<JobPosting>>,
-          List<JobPosting>,
-          FutureOr<List<JobPosting>>
+          AsyncValue<JobPostingPage>,
+          JobPostingPage,
+          FutureOr<JobPostingPage>
         >
-    with $FutureModifier<List<JobPosting>>, $FutureProvider<List<JobPosting>> {
+    with $FutureModifier<JobPostingPage>, $FutureProvider<JobPostingPage> {
   JobListProvider._({
     required JobListFamily super.from,
     required (DateFilter, int?) super.argument,
@@ -43,12 +43,12 @@ final class JobListProvider
 
   @$internal
   @override
-  $FutureProviderElement<List<JobPosting>> $createElement(
+  $FutureProviderElement<JobPostingPage> $createElement(
     $ProviderPointer pointer,
   ) => $FutureProviderElement(pointer);
 
   @override
-  FutureOr<List<JobPosting>> create(Ref ref) {
+  FutureOr<JobPostingPage> create(Ref ref) {
     final argument = this.argument as (DateFilter, int?);
     return jobList(ref, argument.$1, argument.$2);
   }
@@ -64,12 +64,12 @@ final class JobListProvider
   }
 }
 
-String _$jobListHash() => r'281502459ac2eb849b6ef2c06181cb13275c0ef4';
+String _$jobListHash() => r'b3c96a76fe2a3240404948262a54ff525989c359';
 
 final class JobListFamily extends $Family
     with
         $FunctionalFamilyOverride<
-          FutureOr<List<JobPosting>>,
+          FutureOr<JobPostingPage>,
           (DateFilter, int?)
         > {
   JobListFamily._()

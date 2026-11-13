@@ -14,6 +14,7 @@
 // - POST /api/worker/job-postings/{id}/applications                 応募（本文は空。201 で自分の応募）
 
 import '../../domain/models/job_posting.dart';
+import '../../domain/models/job_posting_page.dart';
 import '../../domain/models/worker_application.dart';
 import '../services/api_client.dart';
 import '../services/api_error.dart';
@@ -30,7 +31,7 @@ class ApiJobRepository implements JobRepository {
   static const int _perPage = 100;
 
   @override
-  Future<List<JobPosting>> fetchJobPostings({
+  Future<JobPostingPage> fetchJobPostings({
     DateTime? from,
     DateTime? to,
     int? locationId,
@@ -48,14 +49,10 @@ class ApiJobRepository implements JobRepository {
         'location_id': ?locationId,
       },
     );
-    // 一覧の応答は {"data": [...], "meta": {...}, "links": {...}}（6.1）。data の配列を 1 件ずつモデルにする。
+    // 一覧の応答は {"data": [...], "meta": {...}, "links": {...}}（6.1）。data と meta を JobPostingPage にまとめて型にする
+    // （T10。T3〜T9 は data の配列だけを 1 件ずつ JobPosting にしていた）。
     // 並び（勤務日 → 開始時刻 → id）は API が決めるので、アプリで並べ替えない。
-    final data = switch (body) {
-      {'data': final List<dynamic> data} => data,
-      _ => throw const FormatException('募集の一覧の応答に data の配列がありません'),
-    };
-    // [for (...) 式]: 配列を作りながら 1 件ずつ変換する（collection for。JavaScript の data.map(...)）。
-    return [for (final item in data) parseModel(item, JobPosting.fromJson)];
+    return parseModel(body, JobPostingPage.fromJson);
   }
 
   @override
@@ -66,6 +63,7 @@ class ApiJobRepository implements JobRepository {
       {'data': final List<dynamic> data} => data,
       _ => throw const FormatException('拠点の一覧の応答に data の配列がありません'),
     };
+    // [for (...) 式]: 配列を作りながら 1 件ずつ変換する（collection for。JavaScript の data.map(...)）。
     return [for (final item in data) parseModel(item, JobLocation.fromJson)];
   }
 

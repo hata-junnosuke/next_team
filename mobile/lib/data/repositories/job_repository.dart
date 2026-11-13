@@ -9,6 +9,7 @@
 // クラスの修飾子（interface など）: https://dart.dev/language/class-modifiers
 
 import '../../domain/models/job_posting.dart';
+import '../../domain/models/job_posting_page.dart';
 import '../../domain/models/worker_application.dart';
 
 // abstract interface class = 「このメソッドを持つこと」という約束だけを書いた型（TypeScript の interface）。
@@ -22,7 +23,8 @@ abstract interface class JobRepository {
   // {DateTime? from, DateTime? to}: { } で囲んだ引数は「名前付き引数」で、呼ぶ側は fetchJobPostings(from: …, to: …)
   // と名前を書く（TypeScript で引数を 1 つのオブジェクト { from, to } にするのに近い）。省略すると null になる。
   // locationId を渡すと、その拠点の募集だけを返す（API の location_id。Step 7）。null なら絞り込まない。
-  Future<List<JobPosting>> fetchJobPostings({
+  // 返すのは 1 ページ目（件数の上限あり）と、全件数（meta.total）。入りきらなかった件数は JobPostingPage.hiddenCount。
+  Future<JobPostingPage> fetchJobPostings({
     DateTime? from,
     DateTime? to,
     int? locationId,

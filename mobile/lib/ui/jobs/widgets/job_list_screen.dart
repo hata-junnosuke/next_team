@@ -94,11 +94,14 @@ class JobListScreen extends ConsumerWidget {
                 onRetry: () =>
                     ref.invalidate(jobListProvider(filter, locationId)),
               ),
-              // 届いたとき。jobs は List<JobPosting>（null ではない）。絞り込み済み。
+              // 届いたとき。page は 1 ページ目（JobPostingPage）。jobs はその募集（絞り込み済み）。
               // 引っ張って更新している間は、loading ではなく data のまま（前の一覧を出したまま）になる。
               // when は既定で「取り直し中は前の値を見せる」ので、一覧が一瞬消えてくるくるに替わることはない。
               // 取り直し中の印は、RefreshIndicator が上に出すくるくるだけ。
-              data: (jobs) {
+              data: (page) {
+                final jobs = page.data;
+                // 入りきらなかった件数（T10。issue #48 の Q3）。1 以上なら、一覧の最後に絞り込みを促す文言を足す。
+                final hiddenCount = page.hiddenCount;
                 // RefreshIndicator: 中のリストを下に引っ張ると、上にくるくるを出して onRefresh を呼ぶ。
                 // onRefresh が返す Future が終わるまでくるくるを出し続け、終わったら閉じる。
                 return RefreshIndicator(
@@ -121,9 +124,17 @@ class JobListScreen extends ConsumerWidget {
                       : ListView.builder(
                           physics: const AlwaysScrollableScrollPhysics(),
                           padding: const EdgeInsets.all(8),
-                          itemCount: jobs.length,
-                          itemBuilder: (context, index) =>
-                              JobListTile(job: jobs[index]),
+                          // 入りきらなかったときは、最後に 1 行（文言）を足すので、行の数を 1 つ増やす。
+                          itemCount: jobs.length + (hiddenCount > 0 ? 1 : 0),
+                          itemBuilder: (context, index) => index < jobs.length
+                              ? JobListTile(job: jobs[index])
+                              : Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Text(
+                                    'ほかに $hiddenCount 件あります。日付や拠点で絞り込んでください。',
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
                         ),
                 );
               },

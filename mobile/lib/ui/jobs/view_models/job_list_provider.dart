@@ -11,12 +11,12 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../config/dependencies.dart';
 import '../../../domain/models/date_filter.dart';
-import '../../../domain/models/job_posting.dart';
+import '../../../domain/models/job_posting_page.dart';
 
 part 'job_list_provider.g.dart';
 
 // 日付のチップで絞り込んだ募集の一覧。
-// Future を返す関数に @riverpod を付けると、画面から読んだ値は AsyncValue<List<JobPosting>> になる。
+// Future を返す関数に @riverpod を付けると、画面から読んだ値は AsyncValue<JobPostingPage> になる（T10 までは AsyncValue<List<JobPosting>>）。
 // AsyncValue = 「読み込み中 / エラー / データ」のどれかを表す値（TanStack Query の isLoading / error / data を 1 つにしたもの）。
 //
 // 引数つきの Provider（family）: 関数に Ref のほかの引数（filter）を足すと、引数ごとに別の Provider になる。
@@ -43,7 +43,8 @@ part 'job_list_provider.g.dart';
 // Step 7 で拠点（locationId。null なら「すべての拠点」）も引数に足した。引数が 2 つでも family は同じで、
 // (日付のチップ, 拠点) の組ごとに別の値を持つ（useQuery の queryKey: ['jobs', filter, locationId]）。
 // 応募の後に ref.invalidate(jobListProvider) と引数なしで捨てると、どの組も全部捨てる（apply_mutation.dart）。
-Future<List<JobPosting>> jobList(Ref ref, DateFilter filter, int? locationId) {
+// 値は 1 ページ目（JobPostingPage）。画面は data を並べ、hiddenCount が 1 以上なら絞り込みを促す（T10）。
+Future<JobPostingPage> jobList(Ref ref, DateFilter filter, int? locationId) {
   // ref.watch: ほかの Provider の値を読み、それが変わったらこの Provider も作り直す（React の useEffect の依存配列に近い）。
   final repository = ref.watch(jobRepositoryProvider);
   // チップを日付の範囲（から・まで）に変える。「すべて」なら null で、絞り込まない。
