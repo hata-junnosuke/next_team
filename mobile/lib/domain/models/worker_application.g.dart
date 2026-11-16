@@ -47,6 +47,10 @@ _WorkerApplication _$WorkerApplicationFromJson(Map<String, dynamic> json) =>
             'cancelled_at',
             (v) => v == null ? null : DateTime.parse(v as String),
           ),
+          can: $checkedConvert(
+            'can',
+            (v) => WorkerApplicationCan.fromJson(v as Map<String, dynamic>),
+          ),
         );
         return val;
       },
@@ -90,3 +94,12 @@ _ApplicationJobPosting _$ApplicationJobPostingFromJson(
     'endTime': 'end_time',
   },
 );
+
+_WorkerApplicationCan _$WorkerApplicationCanFromJson(
+  Map<String, dynamic> json,
+) => $checkedCreate('_WorkerApplicationCan', json, ($checkedConvert) {
+  final val = _WorkerApplicationCan(
+    withdraw: $checkedConvert('withdraw', (v) => v as bool),
+  );
+  return val;
+});

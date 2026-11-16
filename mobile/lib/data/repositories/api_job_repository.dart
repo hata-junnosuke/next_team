@@ -12,9 +12,11 @@
 // - GET /api/worker/job-postings/{id}                                1 件（ほかは 404）
 // - GET /api/worker/locations                                       拠点の一覧（ページなし。絞り込みの選択肢）
 // - POST /api/worker/job-postings/{id}/applications                 応募（本文は空。201 で自分の応募）
+// - GET /api/worker/applications?status=&per_page=100                自分の応募の一覧（Step 8。よてい）
 
 import '../../domain/models/job_posting.dart';
 import '../../domain/models/job_posting_page.dart';
+import '../../domain/models/schedule_tab.dart';
 import '../../domain/models/worker_application.dart';
 import '../services/api_client.dart';
 import '../services/api_error.dart';
@@ -102,6 +104,22 @@ class ApiJobRepository implements JobRepository {
       ),
       _ => throw const FormatException('応募の応答に data がありません'),
     };
+  }
+
+  @override
+  Future<List<WorkerApplication>> fetchMyApplications(ScheduleTab tab) async {
+    // 作りは fetchJobPostings と同じ（クエリを付けて GET し、parseModel で型にする）。
+    // status にタブの値（confirmed / applied）を送り、絞り込みは API に任せる。
+    final body = await _apiClient.get(
+      '/api/worker/applications',
+      query: {'status': tab.status, 'per_page': _perPage},
+    );
+    // 一覧の応答は {"data": [...], "meta": {...}, "links": {...}}（6.1）。ここでは data だけを使う。
+    final data = switch (body) {
+      {'data': final List<dynamic> data} => data,
+      _ => throw const FormatException('応募の一覧の応答に data の配列がありません'),
+    };
+    return [for (final item in data) parseModel(item, WorkerApplication.fromJson)];
   }
 
   // DateTime を API の日付の形 "2026-09-20"（6.1）にする。
