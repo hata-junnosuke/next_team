@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Worker\Concerns\ResolvesWorker;
 use App\Http\Requests\Worker\IndexApplicationRequest;
 use App\Http\Resources\Worker\WorkerApplicationResource;
+use App\Models\Application;
 use App\Models\JobPosting;
 use App\Services\ApplicationService;
 use App\Services\WorkerPortalService;
@@ -14,8 +15,9 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 /**
- * ワーカー本人の応募と、自分の応募の一覧（F-32・F-33。docs/01 の 6.11）。
- * 他社・存在しない募集の ID はルートモデルバインディング（グローバルスコープ）で 404 になる。応募の可否は ApplicationService::applyAsWorker() の 422。
+ * ワーカー本人の応募と、自分の応募の一覧と取り下げ（F-32・F-33・F-34。docs/01 の 6.11）。
+ * 他社・存在しない募集・応募の ID はルートモデルバインディング（グローバルスコープ）で 404 になる。
+ * 応募の可否は ApplicationService::applyAsWorker()、取り下げの可否と持ち主の確認は withdrawAsWorker() が決める（422 / 404）。
  */
 class ApplicationController extends Controller
 {
@@ -41,5 +43,15 @@ class ApplicationController extends Controller
         return (new WorkerApplicationResource($application->load('jobPosting.location')))
             ->response()
             ->setStatusCode(201);
+    }
+
+    /**
+     * POST /api/worker/applications/{application}/withdraw（入力なし）→ 200
+     */
+    public function withdraw(Request $request, Application $application, ApplicationService $service): WorkerApplicationResource
+    {
+        $application = $service->withdrawAsWorker($application, $this->worker($request));
+
+        return new WorkerApplicationResource($application->load('jobPosting.location'));
     }
 }

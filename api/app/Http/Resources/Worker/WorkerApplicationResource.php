@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Worker;
 
+use App\Enums\ApplicationStatus;
 use App\Models\Application;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -9,9 +10,11 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /**
  * ワーカーアプリに返す自分の応募（docs/01 の 6.11 の WorkerApplicationResource。F-32 の応答と F-33 の一覧で共有）:
  * {id, job_posting: {id, job_title, work_date, start_time, end_time, location: {id, name}}, status: {value, label},
- *  applied_at, confirmed_at, confirmed_hourly_wage, confirmed_transport_allowance, cancel_reason: {value, label} | null, cancelled_at}
+ *  applied_at, confirmed_at, confirmed_hourly_wage, confirmed_transport_allowance, cancel_reason: {value, label} | null, cancelled_at,
+ *  can: {withdraw}}
  *
- * applied_at は応募の created_at。勤怠・報酬・ワーカーの氏名・管理者向けの can は返さない（管理者用の ApplicationResource と別にしている理由）。
+ * applied_at は応募の created_at。勤怠・報酬・ワーカーの氏名・管理者向けの can（confirm など）は返さない（管理者用の ApplicationResource と別にしている理由）。
+ * can.withdraw は「状態として取り下げられるか」だけ（判定の正は遷移表。F-34 の取り下げのボタンの出し分けに使う）。
  * 呼び出し側が jobPosting.location を読み込んでから渡す。
  *
  * @mixin Application
@@ -45,6 +48,9 @@ class WorkerApplicationResource extends JsonResource
                 ? null
                 : ['value' => $this->cancel_reason->value, 'label' => $this->cancel_reason->label()],
             'cancelled_at' => $this->cancelled_at?->toIso8601String(),
+            'can' => [
+                'withdraw' => $this->status->canTransitionTo(ApplicationStatus::Withdrawn),
+            ],
         ];
     }
 }

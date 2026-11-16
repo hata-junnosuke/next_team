@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ApplicationStatus;
+use App\Models\Application;
 use App\Models\Attendance;
 use App\Models\Company;
 use App\Models\JobPosting;
@@ -135,6 +137,7 @@ class RouteMiddlewareTest extends TestCase
             'GET api/worker/job-postings', 'GET api/worker/job-postings/{job_posting}',
             'POST api/worker/job-postings/{job_posting}/applications',
             'GET api/worker/locations', 'GET api/worker/applications',
+            'POST api/worker/applications/{application}/withdraw',
         ];
 
         $registered = collect(Route::getRoutes()->getRoutes())
@@ -252,6 +255,7 @@ class RouteMiddlewareTest extends TestCase
         return [
             ['GET', '/api/worker/job-postings/{job_posting}'],
             ['POST', '/api/worker/job-postings/{job_posting}/applications'],
+            ['POST', '/api/worker/applications/{application}/withdraw'],
         ];
     }
 
@@ -262,19 +266,25 @@ class RouteMiddlewareTest extends TestCase
     public function test_ワーカーのidを持つ全ルートで他社のidは404(): void
     {
         $other = Company::factory()->create();
-        $otherPosting = CurrentCompany::runAs($other->id, fn () => JobPosting::factory()->create());
+        // 他社の募集（応募のない募集）と、他社の別の募集への応募中の応募
+        [$otherPosting, $otherApplication] = CurrentCompany::runAs($other->id, fn () => [
+            JobPosting::factory()->create(),
+            Application::factory()->create(),
+        ]);
         $token = $this->workerToken(Worker::factory()->registered()->create());
         Context::forget('company_id');
 
         foreach (self::workerBoundRoutes() as [$method, $uri]) {
             $this->withToken($token)
-                ->json($method, self::fill($uri, ['job_posting' => $otherPosting->id]))
+                ->json($method, self::fill($uri, ['job_posting' => $otherPosting->id, 'application' => $otherApplication->id]))
                 ->assertNotFound()
                 ->assertExactJson(['message' => '見つかりませんでした。', 'errors' => []]);
             $this->forgetAuthenticatedUsers();
         }
 
-        $this->assertDatabaseCount('applications', 0);
+        // 他社の募集に応募は作られず、他社の応募の状態も変わらない（行は他社の応募の 1 件だけ）
+        $this->assertDatabaseCount('applications', 1);
+        $this->assertDatabaseHas('applications', ['id' => $otherApplication->id, 'status' => ApplicationStatus::Applied->value]);
     }
 
     public function test_ワーカーのidを持つ全ルートで存在しないidは404(): void
@@ -283,7 +293,7 @@ class RouteMiddlewareTest extends TestCase
         Context::forget('company_id');
 
         foreach (self::workerBoundRoutes() as [$method, $uri]) {
-            $this->withToken($token)->json($method, self::fill($uri, ['job_posting' => 999999]))->assertNotFound();
+            $this->withToken($token)->json($method, self::fill($uri, ['job_posting' => 999999, 'application' => 999999]))->assertNotFound();
             $this->forgetAuthenticatedUsers();
         }
     }

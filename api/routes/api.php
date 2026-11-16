@@ -91,7 +91,7 @@ Route::get('/report-exports/{report_export}/download', [ReportExportController::
     ->name('report-exports.download');
 
 /*
- * ワーカー用 API（F-26〜F-33。ワーカーアプリ mobile/ とだけ結ぶ契約。docs/01 の 5.3・6.11）。
+ * ワーカー用 API（F-26〜F-34。ワーカーアプリ mobile/ とだけ結ぶ契約。docs/01 の 5.3・6.11）。
  * 認証は Sanctum の API トークン（Bearer）で、管理者の Cookie とは guard を分ける（auth:worker）。
  * worker ミドルウェアがワーカーであること・有効であることを確かめ、ワーカーの企業を CurrentCompany に入れる。
  * 例外は認証の外の register と login だけで、総当たりに備えて throttle（AppServiceProvider の RateLimiter::for）を付ける。
@@ -122,5 +122,9 @@ Route::prefix('worker')->name('worker.')->group(function () {
 
         // F-33 自分の応募の一覧
         Route::get('/applications', [WorkerApplicationController::class, 'index'])->name('applications.index');
+
+        // F-34 自分の応募の取り下げ。他社の応募はバインディング（グローバルスコープ）、ほかのワーカーの応募はサービスで 404
+        Route::post('/applications/{application}/withdraw', [WorkerApplicationController::class, 'withdraw'])
+            ->name('applications.withdraw');
     });
 });

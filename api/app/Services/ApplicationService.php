@@ -15,6 +15,7 @@ use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 
@@ -162,6 +163,30 @@ class ApplicationService
                 'cancel_reason' => $reason,
                 'cancelled_at' => CarbonImmutable::now(),
             ]);
+
+            return $application;
+        });
+    }
+
+    /**
+     * ワーカー本人の取り下げ（F-34。docs/01 の 4.5・6.11）。応募中だけを取り下げにする。期限はない
+     * （締切・中止の募集や、勤務日が過ぎた募集の応募中も取り下げられる）。付随する列はない。
+     * 他社の応募はルートモデルバインディング（グローバルスコープ）で先に 404。同じ企業のほかのワーカーの応募は、
+     * ロックして読み直した後に持ち主を確かめて 404 にする（ほかのワーカーの応募の有無を明かさない。docs/01 の 12 章。Policy は作らない）。
+     */
+    public function withdrawAsWorker(Application $application, Worker $worker): Application
+    {
+        return DB::transaction(function () use ($application, $worker) {
+            $locked = self::lockFresh($application);
+
+            // is() は外部キーの値と相手の主キーを比べるだけでクエリを出さない（PDO が返す ID の型にも頼らない）
+            if (! $locked->worker()->is($worker)) {
+                // WorkerPortalService::findPosting() と同じ形。例外ハンドラが「見つかりませんでした。」の 404 にする
+                throw (new ModelNotFoundException)->setModel(Application::class, [$application->id]);
+            }
+
+            $this->assertCanTransition($locked, ApplicationStatus::Withdrawn);
+            $application->transitionTo(ApplicationStatus::Withdrawn);
 
             return $application;
         });

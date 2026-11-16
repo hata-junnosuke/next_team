@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ApplicationStatus;
 use App\Exceptions\DomainException;
+use App\Models\Application;
 use App\Models\Company;
 use App\Models\JobPosting;
 use App\Models\Worker;
@@ -309,25 +311,33 @@ class WorkerAuthTest extends TestCase
     {
         // 5.3 の「入れないことの確認」の 2 行目（register・login 以外の /api/worker/*）。13 章の 9
         $posting = JobPosting::factory()->create();
+        // 取り下げ（F-34）のルートに渡す、自社の応募中の応募（別の募集に作る）
+        $application = Application::factory()->create();
         Context::forget('company_id');
 
         foreach (self::protectedWorkerRoutes() as [$method, $uri]) {
             $this->actingAsAdmin()
-                ->json($method, str_replace('{job_posting}', (string) $posting->id, $uri))
+                ->json($method, self::fillWorkerRoute($uri, $posting, $application))
                 ->assertUnauthorized();
         }
+
+        // 管理者は取り下げられない（docs/01 の 4.1）。応募の状態は変わらない
+        $this->assertDatabaseHas('applications', ['id' => $application->id, 'status' => ApplicationStatus::Applied->value]);
     }
 
     public function test_トークンなしではワーカーのapiのどのルートにも入れない(): void
     {
         $posting = JobPosting::factory()->create();
+        $application = Application::factory()->create();
         Context::forget('company_id');
 
         foreach (self::protectedWorkerRoutes() as [$method, $uri]) {
-            $this->json($method, str_replace('{job_posting}', (string) $posting->id, $uri))
+            $this->json($method, self::fillWorkerRoute($uri, $posting, $application))
                 ->assertUnauthorized()
                 ->assertExactJson(['message' => 'Unauthenticated.']);
         }
+
+        $this->assertDatabaseHas('applications', ['id' => $application->id, 'status' => ApplicationStatus::Applied->value]);
     }
 
     public function test_無効にされたワーカーのトークンはワーカーのapiのどのルートにも入れない(): void
@@ -337,18 +347,21 @@ class WorkerAuthTest extends TestCase
         $token = $this->workerToken($worker);
         $worker->update(['is_active' => false]);
         $posting = JobPosting::factory()->create();
+        // 取り下げ（F-34）のルートに渡す、このワーカー本人の応募中の応募（$posting とは別の募集）
+        $application = Application::factory()->create(['worker_id' => $worker->id]);
         Context::forget('company_id');
 
         foreach (self::protectedWorkerRoutes() as [$method, $uri]) {
             $this->withToken($token)
-                ->json($method, str_replace('{job_posting}', (string) $posting->id, $uri))
+                ->json($method, self::fillWorkerRoute($uri, $posting, $application))
                 ->assertUnauthorized()
                 ->assertExactJson(['message' => self::DISABLED_MESSAGE, 'errors' => []]);
             $this->forgetAuthenticatedUsers();
         }
 
-        // 401 で止まりコントローラまで届かない: 応募は作られず、ログアウトでもトークンは消えない
-        $this->assertDatabaseCount('applications', 0);
+        // 401 で止まりコントローラまで届かない: 応募は作られず（行は用意した 1 件だけ）、取り下げにもならず、ログアウトでもトークンは消えない
+        $this->assertDatabaseCount('applications', 1);
+        $this->assertDatabaseHas('applications', ['id' => $application->id, 'status' => ApplicationStatus::Applied->value]);
         $this->assertSame(1, $worker->tokens()->count());
     }
 
@@ -1337,7 +1350,20 @@ class WorkerAuthTest extends TestCase
             ['GET', '/api/worker/job-postings'], ['GET', '/api/worker/job-postings/{job_posting}'],
             ['POST', '/api/worker/job-postings/{job_posting}/applications'],
             ['GET', '/api/worker/locations'], ['GET', '/api/worker/applications'],
+            ['POST', '/api/worker/applications/{application}/withdraw'],
         ];
+    }
+
+    /**
+     * protectedWorkerRoutes() の {job_posting} と {application} を、用意した募集と応募の ID で埋める
+     */
+    private static function fillWorkerRoute(string $uri, JobPosting $posting, Application $application): string
+    {
+        return str_replace(
+            ['{job_posting}', '{application}'],
+            [(string) $posting->id, (string) $application->id],
+            $uri,
+        );
     }
 
     /**

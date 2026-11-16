@@ -695,7 +695,7 @@ sequenceDiagram
 | `GET job-postings/{id}` | 404（他社・存在しない・条件を満たさない募集） |
 | `POST job-postings/{id}/applications` | 404（他社・存在しない募集）、422（4.5 の `applyAsWorker()` の 5 つと、ミドルウェアの後に無効にされたとき） |
 | `GET applications` | 422（`status` が Enum にない値） |
-| `POST applications/{id}/withdraw` | 404（他社・存在しない応募と、同じ企業のほかのワーカーの応募。Policy は作らない。12 章）、422（4.5 の `withdrawAsWorker()` の 2 つ。`errors` は空）。ミドルウェアの後に無効にされたワーカーは 401（5.3） |
+| `POST applications/{id}/withdraw` | 404（他社・存在しない応募と、同じ企業のほかのワーカーの応募。Policy は作らない。12 章）、422（4.5 の `withdrawAsWorker()` の 2 つ。`errors` は空）。無効にされたワーカーは `worker` ミドルウェアで 401（5.3）。ミドルウェアを通った直後に無効にされたときは、応募（`applyAsWorker()`）と違って取り下げを止めない（本人が自分の応募中を取り消すだけで、定員や確定を増やさないため） |
 
 `WorkerMeResource`: `{id, name, email, company: {id, name, code}}`（`email` は小文字で保存したメール。アプリは `company.code` を覚えておき、次のログインの入力欄に入れておく）
 
@@ -1065,7 +1065,7 @@ api は直列（T2 → T3 → T4）。T3 の後は api の T4・web の T5・mob
 
 | 担当 | 所有ファイル |
 |---|---|
-| api（`implementer-api`） | `app/Enums/ApplicationStatus.php`、`app/Models/Application.php`（遷移の付随列の `match` とコメントだけ）、`app/Services/ApplicationService.php`（遷移の判定と `withdrawAsWorker()`）、`database/factories/ApplicationFactory.php`（`withdrawn()`）、`database/seeders/DatabaseSeeder.php`（画面の確認用に、取り下げた応募を 1 件。T2）、`tests/Feature/DomainFoundationTest.php`（遷移の総当たりを 25 組に。T2）、`routes/api.php`（ワーカーのグループに 1 行）、`app/Http/Controllers/Worker/ApplicationController.php`、`app/Http/Resources/Worker/WorkerApplicationResource.php`、`tests/Unit/ApplicationStatusTest.php`、`tests/Feature/{ApplicationTest,WorkerApplicationTest,WorkerJobPostingTest,RouteMiddlewareTest,WorkerAcceptanceScenarioTest}.php` |
+| api（`implementer-api`） | `app/Enums/ApplicationStatus.php`、`app/Models/Application.php`（遷移の付随列の `match` とコメントだけ）、`app/Services/ApplicationService.php`（遷移の判定と `withdrawAsWorker()`）、`database/factories/ApplicationFactory.php`（`withdrawn()`）、`database/seeders/DatabaseSeeder.php`（画面の確認用に、取り下げた応募を 1 件。T2）、`tests/Feature/DomainFoundationTest.php`（遷移の総当たりを 25 組に。T2）、`routes/api.php`（ワーカーのグループに 1 行）、`app/Http/Controllers/Worker/ApplicationController.php`、`app/Http/Resources/Worker/WorkerApplicationResource.php`、`tests/Unit/ApplicationStatusTest.php`、`tests/Feature/{ApplicationTest,WorkerApplicationTest,WorkerJobPostingTest,RouteMiddlewareTest,WorkerAuthTest,WorkerAcceptanceScenarioTest}.php`（`WorkerAuthTest` は 5.3 の「入れないことの確認」の手書きのルートの一覧に取り下げを足す。T3） |
 | web（`implementer-web`） | `lib/status.ts`（応募の状態の色に `withdrawn` を足すだけ） |
 | mobile（リード） | `lib/data/repositories/{job_repository,api_job_repository}.dart`、`lib/domain/models/worker_application.dart` と生成物、`lib/domain/models/schedule_tab.dart`、`lib/ui/schedule/view_models/{my_applications_provider,withdraw_mutation}.dart` と生成物、`lib/ui/schedule/widgets/{schedule_screen,schedule_list_tile,withdraw_confirm_dialog}.dart`、`lib/ui/jobs/view_models/apply_mutation.dart` |
 
