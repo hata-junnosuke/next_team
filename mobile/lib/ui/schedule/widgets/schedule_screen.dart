@@ -1,5 +1,5 @@
 // よてい タブの画面。パスは /schedule。
-// 自分の応募のうち、確定した予定を勤務日の順に並べる（Step 8）。
+// 自分の応募を「確定」「応募中」の 2 つのタブに分け、勤務日の順に並べる（Step 8）。
 // Next.js で言うと app/schedule/page.tsx に当たる。
 // 作りは さがす の一覧（job_list_screen.dart）と同じ: Provider を watch → when で 3 つの状態を描き分け →
 // 引っ張って更新（RefreshIndicator）と、失敗したときの「再読み込み」。
@@ -15,16 +15,42 @@ import '../../core/ui/error_banner.dart';
 import '../view_models/my_applications_provider.dart';
 import 'schedule_list_tile.dart';
 
-// 外枠（見出しと本文）だけを描く。Provider を読むのは中の _ScheduleList なので、ここは StatelessWidget でよい。
+// 外枠（見出し・タブ・本文）だけを描く。Provider を読むのは中の _ScheduleList なので、ここは StatelessWidget でよい。
+// 「どのタブを選んでいるか」は DefaultTabController が持つので、この画面は State を持たなくてよい。
+//
+// タブの 3 点セット（T8。この機能で新しく出る概念はこれだけ）:
+// - DefaultTabController: 選んでいるタブの番号を持ち、下の TabBar と TabBarView に配る係
+//   （React で言うと、const [tab, setTab] = useState(0) を Context で子に配る Provider コンポーネント）
+// - TabBar: 上に並ぶタブの見出し。押すと選ぶタブが変わる
+// - TabBarView: タブごとの中身。左右にスワイプしても切り替わり、TabBar と連動する
+// 3 つを同じ数（length）でそろえる。ScheduleTab.values の並びをそのまま使うので、ずれない。
+// タブの作例: https://docs.flutter.dev/cookbook/design/tabs
+// TabBar: https://api.flutter.dev/flutter/material/TabBar-class.html
 class ScheduleScreen extends StatelessWidget {
   const ScheduleScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('よてい')),
-      // 今は確定のタブだけを出す。
-      body: const _ScheduleList(tab: ScheduleTab.confirmed),
+    return DefaultTabController(
+      length: ScheduleTab.values.length,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('よてい'),
+          // AppBar の bottom に置くと、見出しのすぐ下にタブが並ぶ。
+          bottom: TabBar(
+            tabs: [
+              for (final tab in ScheduleTab.values) Tab(text: tab.label),
+            ],
+          ),
+        ),
+        // タブごとに、そのタブの一覧（myApplicationsProvider(tab)）を読む。
+        // 「応募中」は初めて開いたときに取りに行く（Provider は watch されて初めて作られる）。
+        body: TabBarView(
+          children: [
+            for (final tab in ScheduleTab.values) _ScheduleList(tab: tab),
+          ],
+        ),
+      ),
     );
   }
 }
