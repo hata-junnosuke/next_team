@@ -9,10 +9,11 @@ description: myteam の業務ルールの正（状態遷移表、定員チェッ
 
 ## 応募の状態遷移（F-14）
 ```
-応募中(applied) → 確定(confirmed) / 却下(rejected)
+応募中(applied) → 確定(confirmed) / 却下(rejected) / 取り下げ(withdrawn)
 確定(confirmed) → キャンセル(cancelled)
-却下・キャンセル → （終端。再承認不可）
+却下・キャンセル・取り下げ → （終端。再承認不可）
 ```
+- 取り下げ（F-34。ワーカー Step 8）はワーカー本人だけが、応募中のときだけ行える（`ApplicationService::withdrawAsWorker()`）。管理者の API に取り下げの操作はない。期限はない。付随する列はない。取り下げた募集には再応募できない（二重応募と同じ）
 - 遷移表は `App\Enums\ApplicationStatus::canTransitionTo()` の **1 箇所**
 - `status` を変える唯一の入口は `Application::transitionTo()`。呼ぶのはサービスだけ
 - `#[Fillable]` に `status` を入れない。モデルの `$attributes` で既定値 `applied` を持つ

@@ -54,6 +54,14 @@ class ApplicationFactory extends Factory
     }
 
     /**
+     * 取り下げ（F-34）。ワーカーが応募中から取り下げた形。付随する列はない
+     */
+    public function withdrawn(): static
+    {
+        return $this->state(['status' => ApplicationStatus::Withdrawn]);
+    }
+
+    /**
      * キャンセル（F-13）。確定の後にキャンセルされた形（確定時の値と理由区分・日時が入る）。
      * 募集の中止による自動キャンセルは cancelled(CancelReason::Company)
      */

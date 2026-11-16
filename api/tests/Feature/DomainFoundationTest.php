@@ -357,13 +357,13 @@ class DomainFoundationTest extends TestCase
     // ---- 以下 tester 追加（テスト補強） ----
 
     /**
-     * 応募の 16 組を DB 越しに確かめる。許可される組だけ書き、それ以外は DomainException で保存されないこと
+     * 応募の 25 組（5 × 5）を DB 越しに確かめる。許可される組だけ書き、それ以外は DomainException で保存されないこと
      *
      * @return iterable<string, array{ApplicationStatus, ApplicationStatus, bool}>
      */
     public static function applicationPairs(): iterable
     {
-        $allowed = ['applied>confirmed', 'applied>rejected', 'confirmed>cancelled'];
+        $allowed = ['applied>confirmed', 'applied>rejected', 'applied>withdrawn', 'confirmed>cancelled'];
         foreach (ApplicationStatus::cases() as $from) {
             foreach (ApplicationStatus::cases() as $to) {
                 $key = "{$from->value}>{$to->value}";
@@ -373,7 +373,7 @@ class DomainFoundationTest extends TestCase
     }
 
     #[DataProvider('applicationPairs')]
-    public function test_応募のtransition_toは全16組で遷移表どおりに保存または拒否する(ApplicationStatus $from, ApplicationStatus $to, bool $allowed): void
+    public function test_応募のtransition_toは全25組で遷移表どおりに保存または拒否する(ApplicationStatus $from, ApplicationStatus $to, bool $allowed): void
     {
         $application = Application::factory()->create(['status' => $from]);
         // 差し戻し 3: 確定・キャンセルへの遷移は付随する列が必須になったので、契約どおりの列を渡す

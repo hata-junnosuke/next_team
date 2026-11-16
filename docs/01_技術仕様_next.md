@@ -576,7 +576,7 @@ sequenceDiagram
 
 `JobPostingResource`: `{id, location: {id, name}, job_title, work_date, start_time, end_time, capacity, hourly_wage, transport_allowance, status: {value, label}, applications_count, confirmed_count, can: {edit, close, cancel, apply}}`
 
-`applications_count` は却下・キャンセルを含む全件の応募数、`confirmed_count` は確定の数（P2-03 で決定）。`can.edit` は中止以外、`can.apply` は募集中のときだけ（`JobPostingStatus::isEditable()` / `acceptsApplications()` の 1 箇所）。
+`applications_count` は却下・キャンセル・取り下げ（ワーカー Step 8）を含む全件の応募数、`confirmed_count` は確定の数（P2-03 で決定）。`can.edit` は中止以外、`can.apply` は募集中のときだけ（`JobPostingStatus::isEditable()` / `acceptsApplications()` の 1 箇所）。
 
 複製（duplicate）: 勤務日は元の募集と別の日（同じ日は 422）。元の時給が今の最低賃金未満なら 422。
 
@@ -1065,7 +1065,7 @@ api は直列（T2 → T3 → T4）。T3 の後は api の T4・web の T5・mob
 
 | 担当 | 所有ファイル |
 |---|---|
-| api（`implementer-api`） | `app/Enums/ApplicationStatus.php`、`app/Models/Application.php`（遷移の付随列の `match` とコメントだけ）、`app/Services/ApplicationService.php`（遷移の判定と `withdrawAsWorker()`）、`database/factories/ApplicationFactory.php`（`withdrawn()`）、`routes/api.php`（ワーカーのグループに 1 行）、`app/Http/Controllers/Worker/ApplicationController.php`、`app/Http/Resources/Worker/WorkerApplicationResource.php`、`tests/Unit/ApplicationStatusTest.php`、`tests/Feature/{ApplicationTest,WorkerApplicationTest,WorkerJobPostingTest,RouteMiddlewareTest,WorkerAcceptanceScenarioTest}.php` |
+| api（`implementer-api`） | `app/Enums/ApplicationStatus.php`、`app/Models/Application.php`（遷移の付随列の `match` とコメントだけ）、`app/Services/ApplicationService.php`（遷移の判定と `withdrawAsWorker()`）、`database/factories/ApplicationFactory.php`（`withdrawn()`）、`database/seeders/DatabaseSeeder.php`（画面の確認用に、取り下げた応募を 1 件。T2）、`tests/Feature/DomainFoundationTest.php`（遷移の総当たりを 25 組に。T2）、`routes/api.php`（ワーカーのグループに 1 行）、`app/Http/Controllers/Worker/ApplicationController.php`、`app/Http/Resources/Worker/WorkerApplicationResource.php`、`tests/Unit/ApplicationStatusTest.php`、`tests/Feature/{ApplicationTest,WorkerApplicationTest,WorkerJobPostingTest,RouteMiddlewareTest,WorkerAcceptanceScenarioTest}.php` |
 | web（`implementer-web`） | `lib/status.ts`（応募の状態の色に `withdrawn` を足すだけ） |
 | mobile（リード） | `lib/data/repositories/{job_repository,api_job_repository}.dart`、`lib/domain/models/worker_application.dart` と生成物、`lib/domain/models/schedule_tab.dart`、`lib/ui/schedule/view_models/{my_applications_provider,withdraw_mutation}.dart` と生成物、`lib/ui/schedule/widgets/{schedule_screen,schedule_list_tile,withdraw_confirm_dialog}.dart`、`lib/ui/jobs/view_models/apply_mutation.dart` |
 

@@ -455,6 +455,7 @@ class WorkerApplicationTest extends TestCase
         $confirmed = $this->application(state: ApplicationStatus::Confirmed);
         $rejected = $this->application(state: ApplicationStatus::Rejected);
         $cancelled = $this->application(state: ApplicationStatus::Cancelled);
+        $withdrawn = $this->application(state: ApplicationStatus::Withdrawn);
         // ほかのワーカーの確定は、確定で絞っても出ない
         Application::factory()->confirmed()->create(['job_posting_id' => $confirmed->job_posting_id]);
 
@@ -463,6 +464,7 @@ class WorkerApplicationTest extends TestCase
             ApplicationStatus::Confirmed->value => $confirmed->id,
             ApplicationStatus::Rejected->value => $rejected->id,
             ApplicationStatus::Cancelled->value => $cancelled->id,
+            ApplicationStatus::Withdrawn->value => $withdrawn->id,
         ];
 
         $this->actingAsWorker($this->worker);
@@ -480,11 +482,10 @@ class WorkerApplicationTest extends TestCase
         $confirmed = $this->application(['work_date' => '2026-10-06'], state: ApplicationStatus::Confirmed);
 
         $this->actingAsWorker($this->worker);
-        // 決められた値（applied / confirmed / rejected / cancelled）以外。大文字は別の値として扱う。
+        // 決められた値（applied / confirmed / rejected / cancelled / withdrawn。docs/01 の 6.11）以外。大文字は別の値として扱う。
         // 配列（status[]=applied）も Enum の値ではないので 422（複数の状態での絞り込みは契約にない）
         $queries = [
             'status=unknown',
-            'status=withdrawn',
             'status=Applied',
             'status=APPLIED',
             'status[]=applied',
@@ -743,6 +744,7 @@ class WorkerApplicationTest extends TestCase
             ApplicationStatus::Confirmed => Application::factory()->confirmed(),
             ApplicationStatus::Rejected => Application::factory()->rejected(),
             ApplicationStatus::Cancelled => Application::factory()->cancelled($reason),
+            ApplicationStatus::Withdrawn => Application::factory()->withdrawn(),
         };
 
         return $factory->create([

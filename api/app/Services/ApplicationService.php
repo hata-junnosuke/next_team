@@ -169,7 +169,7 @@ class ApplicationService
 
     /**
      * 応募できるワーカー（docs/01 の API 契約（募集）の applicable-workers）。有効で、まだこの募集に応募していない自社のワーカー。
-     * 却下・キャンセル済みの応募があるワーカーも、UNIQUE (job_posting_id, worker_id) で再応募できないので出さない。
+     * 却下・キャンセル・取り下げ済みの応募があるワーカーも、UNIQUE (job_posting_id, worker_id) で再応募できないので出さない。
      *
      * @return Collection<int, Worker>
      */
@@ -232,20 +232,27 @@ class ApplicationService
             return;
         }
 
+        // 内側の match に default を置かない。遷移表で許可される組（応募中から）はここに来ないので枝がなく、
+        // 状態を足したのに文言を足し忘れたら UnhandledMatchError（500）で気づける
         throw new DomainException(match ($next) {
             ApplicationStatus::Confirmed => match ($current) {
                 ApplicationStatus::Confirmed => 'この応募はすでに確定しています。',
                 ApplicationStatus::Rejected => '却下された応募は承認できません。',
-                default => 'キャンセルされた応募は承認できません。',
+                ApplicationStatus::Withdrawn => '取り下げられた応募は承認できません。',
+                ApplicationStatus::Cancelled => 'キャンセルされた応募は承認できません。',
             },
             ApplicationStatus::Rejected => match ($current) {
                 ApplicationStatus::Confirmed => '確定した応募は却下できません。',
                 ApplicationStatus::Rejected => 'この応募はすでに却下されています。',
-                default => 'キャンセルされた応募は却下できません。',
+                ApplicationStatus::Withdrawn => '取り下げられた応募は却下できません。',
+                ApplicationStatus::Cancelled => 'キャンセルされた応募は却下できません。',
             },
             ApplicationStatus::Cancelled => $current === ApplicationStatus::Cancelled
                 ? 'この応募はすでにキャンセルされています。'
-                : '確定済みの応募だけキャンセルできます。',
+                : '確定済みの応募だけキャンセルできます。', // 取り下げた応募もこの文言（docs/01 の 6.5）
+            ApplicationStatus::Withdrawn => $current === ApplicationStatus::Withdrawn
+                ? 'この応募はすでに取り下げられています。'
+                : '応募中の応募だけ取り下げられます。',
             ApplicationStatus::Applied => '応募中には戻せません。',
         });
     }
