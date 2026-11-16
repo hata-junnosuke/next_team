@@ -17,14 +17,14 @@ use Tests\Concerns\ActsAsWorker;
 use Tests\TestCase;
 
 /**
- * 要件 4.8 の動線（docs/05 の付録 A.3 の 6 ステップ）を API 経由だけで 1 本通す（docs/01 の 9 章）。
+ * 要件 4.8 の動線（docs/05 の付録 A.3 の 7 ステップ）を API 経由だけで 1 本通す（docs/01 の 9 章）。
  *
  * - キューは sync のまま（phpunit.xml）。ジョブはその場で動き、メールは Mail::fake() に届く。招待コードは届いた
  *   WorkerInvitationMail に渡された招待から取り、本文に書かれていることを確かめる（DB の暗号文は読まない）
  * - ワーカーは register / login で受け取った本物のトークンを withToken() で付ける。管理者は switchToAdmin()（ActsAsWorker）
  * - 本番のリクエストは企業が空の状態で始まるので、どのリクエストも asAdmin() / asWorker() / asGuest() を通し、
  *   Context の企業と guard が覚えたユーザーを消してから叩く
- * - 今日は 2026-10-01 10:00 に固定。動線の募集は 10/5、比較用の勤務日が過ぎた募集は 9/30
+ * - 今日は 2026-10-01 10:00 に固定。動線の募集は 10/5（7 の取り下げは 10/6）、比較用の勤務日が過ぎた募集は 9/30
  */
 class WorkerAcceptanceScenarioTest extends TestCase
 {
@@ -49,7 +49,7 @@ class WorkerAcceptanceScenarioTest extends TestCase
         Context::forget('company_id');
     }
 
-    public function test_ワーカーアプリの動線6ステップが通る(): void
+    public function test_ワーカーアプリの動線7ステップが通る(): void
     {
         Mail::fake();
 
@@ -200,6 +200,46 @@ class WorkerAcceptanceScenarioTest extends TestCase
             ->assertJsonPath('data.status.value', 'cancelled')
             ->assertJsonPath('data.my_application', ['id' => $applicationId, 'status' => ['value' => 'cancelled', 'label' => 'キャンセル']])
             ->assertJsonPath('data.can.apply', false);
+
+        // ---- 7. 山田が別の募集に応募して取り下げる → 管理画面の応募一覧に「取り下げ」で出る。同じ募集にはもう応募できない（F-34） ----
+        $packingId = $this->createPosting($locationId, '2026-10-06', '梱包');
+        $packingApplicationId = $this->applyAsWorker($yamada, $packingId)
+            ->assertCreated()
+            ->assertJsonPath('data.status', ['value' => 'applied', 'label' => '応募中'])
+            ->assertJsonPath('data.can', ['withdraw' => true])
+            ->json('data.id');
+
+        $this->asWorker($yamada)->postJson("/api/worker/applications/{$packingApplicationId}/withdraw")
+            ->assertOk()
+            ->assertJsonPath('data.id', $packingApplicationId)
+            ->assertJsonPath('data.job_posting.id', $packingId)
+            ->assertJsonPath('data.status', ['value' => 'withdrawn', 'label' => '取り下げ'])
+            ->assertJsonPath('data.can', ['withdraw' => false]);
+
+        // 管理者の応募一覧（F-10）に「取り下げ」で出て、管理者の操作はどれもできない
+        $this->asAdmin()->getJson("/api/job-postings/{$packingId}/applications")
+            ->assertOk()
+            ->assertJsonPath('data.*.id', [$packingApplicationId])
+            ->assertJsonPath('data.0.worker.name', '山田太郎')
+            ->assertJsonPath('data.0.status', ['value' => 'withdrawn', 'label' => '取り下げ'])
+            ->assertJsonPath('data.0.can', ['confirm' => false, 'reject' => false, 'cancel' => false, 'attend' => false]);
+
+        // 山田の応募一覧には 6 の中止（10/5）と 7 の取り下げ（10/6）が勤務日の順に並ぶ
+        $this->asWorker($yamada)->getJson('/api/worker/applications')
+            ->assertOk()
+            ->assertJsonPath('data.*.id', [$applicationId, $packingApplicationId])
+            ->assertJsonPath('data.1.status', ['value' => 'withdrawn', 'label' => '取り下げ']);
+        // 取り下げた募集は一覧に残り、自分の応募が付く。同じ募集にはもう応募できない（UNIQUE (job_posting_id, worker_id)）
+        $this->asWorker($yamada)->getJson("/api/worker/job-postings/{$packingId}")
+            ->assertOk()
+            ->assertJsonPath('data.my_application', ['id' => $packingApplicationId, 'status' => ['value' => 'withdrawn', 'label' => '取り下げ']])
+            ->assertJsonPath('data.can.apply', false);
+        $this->applyAsWorker($yamada, $packingId)
+            ->assertUnprocessable()
+            ->assertExactJson(['message' => 'この募集にはすでに応募しています。', 'errors' => []]);
+        $this->asAdmin()->getJson("/api/job-postings/{$packingId}/applications")
+            ->assertOk()
+            ->assertJsonPath('data.*.id', [$packingApplicationId]);
     }
 
     // ---- 補助 ----
