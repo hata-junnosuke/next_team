@@ -16,8 +16,7 @@ import '../../../utils/format.dart';
 import '../view_models/withdraw_mutation.dart';
 import 'withdraw_confirm_dialog.dart';
 
-// 取り下げの送信の状態（withdrawMutation）を読むので ConsumerWidget にする
-// （T7 では渡された応募を描くだけだったので StatelessWidget だった）。自分では状態を持たない。
+// 取り下げの送信の状態（withdrawMutation）を watch するので ConsumerWidget にする。自分では状態を持たない。
 class ScheduleListTile extends ConsumerWidget {
   const ScheduleListTile({required this.application, super.key});
 
@@ -29,8 +28,11 @@ class ScheduleListTile extends ConsumerWidget {
     // 応募の中の募集の要約（勤務日・時間・職種・拠点）。
     final posting = application.jobPosting;
     // この応募の取り下げの送信の状態。送信中ならボタンを押せなくし、くるくるを出す。
-    final isSending =
-        ref.watch(withdrawMutation(application.id)) is MutationPending;
+    final withdrawing = ref.watch(withdrawMutation(application.id));
+    final isSending = withdrawing is MutationPending;
+    // 成功した後も押せなくする。取り直しが届いて行が消えるまでの間、前の値（can.withdraw が true）のまま描かれるため
+    // （詳細の画面の「応募する」と同じ考え方。withdrawApplication の中でも確かめている）。
+    final isDone = withdrawing is MutationSuccess;
 
     return Card(
       child: ListTile(
@@ -49,7 +51,9 @@ class ScheduleListTile extends ConsumerWidget {
                 // Align: 子を親の中のどこに置くか（ここでは右端。CSS の justify-self: end）。
                 alignment: Alignment.centerRight,
                 child: OutlinedButton(
-                  onPressed: isSending ? null : () => _withdraw(context, ref),
+                  onPressed: isSending || isDone
+                      ? null
+                      : () => _withdraw(context, ref),
                   child: isSending
                       ? const SizedBox.square(
                           dimension: 16,
@@ -83,9 +87,7 @@ class ScheduleListTile extends ConsumerWidget {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            e is FormatException
-                ? '応答の形が想定と違います。管理者にお問い合わせください。'
-                : '$e',
+            e is FormatException ? '応答の形が想定と違います。管理者にお問い合わせください。' : '$e',
           ),
         ),
       );

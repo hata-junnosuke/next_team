@@ -35,7 +35,10 @@ class _WithdrawConfirmDialog extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(posting.jobTitle, style: Theme.of(context).textTheme.titleMedium),
+          Text(
+            posting.jobTitle,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
           const SizedBox(height: 8),
           Text('勤務日: ${formatDate(posting.workDate)}'),
           Text('時間: ${formatTimeRange(posting.startTime, posting.endTime)}'),

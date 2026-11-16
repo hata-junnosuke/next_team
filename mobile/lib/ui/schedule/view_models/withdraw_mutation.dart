@@ -1,8 +1,10 @@
 // 応募の取り下げを送る「mutation」と、その送り方（Step 8）。
-// 作りは さがす の応募（ui/jobs/view_models/apply_mutation.dart）と同じ形。違いは 3 つだけ:
+// 作りは さがす の応募（ui/jobs/view_models/apply_mutation.dart）と同じ形。違いは 4 つだけ:
 // - キーが募集の id ではなく、応募の id（よてい の 1 行 = 1 つの応募）
 // - 送る先が POST /api/worker/applications/{id}/withdraw
 // - 成功したあとに捨てる Provider（よてい と、さがす の詳細・一覧）
+// - 結果の見せ方: 応募は詳細の画面に失敗の文言（MutationError）を出すが、取り下げはスナックバーで出す
+//   （成功すると その行が一覧から消えるので、行の中に文言を出しても見えないため）
 // React で言うと TanStack Query の useMutation。
 //
 // mutations: https://riverpod.dev/ja/docs/concepts2/mutations
@@ -29,13 +31,15 @@ final withdrawMutation = Mutation<WorkerApplication>(label: 'withdraw');
 // 1. 送信中か、もう成功していたら何もしない（2 回押しても 1 回しか送らない）
 // 2. run の中で API に送る
 // 3. 成功したら関係する Provider を捨てて取り直させる。422（その間に確定されたなど）と 404 のときも、画面の値が古いので取り直す
-// 失敗したとき run は例外を投げ直すので、呼んだ側（画面）は受け止める。表示は mutation の状態（MutationError）で行う。
+// 失敗したとき run は例外を投げ直すので、呼んだ側（よてい の行）が受け止めてスナックバーで出す。
+// 画面が mutation の状態から読むのは「送信中か」「成功したか」（ボタンを押せなくするため）だけ。
 Future<void> withdrawApplication(
   MutationTarget target,
   WorkerApplication application,
 ) async {
   final mutation = withdrawMutation(application.id);
-  if (target.container.read(mutation) case MutationPending() || MutationSuccess()) {
+  if (target.container.read(mutation)
+      case MutationPending() || MutationSuccess()) {
     return;
   }
 

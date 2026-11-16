@@ -895,7 +895,7 @@ mobile/
 |---|---|---|---|---|
 | `/jobs` | 募集一覧（さがす） | さがす | 3（偽データ）→ 7 | `GET /api/worker/job-postings`、`GET /api/worker/locations` |
 | `/jobs/:id` | 募集の詳細・応募 | さがす | 3 → 7 | `GET /api/worker/job-postings/{id}`、`POST /api/worker/job-postings/{id}/applications` |
-| `/schedule` | 自分の応募（よてい） | よてい | 3（空）→ 8 | `GET /api/worker/applications` |
+| `/schedule` | 自分の応募（よてい。確定・応募中の 2 タブと取り下げ） | よてい | 3（空）→ 8 | `GET /api/worker/applications`、`POST /api/worker/applications/{id}/withdraw` |
 | `/notices` | おしらせ | おしらせ | 3（空）→ 10 | （Step 10 で決める） |
 | `/account` | マイページ・ログアウト | マイページ | 3（空）→ 6 | `GET /api/worker/me`、`POST /api/worker/logout` |
 | `/login` | ログイン | タブの外 | 6 | `POST /api/worker/login` |

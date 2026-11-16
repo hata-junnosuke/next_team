@@ -38,9 +38,7 @@ class ScheduleScreen extends StatelessWidget {
           title: const Text('よてい'),
           // AppBar の bottom に置くと、見出しのすぐ下にタブが並ぶ。
           bottom: TabBar(
-            tabs: [
-              for (final tab in ScheduleTab.values) Tab(text: tab.label),
-            ],
+            tabs: [for (final tab in ScheduleTab.values) Tab(text: tab.label)],
           ),
         ),
         // タブごとに、そのタブの一覧（myApplicationsProvider(tab)）を読む。
@@ -76,17 +74,27 @@ class _ScheduleList extends ConsumerWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // 見出しと理由を分けて出す（さがす の一覧・詳細と同じ並び）。理由は ApiError の message か、
+              // 接続できないときの文言。形が違うときだけ決まりの文言にする。
+              const Text('予定を読み込めませんでした'),
+              const SizedBox(height: 8),
               ErrorBanner(
                 message: error is FormatException
                     ? '応答の形が想定と違います。管理者にお問い合わせください。'
-                    : '予定を読み込めませんでした。$error',
+                    : '$error',
               ),
               const SizedBox(height: 16),
               FilledButton.icon(
                 onPressed: applicationsAsync.isLoading
                     ? null
                     : () => ref.invalidate(myApplicationsProvider(tab)),
-                icon: const Icon(Icons.refresh),
+                // 取り直し中はアイコンをくるくるに替える（さがす の一覧の _ErrorView と同じ）。
+                icon: applicationsAsync.isLoading
+                    ? const SizedBox.square(
+                        dimension: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh),
                 label: const Text('再読み込み'),
               ),
             ],
