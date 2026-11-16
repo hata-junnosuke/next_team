@@ -853,10 +853,10 @@ mobile/
     │   ├── core/ui/              複数の画面で使う Widget（scaffold_with_nav_bar.dart、Step 6 から error_banner.dart）
     │   ├── core/themes/          テーマ（theme.dart）
     │   ├── jobs/                 さがす（view_models/ 状態（Riverpod の Provider と、Step 7 の応募の mutation apply_mutation.dart）、widgets/ 画面と Widget（Step 7 から apply_confirm_dialog.dart））
-    │   ├── schedule/             よてい（自分の応募）
+    │   ├── schedule/             よてい（自分の応募。Step 8: view_models/ に my_applications_provider.dart と取り下げの mutation withdraw_mutation.dart、widgets/ に schedule_screen.dart・schedule_list_tile.dart・withdraw_confirm_dialog.dart）
     │   ├── notices/              おしらせ（Step 10 まで中身なし）
     │   └── account/              マイページ・ログイン・初回登録（Step 6）
-    ├── domain/models/            モデル（Step 7 から freezed: JobPosting・JobPostingPage・LabeledValue・WorkerApplication・WorkerMe）と値の定義（DateFilter・ApplyStatus）
+    ├── domain/models/            モデル（Step 7 から freezed: JobPosting・JobPostingPage・LabeledValue・WorkerApplication（Step 8 から can）・WorkerMe）と値の定義（DateFilter・ApplyStatus、Step 8 から ScheduleTab）
     └── data/
         ├── repositories/         リポジトリ（JobRepository と、Step 7 からの実装 api_job_repository.dart。Step 6 から auth_repository.dart）
         └── services/             Step 6: api_client.dart（ApiClient（dio）と、Step 7 からトップレベルの関数 parseModel()）・AuthInterceptor・TokenStorage・ApiError（Step 7 から freezed）・device_name.dart
