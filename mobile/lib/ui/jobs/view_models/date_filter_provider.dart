@@ -11,13 +11,13 @@ import '../../../domain/models/date_filter.dart';
 
 part 'date_filter_provider.g.dart';
 
-// 値（今のチップ）と、それを変えるメソッド（select）を持つので、クラスの @riverpod（Notifier）にする（issue #33 の T4 の appliedJobsProvider と同じ形）。
+// 値（今のチップ）と、それを変えるメソッド（select）を持つので、クラスの @riverpod（Notifier）にする（Step 4〜6 の「応募済み」の Provider と同じ形だった）。
 // 生成される Provider の名前は selectedDateFilterProvider。
 //
 // 何を持つか: 選んでいる DateFilter（最初は「すべて」）。
 // いつ作り直されるか: keepAlive を付けていないので、読む画面がなくなると捨てられ、次は「すべて」から始まる。
 // ただし「さがす」タブは indexedStack で残り、一覧の画面が watch し続けるので、アプリを動かしている間は残る。
-// 応募済み（keepAlive）と違い、捨てて「すべて」に戻っても困らないので、既定のままにする。
+// 捨てて「すべて」に戻っても困らないので、keepAlive を付けず既定のままにする。
 @riverpod
 class SelectedDateFilter extends _$SelectedDateFilter {
   @override

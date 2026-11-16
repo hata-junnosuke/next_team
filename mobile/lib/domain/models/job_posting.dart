@@ -1,81 +1,102 @@
 // 募集のモデル（データの型）。画面とリポジトリの両方がこの型でやりとりする。
 // TypeScript で言うと web/ の zod スキーマから作る型（type JobPosting = z.infer<...>）に当たる。
-// 項目の名前と形は docs/01 の 6.11 の WorkerJobPostingResource に合わせ、Step 7 で API に替えても画面を直さずに済むようにする。
-// ただし今は Step 3 の画面で使う項目だけ。status / my_application / can は Step 7 で足す。
+// 項目の名前と形は docs/01 の 6.11 の WorkerJobPostingResource に合わせる（Step 7 で status・my_application・can を足した）。
 //
-// JSON（API の形）から作る fromJson を、手で書いている（Step 7 で freezed + json_serializable の生成に替える）。
-// web/ で zod の parse をするのと同じく、形が違えばここで例外になる（契約のずれに気づける。docs/01 の 7A.4）。
+// Step 7 から freezed + json_serializable で生成する（docs/01 の 7A.4）。Step 3〜6 は手書きだった。
+// 手で書くのは「どんな項目があるか」だけ。次のものは build_runner が job_posting.freezed.dart と
+// job_posting.g.dart に作る（手で書き換えない。このファイルを変えたら dart run build_runner build をやり直す）:
+// - ==・hashCode（中身が同じなら等しい。Riverpod の「値が変わったか」の判定に効く）、toString、copyWith
+// - fromJson の中身（_$JobPostingFromJson）。JSON のキーは build.yaml の field_rename: snake で
+//   jobTitle → job_title のように対応させる。形が違えば CheckedFromJsonException を投げる（build.yaml の checked）
 //
-// クラス: https://dart.dev/language/classes
-// コンストラクタ: https://dart.dev/language/constructors
-// JSON を手で読む: https://docs.flutter.dev/data-and-backend/serialization/json
+// domain/ なので Flutter も Riverpod も import しない（docs/01 の 7A.1）。freezed_annotation（印だけのパッケージ）は使ってよい。
+//
+// freezed: https://pub.dev/packages/freezed
+// json_serializable: https://pub.dev/packages/json_serializable
+// JSON の手書きとコード生成の比較: https://docs.flutter.dev/data-and-backend/serialization/json
+
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+import 'labeled_value.dart';
+
+// part: 生成されたファイルを、このファイルの一部として取り込む（Provider の .g.dart と同じ仕組み）。
+// .freezed.dart は freezed が、.g.dart は json_serializable が作る。
+part 'job_posting.freezed.dart';
+part 'job_posting.g.dart';
 
 // 拠点（WorkerJobPostingResource の location: {id, name}）。
-class JobLocation {
-  // this.id: 受け取った引数をそのままフィールドに入れる短い書き方（TypeScript の constructor(public id: number)）。
-  const JobLocation({required this.id, required this.name});
+// @freezed: 「このクラスの ==・copyWith などを生成して」という印。
+// abstract class ... with _$JobLocation: 生成された部品（mixin = 混ぜ込む部品。Ruby の include に近い）を取り込む。
+// abstract なのは、本体（_JobLocation）を生成側が作り、このクラスそのものは new しないため。
+@freezed
+abstract class JobLocation with _$JobLocation {
+  // const factory ... = _JobLocation: 「作るときは生成された _JobLocation を使う」という宣言。
+  // ここに並べた引数が、そのまま final のフィールドになる（手書きのときのフィールドの宣言が要らない）。
+  const factory JobLocation({required int id, required String name}) =
+      _JobLocation;
 
-  // factory コンストラクタ: 決まった手順で値を作って返すコンストラクタ（Ruby のクラスメソッド self.from_json に近い）。
-  // Map<String, dynamic>: キーが文字列、値は何でも入る Map（jsonDecode が返す形。TypeScript の Record<string, any>）。
-  // dynamic は「型が分からない値」。analysis_options.yaml の strict-casts があるので、
-  // json['id'] をそのまま int に入れられず、as int と書いて「int のはず」と確かめる必要がある。
-  // 違う型（例: "1" という文字列）が来たら、as のところで例外になる（zod の parse が落ちるのと同じ）。
-  factory JobLocation.fromJson(Map<String, dynamic> json) {
-    return JobLocation(id: json['id'] as int, name: json['name'] as String);
-  }
-
-  final int id;
-  final String name;
+  // fromJson は 1 行だけ書き、中身は生成された _$JobLocationFromJson に任せる。
+  // 手書きのときに 1 項目ずつ書いていた型の確かめ（as int など）が、生成側に移った。
+  // 呼ぶ側（リポジトリ）は直に呼ばず、data/services/api_client.dart の parseModel() を通す（7A.4。issue #48 の Q1）。
+  factory JobLocation.fromJson(Map<String, dynamic> json) =>
+      _$JobLocationFromJson(json);
 }
 
-// 募集 1 件。全部の項目が final なので、作ったあとは変えられない（不変）。
-// 変えたいときは新しい値を作る（React の state を直接書き換えないのと同じ考え方）。
-class JobPosting {
-  const JobPosting({
-    required this.id,
-    required this.location,
-    required this.jobTitle,
-    required this.workDate,
-    required this.startTime,
-    required this.endTime,
-    required this.hourlyWage,
-    required this.transportAllowance,
-    required this.capacity,
-    required this.remaining,
-  });
+// 募集 1 件。全部の項目が final（不変）。変えたいときは copyWith で一部だけ替えた新しい値を作る
+// （React の state を直接書き換えず {...job, x: 1} で作り直すのと同じ考え方）。
+@freezed
+abstract class JobPosting with _$JobPosting {
+  const factory JobPosting({
+    required int id,
+    // 入れ子の {id, name} は、生成された fromJson が JobLocation.fromJson を呼んで型にする。
+    required JobLocation location,
+    // 職種（JSON では job_title）。
+    required String jobTitle,
+    // 勤務日（"2026-09-20"）。生成された fromJson が DateTime.parse で日付にする。時刻は使わない。
+    required DateTime workDate,
+    // 開始・終了の時刻は API と同じ "09:00" の文字列のまま持つ（表示するだけで計算しないため）。
+    required String startTime,
+    required String endTime,
+    // 時給と交通費（円）。
+    required int hourlyWage,
+    required int transportAllowance,
+    // 定員と残り枠（人数）。残り枠は API が数えて返す値をそのまま持つ（docs/01 の 6.11 の remaining）。
+    // アプリで「定員 − 確定数」を計算しないのは、数え方（どの状態の応募を数えるか）が業務ルールだから。
+    required int capacity,
+    required int remaining,
+    // 募集の状態（{value: "open", label: "募集中"}）。一覧に出るのは募集中だけ（6.11）だが、
+    // 自分が応募した募集は、中止・締切の後も詳細を開ける（6.11 の GET job-postings/{id}）。
+    required LabeledValue status,
+    // 自分の応募（なければ null）。JSON では my_application。
+    // 型の後ろの ?: null を許す（TypeScript の MyApplication | null）。null を許した項目は、キーが null でも、キーがなくても通る
+    // （checked: true でもキーの欠けは検出しない。null を許さない項目は、キーが欠けると例外になる）。
+    required MyApplication? myApplication,
+    // この募集に対して、自分ができること（{apply: true}）。表示の出し分けにだけ使い、最後の判定は API の 422（6.11）。
+    required JobPostingCan can,
+  }) = _JobPosting;
 
-  // JSON のキーは snake_case（API の形）、Dart のフィールドは lowerCamelCase。その対応をここで 1 回だけ書く。
-  factory JobPosting.fromJson(Map<String, dynamic> json) {
-    return JobPosting(
-      id: json['id'] as int,
-      // 入れ子の Map は、さらに as Map<String, dynamic> と確かめてから、その型の fromJson に渡す。
-      location: JobLocation.fromJson(json['location'] as Map<String, dynamic>),
-      jobTitle: json['job_title'] as String,
-      // "2026-09-20" の文字列を日付にする。形が違えば DateTime.parse が例外を投げる。
-      workDate: DateTime.parse(json['work_date'] as String),
-      startTime: json['start_time'] as String,
-      endTime: json['end_time'] as String,
-      hourlyWage: json['hourly_wage'] as int,
-      transportAllowance: json['transport_allowance'] as int,
-      capacity: json['capacity'] as int,
-      remaining: json['remaining'] as int,
-    );
-  }
+  factory JobPosting.fromJson(Map<String, dynamic> json) =>
+      _$JobPostingFromJson(json);
+}
 
-  final int id;
-  final JobLocation location;
-  // 職種（job_title）。Dart の名前は lowerCamelCase にする（JSON の snake_case との変換は下の fromJson でしている）。
-  final String jobTitle;
-  // 勤務日。時刻は使わず、日付だけを見る。
-  final DateTime workDate;
-  // 開始・終了の時刻は API と同じ "09:00" の文字列のまま持つ（表示するだけで計算しないため）。
-  final String startTime;
-  final String endTime;
-  // 時給と交通費（円）。
-  final int hourlyWage;
-  final int transportAllowance;
-  // 定員と残り枠（人数）。残り枠は API が数えて返す値をそのまま持つ（docs/01 の 6.11 の remaining）。
-  // アプリで「定員 − 確定数」を計算しないのは、数え方（どの状態の応募を数えるか）が業務ルールだから。
-  final int capacity;
-  final int remaining;
+// 自分の応募（WorkerJobPostingResource の my_application: {id, status}）。
+// status.label（応募中・確定・却下など）を、そのまま「応募済み」のバッジに出す（T4）。
+@freezed
+abstract class MyApplication with _$MyApplication {
+  const factory MyApplication({required int id, required LabeledValue status}) =
+      _MyApplication;
+
+  factory MyApplication.fromJson(Map<String, dynamic> json) =>
+      _$MyApplicationFromJson(json);
+}
+
+// 自分ができること（WorkerJobPostingResource の can: {apply}）。
+// apply は「募集中・勤務日が今日以降・残り枠がある・自分の応募がない」を API がまとめて判定した結果（6.11）。
+// アプリはこの 4 つを自分で組み立てない（業務ルールを二重に書かない。CLAUDE.md の絶対ルール 1）。
+@freezed
+abstract class JobPostingCan with _$JobPostingCan {
+  const factory JobPostingCan({required bool apply}) = _JobPostingCan;
+
+  factory JobPostingCan.fromJson(Map<String, dynamic> json) =>
+      _$JobPostingCanFromJson(json);
 }

@@ -114,7 +114,7 @@ UI コンポーネントライブラリ、状態管理ライブラリ、デー�
 | name | string | NOT NULL |
 | code | string | ワーカー Step 5 で新しいマイグレーションで足す。**UNIQUE**。既存の行は同じマイグレーションで埋め、以後 NOT NULL（企業コード。ワーカーのログインに使う。docs/00 の決定 68） |
 
-企業コードは 6 文字（紛らわしい `0` `O` `1` `I` `L` を除いた英大文字と数字）。大文字で保存し、入力は大文字に直してから比べる。秘密ではなく識別子なので、招待メールと管理者の画面（`/api/user` の `company.code`）に出してよい。企業を作るのは今はシーダーだけなので、`Company` の `creating` で作る（重なったら作り直す）。
+企業コードは 6 文字（紛らわしい `0` `O` `1` `I` `L` を除いた英大文字と数字）。大文字で保存し、入力は大文字に直してから比べる。秘密ではなく識別子なので、招待メールと管理者の画面（`/api/user` の `company.code`）に出してよい。企業を作るのは今はシーダーだけなので、`Company` の `creating` で作る（重なったら作り直す）。開発用のシーダー（`make fresh`）だけは、自社 `NEXT22`・他社 `XYZ789` に固定する（DB を作り直しても、worktree ごとに別の DB でも、同じ企業コードでログインできるように。`creating` はコードが入っていれば作らない）。
 
 **users**（管理者）
 
@@ -824,7 +824,7 @@ export type FormState = { ok?: boolean; message?: string; errors?: Record<string
 
 ## 7A. アプリ契約（`mobile/`。ワーカーアプリ）
 
-ワーカーアプリと api の境界は 5.3 と 6.11 だけです。**`mobile/` を書くときは `api/` のコードを読まず**、契約と実際のレスポンスだけを見ます（CLAUDE.md の絶対ルール 4）。書き方（コメント多め、1 機能 = 1 コミットで止まって変更点を案内する）は `mobile/CLAUDE.md` と docs/05 の 1・2 章に従います。
+ワーカーアプリと api の境界は 5.3 と 6.11 だけです。**`mobile/` を書くときは `api/` のコードを読まず**、契約と実際のレスポンスだけを見ます（CLAUDE.md の絶対ルール 4）。書き方（コメント多め、1 機能 = 1 コミットで止まらずに実装し、そろったら解説を 1 枚の HTML にする）は `mobile/CLAUDE.md` と docs/05 の 1・2 章に従います。
 
 ### 7A.1 ディレクトリ（Step 3 で作り、issue #35 で Flutter 公式の case study の構成に合わせた）
 
@@ -832,10 +832,10 @@ Flutter 公式の構成ガイドの case study の Package structure（https://d
 
 ```
 mobile/
-├── CLAUDE.md                     コメントのルールと進め方（docs/05 の 1・2 章を写す）
+├── CLAUDE.md                     コメントのルールと進め方（docs/05 の 1・2・5 章を写す）
 ├── analysis_options.yaml         flutter_lints ＋ 厳しめのルール（strict-casts / strict-raw-types / strict-inference、avoid_print など）
 ├── pubspec.yaml / pubspec.lock   依存（Rails の Gemfile / Gemfile.lock）
-├── assets/jobs.json              偽データ（Step 3。Step 7 で使わなくなる）
+├── build.yaml                    コード生成の設定（Step 7。json_serializable の checked・snake_case・toJson を作らない）
 └── lib/
     ├── main.dart                 起動する。その前に API_BASE_URL の検査と、保存したログインの状態の復元をする（Step 6）
     ├── app.dart                  MaterialApp.router とテーマ（Next.js の app/layout.tsx）
@@ -845,22 +845,25 @@ mobile/
     ├── ui/
     │   ├── core/ui/              複数の画面で使う Widget（scaffold_with_nav_bar.dart、Step 6 から error_banner.dart）
     │   ├── core/themes/          テーマ（theme.dart）
-    │   ├── jobs/                 さがす（view_models/ 状態（Riverpod の Provider）、widgets/ 画面と Widget）
+    │   ├── jobs/                 さがす（view_models/ 状態（Riverpod の Provider と、Step 7 の応募の mutation apply_mutation.dart）、widgets/ 画面と Widget（Step 7 から apply_confirm_dialog.dart））
     │   ├── schedule/             よてい（自分の応募）
     │   ├── notices/              おしらせ（Step 10 まで中身なし）
     │   └── account/              マイページ・ログイン・初回登録（Step 6）
-    ├── domain/models/            モデル（JobPosting）と値の定義（DateFilter・ApplyStatus）
+    ├── domain/models/            モデル（Step 7 から freezed: JobPosting・JobPostingPage・LabeledValue・WorkerApplication・WorkerMe）と値の定義（DateFilter・ApplyStatus）
     └── data/
-        ├── repositories/         リポジトリ（JobRepository と実装。Step 6 から auth_repository.dart）
-        └── services/             Step 6: ApiClient（dio）・AuthInterceptor・TokenStorage・ApiError・device_name.dart
+        ├── repositories/         リポジトリ（JobRepository と、Step 7 からの実装 api_job_repository.dart。Step 6 から auth_repository.dart）
+        └── services/             Step 6: api_client.dart（ApiClient（dio）と、Step 7 からトップレベルの関数 parseModel()）・AuthInterceptor・TokenStorage・ApiError（Step 7 から freezed）・device_name.dart
 ```
 
-- `domain/models/` はモデル（`JobPosting`）と、画面に依存しない値の定義（`DateFilter`・`ApplyStatus` などの enum）。Flutter（`package:flutter`）も Riverpod も import しない
-- `data/repositories/` のリポジトリは抽象（`JobRepository`）と実装（Step 3〜5 は `FakeJobRepository`、Step 7 から `ApiJobRepository`）に分ける。`data/services/` は API との通信だけを持つ（Step 6）。`data/` は Riverpod を import しない（Flutter の `rootBundle` などの読み込みには使ってよい）。公式のサンプル（compass_app）は API の型を `data/services/api/model/` に分けて置くが、ここでは Step 7 で `domain/models/` のモデルに `fromJson` を持たせる（分けるかは Step 7 で決める）
+- `domain/models/` はモデル（`JobPosting`）と、画面に依存しない値の定義（`DateFilter` の enum、`ApplyStatus` の sealed class など）。Flutter（`package:flutter`）も Riverpod も import しない。Step 7 からモデルは `freezed` + `json_serializable` で生成する（`@freezed` と生成した `fromJson`。生成物の `*.freezed.dart` `*.g.dart` もコミットする）。import してよいパッケージは `freezed_annotation` と `json_annotation` だけ。`toJson` は使わないので作らない（`build.yaml`）
+- `data/repositories/` のリポジトリは抽象（`JobRepository`）と実装（Step 3〜6 は `FakeJobRepository`、Step 7 から `ApiJobRepository`）に分ける。`data/services/` は API との通信だけを持つ（Step 6）。`data/` は Riverpod を import しない（Flutter の `rootBundle` などの読み込みには使ってよい）。公式のサンプル（compass_app）は API の型を `data/services/api/model/` に分けて置くが、ここでは分けず、`domain/models/` のモデルに生成した `fromJson` を持たせる（issue #48 で決定。API の形と画面で使う形がほぼ同じで、分けると同じ項目を 2 回書くことになるため）。例外は `ApiError`（API の失敗の形と状態コード）で、`data/services/` に置いたまま freezed にする
+- Step 7 で、偽のリポジトリ `FakeJobRepository` と偽データ `assets/jobs.json`（と `pubspec.yaml` の `assets` の登録）を消す。Step 9 のテスト用の偽物は、そのとき `mobile/test/` に作る
+- **募集の一覧のページ**（issue #48 の Q3）: 一覧は `per_page=100` の 1 ページ目だけを読む（無限スクロールはしない）。`meta.total` が出した件数より多ければ、一覧の下に「ほかに N 件あります。日付や拠点で絞り込んでください。」を出す。`meta` も `fromJson` で型にしてから使う
+- **応募の送信と、その後の更新**（issue #48 の Q4）: 送信中・成功・失敗の状態は `ui/jobs/view_models/` の Riverpod の mutation（`Mutation<WorkerApplication>`。募集の id をキーにして、募集ごとに別の状態を持つ。https://riverpod.dev/ja/docs/concepts2/mutations ）が持つ。成功したら、その募集の詳細（`jobDetailProvider(id)`）と一覧（`jobListProvider` のすべての絞り込み）を `invalidate` して API から取り直す（422 と 404 のときも、画面の値が古いので取り直す）。応答で手元の値（残り枠など）を書き換えない（残り枠をアプリで計算することになり、7A.4 の「残り枠」に反する）。送信中と成功の後はボタンを押せなくし、2 回押しても 1 回しか送らない
 - `config/dependencies.dart` は、どの実装を使うかを決める Provider（`jobRepositoryProvider`。Step 4）と、その生成物。差し替えはこの Provider の 1 行だけ。Riverpod を `data/` に持ち込まないために、`data/` の外に置く
-- `ui/<機能>/view_models/` は、その機能の画面の状態を持つ Riverpod の Provider（`@riverpod` の関数と Notifier）と、その生成物（`*.g.dart`）だけ。リポジトリは `config/dependencies.dart` の Provider 経由で使う。公式の ViewModel に当たる（公式は ChangeNotifier が前提なので、Riverpod の Provider を当てはめている。React の hooks のフォルダに近い）。Provider でない部品（変換の関数など）は置かず、`domain/models/` か `utils/` に置く。例外は、その Provider の状態の型（`typedef`。ログインと初回登録の `AuthFormState`）と、その Provider だけが使う private なメソッド。`data/services/api_error.dart` の `ApiError` は、失敗を受け止める `on ApiError` のためだけに import してよい（Step 6）
+- `ui/<機能>/view_models/` は、その機能の画面の状態を持つ Riverpod の Provider（`@riverpod` の関数と Notifier）と、その生成物（`*.g.dart`）だけ。リポジトリは `config/dependencies.dart` の Provider 経由で使う。公式の ViewModel に当たる（公式は ChangeNotifier が前提なので、Riverpod の Provider を当てはめている。React の hooks のフォルダに近い）。Provider でない部品（変換の関数など）は置かず、`domain/models/` か `utils/` に置く（Riverpod の mutation と、それを動かす送信の関数、およびそれらだけが使う private な関数は置いてよい。Step 7 の応募の `apply_mutation.dart`）。例外は、その Provider の状態の型（`typedef`。ログインと初回登録の `AuthFormState`）と、その Provider だけが使う private なメソッド。`data/services/api_error.dart` の `ApiError` は、失敗を `on ApiError` で受け止めて、その `statusCode`・`message`・`errors` を読むためだけに import してよい（Step 6）
 - `ui/<機能>/widgets/` は画面（`<機能>_screen.dart`）と Widget だけ。`view_models/` の Provider を `ref.watch` / `ref.read` で読む。`config/` と `data/` を直接読まない（1 件の取得も `jobDetailProvider(id)` のような引数つきの Provider を通す）
-- 機能をまたいで使う状態は `view_models/` に置かない。今の `appliedJobsProvider` は jobs の中だけで使うので `ui/jobs/view_models/` に置く。Step 8 で schedule からも使うようになったら、状態の持ち主を `data/repositories/` のリポジトリ（Riverpod を知らない）にし、それを返す Provider を `config/dependencies.dart` に置いて、jobs と schedule の `view_models/` がそれぞれ読む（公式の「共有する状態はリポジトリに持つ」。issue #35 の Q4=A）
+- 機能をまたいで使う状態は `view_models/` に置かない。Step 4 の偽の応募済み `appliedJobsProvider` は Step 7 で消し、「応募済み」は API の `my_application`（あればその `status.label`）で出す（issue #48）。Step 8 で jobs と schedule が同じ状態を使うようになったら、状態の持ち主を `data/repositories/` のリポジトリ（Riverpod を知らない）にし、それを返す Provider を `config/dependencies.dart` に置いて、jobs と schedule の `view_models/` がそれぞれ読む（公式の「共有する状態はリポジトリに持つ」。issue #35 の Q4=A）
 - `ui/core/` は複数の画面で使う Widget（`ui/`）とテーマ（`themes/`）だけ。状態は置かない
 - **ログインの状態**（Step 6。issue #46 の Q1）は `data/repositories/auth_repository.dart` の `AuthRepository` が持つ。`ChangeNotifier`（Flutter の `foundation`。Riverpod ではない）を継承し、トークンの有無が変わったら `notifyListeners()` する。go_router は `refreshListenable` でこれを聞き、`redirect` で行き先を決める（公式の compass_app と同じ形）。`AuthRepository` は `config/dependencies.dart` の `authRepositoryProvider` が 1 つだけ作り（`keepAlive`）、`ApiClient`（`apiClientProvider`）と `TokenStorage`（`tokenStorageProvider`）を渡す。画面は `ui/account/view_models/` の Provider を通して使う
 - `device_name`（ログインと初回登録で送るトークンの名前。issue #46 の Q3）は `data/services/device_name.dart` が `dart:io` の `Platform`（`operatingSystem` と `operatingSystemVersion`）から作る（例: `ios Version 18.2 (Build 22C150)`。255 文字で切る）。パッケージは足さない
@@ -899,13 +902,13 @@ mobile/
 | 項目 | 内容 |
 |---|---|
 | 業務ルールと検証 | **アプリに書かない**（CLAUDE.md の絶対ルール 1）。定員・二重応募・状態遷移・応募できるかは API が判定し、アプリは 422 の `message` を表示する。入力欄の下には `errors` の同じキーの文言を出す。ボタンを出すかどうかは `can.apply` を見る |
-| 残り枠 | API の `remaining` をそのまま出す。Step 3 の偽データの画面だけは学習のためアプリで計算してよいが、Step 7 で API の値に置き換える |
+| 残り枠 | API の `remaining` をそのまま出す（Step 7 から。Step 3〜6 の偽データの画面だけは、満員・応募済みを学習のためアプリで判定していた）。応募のボタンと「応募済み」「満員」の表示は `my_application`・`can.apply`・`remaining` だけで出し分ける |
 | 状態の文言 | API が返す `{value, label}` の `label` を出す。色だけアプリが持つ（web の `lib/status.ts` と同じ考え方） |
 | API の呼び出し | `dio` を import するのは `data/services/` だけ（`ApiClient` と、それに差し込む `AuthInterceptor`）。API を呼ぶのは `ApiClient` だけで（web の `lib/api.ts` と同じ。Step 6）、リポジトリは `ApiClient` を通す。リダイレクトは追わない（`followRedirects: false`） |
-| レスポンスの型 | JSON を `Map` のまま使わず、モデルの `fromJson` で型に変えてから使う（Step 3 は手書き、Step 7 から `freezed` + `json_serializable`）。形が合わなければ例外にして、契約のずれとして報告する（web で zod の parse が落ちるのと同じ） |
+| レスポンスの型 | JSON を `Map` のまま使わず、モデルの `fromJson` で型に変えてから使う（Step 3〜6 は手書き、Step 7 から `freezed` + `json_serializable`）。形が合わなければ例外にして、契約のずれとして報告する（web で zod の parse が落ちるのと同じ）。生成した `fromJson` は `build.yaml` の `checked: true` で、形が違うと `CheckedFromJsonException`（どのキーで失敗したかを持つ）を投げる。リポジトリ（と `ApiClient`）は生成した `fromJson` を直に呼ばず、`data/services/api_client.dart` の `parseModel()` を通して呼び、`CheckedFromJsonException` を `FormatException` にそろえる（issue #48 の Q1） |
 | 401 | トークンを消して `/login` へ戻す（`AuthInterceptor`。インターセプタは画面を移さず、ログインの状態を未ログインにするだけで、行き先は `redirect` が決める）。ログイン画面に出す文言（issue #46 の Q4）: 応答に `errors` があれば `message`（無効にされたワーカーの 5.3 の文言）、なければ「もう一度ログインしてください。」（`Unauthenticated.` は英語なので出さない） |
 | トークン | `flutter_secure_storage` にだけ置く。iOS の Keychain は `unlocked_this_device`（バックアップから別の端末に移さない）。ログに出さない（`rules/common/security.md`）。`Authorization` は送り先が `API_BASE_URL` と同じ scheme・host・port のときだけ付ける（`AuthInterceptor`）。**残るリスク**（issue #46 のレビュー。受け入れる）: iOS の Keychain はアプリを消しても残るので、入れ直した直後は前のトークンでログインした状態で始まる（失効していれば最初の API の 401 でログイン画面に戻る）。消すにはアプリの領域に「初回起動の印」を置くパッケージが要るので、Step 6 ではしない |
-| エラーの表示 | 画面は `ApiError` の型を見ず、文字列にした値を出す（`ApiError.toString()` は `message` を返す）。応答の形が契約と違うときは `FormatException`（モデルの `fromJson` は `as` ではなく switch のパターンで確かめる。`as` の `TypeError` は `on FormatException` で受けられない）で、画面は決まりの日本語を出す |
+| エラーの表示 | 画面は `ApiError` の型を見ず、文字列にした値を出す（`ApiError.toString()` は `message` を返す）。応答の形が契約と違うときは `FormatException` で、画面は決まりの日本語を出す。手書きの `fromJson` は `as` ではなく switch のパターンで確かめる（`as` の `TypeError` は `on FormatException` で受けられない）。生成した `fromJson` は `parseModel()` が `FormatException` にそろえる（上の「レスポンスの型」） |
 | 企業コード | ログイン後と初回登録の後に `WorkerMeResource.company.code`（入力した値ではなく API が返した値）を覚えておき、次のログインの入力欄に入れておく（秘密ではない）。保存先は `flutter_secure_storage` の、トークンとは別のキー（issue #46 の Q2。パッケージを足さないため）。ログアウトしても消さない |
 | 日付と時刻 | 6.1 の形（`"2026-09-20"` `"09:00"` ISO 8601）を受け取り、表示は `2026/09/20（日）` `09:00〜17:00` の形にする（web の 7.5 と揃える） |
 
@@ -1032,7 +1035,7 @@ B と C の境界: C の `AttendanceService::save()` は B の `Application`（�
 
 | 担当 | 所有ファイル | 進め方 |
 |---|---|---|
-| リード（専用の implementer は作らない。docs/00 の決定 66） | `mobile/**`、`Makefile` の `mobile-*` のターゲット | 1 機能 = 1 コミットで止まって変更点を案内し、人の「次」を待つ（docs/05 の 1 章、決定 61）。push・PR・CI は、そのステップの機能がそろってから止まらずに進める |
+| リード（専用の implementer は作らない。docs/00 の決定 66） | `mobile/**`、`Makefile` の `mobile-*` のターゲット | 1 機能 = 1 コミットで止まらずに実装し、そろったら機能ごとの解説を 1 枚の HTML にして Orca で開く。人の確認はその後にまとめて行う（docs/05 の 1 章。issue #48 で決定 61 の「1 機能ごとに止まる」から変えた）。push・PR・CI も止まらずに進める |
 
 - レビューは `spec-reviewer` ∥ `code-reviewer`（`mobile/CLAUDE.md` をプロンプトで渡す）。トークンの扱いを変えたステップ（Step 6）は `security-reviewer` も
 - `tester` は使わない（mobile のテストは Step 9 から。そのときに担当を決める）

@@ -1,46 +1,42 @@
 // 募集一覧の 1 行。日付・時間帯・拠点・職種・時給と「残り○枠」のバッジを出す。
-// 残り枠が 0 の行は灰色にし、タップできなくする（詳細に入れないので応募もできない）。
-// 応募済みの募集は、バッジを「応募済み」に替える（appliedJobsProvider を読む）。
+// 満員の行は灰色にし、タップできなくする（詳細に入れないので応募もできない）。
+// 応募済みの募集は、バッジを API の my_application.status.label（応募中・確定など）に替える（Step 7）。
+// どちらも ApplyStatus.of(job)（API の my_application・can.apply・remaining だけで決める）から選ぶ。
 // React で言うと、一覧の map の中で返す <JobListItem job={job} /> コンポーネントに当たる。
 //
 // Card: https://api.flutter.dev/flutter/material/Card-class.html
 // ListTile: https://api.flutter.dev/flutter/material/ListTile-class.html
-// ConsumerWidget: https://riverpod.dev/ja/docs/concepts2/consumers
 
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../domain/models/apply_status.dart';
 import '../../../domain/models/job_posting.dart';
 import '../../../utils/format.dart';
-import '../view_models/applied_jobs_provider.dart';
 
-// 自分では状態を持たないが、「応募済みか」を Provider から読むので ConsumerWidget にする。
-// ConsumerWidget = Provider を読める StatelessWidget。build の 2 つめの引数で ref を受け取る
-// （ConsumerStatefulWidget と違い、State のクラスが要らない。React の関数コンポーネント ＋ useContext）。
-class JobListTile extends ConsumerWidget {
+// 渡された募集を描くだけなので StatelessWidget にする。
+// Step 4〜6 は「応募済みか」をアプリの Provider から読むため ConsumerWidget だった。
+// Step 7 からは応募済みかも募集（API の my_application）の中にあるので、Provider を読まなくてよい
+// （React で言うと、useContext をやめて props だけで描くコンポーネントに戻した）。
+class JobListTile extends StatelessWidget {
   const JobListTile({required this.job, super.key});
 
   final JobPosting job;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     // Theme.of(context): いちばん近い祖先のテーマを読む（React の useContext(ThemeContext)）。
     final textTheme = Theme.of(context).textTheme;
-    // ref.watch で応募した id の集まりを読む。詳細で応募すると state が入れ替わるので、
-    // 一覧に戻ったときにはこの行も描き直されている。
-    final status = ApplyStatus.of(
-      job,
-      applied: ref.watch(appliedJobsProvider).contains(job.id),
-    );
+    // 詳細で応募すると、一覧（jobListProvider）を取り直すので（T5）、戻ったときには新しい my_application で描かれる。
+    final status = ApplyStatus.of(job);
 
     return Card(
       // ListTile = 「上に見出し・下に補足・右に飾り」の 1 行の決まった形。
       child: ListTile(
         // enabled: false にすると、文字が灰色になり、onTap も呼ばれなくなる。
         // 満員の行だけ押せなくする（応募済みなら満員でも詳細を見られる）。
-        enabled: status != ApplyStatus.full,
+        // is: 型を確かめる（sealed class の子のどれかを見る。TypeScript の instanceof）。
+        enabled: status is! ApplyFull,
         title: Text(job.jobTitle, style: textTheme.titleMedium),
         // Column = 子を縦に並べる（CSS の flex-direction: column）。
         subtitle: Column(
@@ -65,10 +61,13 @@ class JobListTile extends ConsumerWidget {
             ),
             // SizedBox を高さだけで使うと、すき間になる（CSS の margin の代わり）。
             const SizedBox(height: 4),
-            // 状態ごとにバッジを選ぶ。|| は「どちらかに当てはまれば」のパターン（未応募と満員は残り枠を出す）。
+            // 状態ごとにバッジを選ぶ。ApplyApplied(:final label) は「ApplyApplied なら label を取り出す」パターン
+            // （:label は label: final label の短縮）。|| は「どれかに当てはまれば」で、ほかは残り枠を出す。
+            // sealed なので、子を 1 つでも書き漏らすとコンパイルエラーになる。
             switch (status) {
-              .applied => const _AppliedBadge(),
-              .notApplied || .full => _RemainingBadge(remaining: job.remaining),
+              ApplyApplied(:final label) => _AppliedBadge(label: label),
+              ApplyAvailable() || ApplyFull() || ApplyUnavailable() =>
+                _RemainingBadge(remaining: job.remaining),
             },
           ],
         ),
@@ -114,9 +113,11 @@ class _RemainingBadge extends StatelessWidget {
   }
 }
 
-// 「応募済み」のバッジ。表示するだけなので Stateless。
+// 「応募済み」のバッジ。文言は API の my_application.status.label（応募中・確定など）。表示するだけなので Stateless。
 class _AppliedBadge extends StatelessWidget {
-  const _AppliedBadge();
+  const _AppliedBadge({required this.label});
+
+  final String label;
 
   @override
   Widget build(BuildContext context) {
@@ -128,7 +129,7 @@ class _AppliedBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
-        '応募済み',
+        label,
         style: TextStyle(fontSize: 12, color: colors.onTertiaryContainer),
       ),
     );

@@ -84,22 +84,21 @@ class DatabaseSeederTest extends TestCase
         });
     }
 
-    public function test_シーダーの企業には企業コードが入る(): void
+    public function test_シーダーの企業には固定の企業コードが入る(): void
     {
         $this->seed(DatabaseSeeder::class);
 
         $admin = User::query()->where('email', 'admin@example.com')->firstOrFail();
         $other = User::query()->where('email', 'other@example.com')->firstOrFail();
 
+        // make fresh や worktree ごとの DB でも、同じ企業コードでログインできる
+        $this->assertSame('NEXT22', Company::query()->findOrFail($admin->company_id)->code);
+        $this->assertSame('XYZ789', Company::query()->findOrFail($other->company_id)->code);
+
         // 企業コードは 6 文字（紛らわしい 0 O 1 I L を除いた英大文字と数字。docs/01 の 3.1）
-        foreach ([$admin->company_id, $other->company_id] as $companyId) {
-            $code = Company::query()->findOrFail($companyId)->code;
+        foreach ([DatabaseSeeder::OWN_COMPANY_CODE, DatabaseSeeder::OTHER_COMPANY_CODE] as $code) {
             $this->assertMatchesRegularExpression('/\A[A-HJKMNP-Z2-9]{6}\z/', $code);
         }
-        $this->assertNotSame(
-            Company::query()->findOrFail($admin->company_id)->code,
-            Company::query()->findOrFail($other->company_id)->code,
-        );
     }
 
     public function test_シーダーに登録済みのワーカーが1人入る(): void
