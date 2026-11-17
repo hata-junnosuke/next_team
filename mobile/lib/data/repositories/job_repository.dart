@@ -10,6 +10,7 @@
 
 import '../../domain/models/job_posting.dart';
 import '../../domain/models/job_posting_page.dart';
+import '../../domain/models/schedule_tab.dart';
 import '../../domain/models/worker_application.dart';
 
 // abstract interface class = 「このメソッドを持つこと」という約束だけを書いた型（TypeScript の interface）。
@@ -40,4 +41,14 @@ abstract interface class JobRepository {
   // 応募できないとき（満員・二重応募・締切など）は API の 422 で ApiError を投げる。可否の判定はアプリでしない
   // （CLAUDE.md の絶対ルール 1）。見つからない募集は 404 の ApiError（一覧・詳細と違い null にしない。送る操作なので失敗として出す）。
   Future<WorkerApplication> apply(int jobPostingId);
+
+  // 自分の応募のうち、そのタブ（確定 / 応募中）のもの（GET /api/worker/applications?status=…。Step 8）。
+  // 並び（勤務日 → 開始時刻 → 応募の id）は API が決めるので、アプリで並べ替えない。
+  // 1 ページ目（最大 100 件）だけを返す（募集の一覧と同じ。予定が 100 件を超えることは考えない）。
+  Future<List<WorkerApplication>> fetchMyApplications(ScheduleTab tab);
+
+  // 自分の応募を取り下げる（POST /api/worker/applications/{id}/withdraw。Step 8）。成功したら取り下げた後の応募を返す。
+  // 取り下げられないとき（確定・却下・キャンセル・取り下げ済み）は 422、見つからない応募は 404 の ApiError を投げる
+  // （応募の apply と同じ。取り下げられるかの判定はアプリでしない）。
+  Future<WorkerApplication> withdraw(int applicationId);
 }

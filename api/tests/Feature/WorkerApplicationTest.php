@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\ApplicationStatus;
 use App\Enums\CancelReason;
 use App\Enums\JobPostingStatus;
+use App\Exceptions\DomainException;
 use App\Http\Middleware\AuthenticateWorker;
 use App\Models\Application;
 use App\Models\Attendance;
@@ -12,6 +13,7 @@ use App\Models\Company;
 use App\Models\JobPosting;
 use App\Models\Location;
 use App\Models\Worker;
+use App\Services\ApplicationService;
 use App\Support\CurrentCompany;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Context;
@@ -70,6 +72,7 @@ class WorkerApplicationTest extends TestCase
             'confirmed_transport_allowance' => null,
             'cancel_reason' => null,
             'cancelled_at' => null,
+            'can' => ['withdraw' => true],
         ]]);
         $this->assertSame($this->worker->id, $application->worker_id);
         $this->assertSame($this->company->id, $application->company_id);
@@ -372,17 +375,22 @@ class WorkerApplicationTest extends TestCase
 
     // ---- 応答の形と、管理者の代行入力（apply()）が変わっていないこと ----
 
-    public function test_応募の応答に勤怠と報酬とワーカーの氏名と可否が出ない(): void
+    public function test_応募の応答に勤怠と報酬とワーカーの氏名と管理者向けの可否が出ない(): void
     {
         $posting = $this->posting();
 
+        // can はワーカー向けの withdraw だけ（docs/01 の 6.11）。管理者向けの confirm・reject・cancel・attend は出ない
         $response = $this->actingAsWorker($this->worker)
             ->postJson("/api/worker/job-postings/{$posting->id}/applications")
             ->assertCreated()
             ->assertJsonMissingPath('data.worker')
             ->assertJsonMissingPath('data.attendance')
             ->assertJsonMissingPath('data.payroll')
-            ->assertJsonMissingPath('data.can')
+            ->assertJsonPath('data.can', ['withdraw' => true])
+            ->assertJsonMissingPath('data.can.confirm')
+            ->assertJsonMissingPath('data.can.reject')
+            ->assertJsonMissingPath('data.can.cancel')
+            ->assertJsonMissingPath('data.can.attend')
             ->assertJsonMissingPath('data.job_posting.hourly_wage')
             ->assertJsonMissingPath('data.job_posting.applications_count');
 
@@ -455,6 +463,7 @@ class WorkerApplicationTest extends TestCase
         $confirmed = $this->application(state: ApplicationStatus::Confirmed);
         $rejected = $this->application(state: ApplicationStatus::Rejected);
         $cancelled = $this->application(state: ApplicationStatus::Cancelled);
+        $withdrawn = $this->application(state: ApplicationStatus::Withdrawn);
         // ほかのワーカーの確定は、確定で絞っても出ない
         Application::factory()->confirmed()->create(['job_posting_id' => $confirmed->job_posting_id]);
 
@@ -463,6 +472,7 @@ class WorkerApplicationTest extends TestCase
             ApplicationStatus::Confirmed->value => $confirmed->id,
             ApplicationStatus::Rejected->value => $rejected->id,
             ApplicationStatus::Cancelled->value => $cancelled->id,
+            ApplicationStatus::Withdrawn->value => $withdrawn->id,
         ];
 
         $this->actingAsWorker($this->worker);
@@ -480,11 +490,10 @@ class WorkerApplicationTest extends TestCase
         $confirmed = $this->application(['work_date' => '2026-10-06'], state: ApplicationStatus::Confirmed);
 
         $this->actingAsWorker($this->worker);
-        // 決められた値（applied / confirmed / rejected / cancelled）以外。大文字は別の値として扱う。
+        // 決められた値（applied / confirmed / rejected / cancelled / withdrawn。docs/01 の 6.11）以外。大文字は別の値として扱う。
         // 配列（status[]=applied）も Enum の値ではないので 422（複数の状態での絞り込みは契約にない）
         $queries = [
             'status=unknown',
-            'status=withdrawn',
             'status=Applied',
             'status=APPLIED',
             'status[]=applied',
@@ -547,6 +556,7 @@ class WorkerApplicationTest extends TestCase
             'confirmed_transport_allowance' => 500,
             'cancel_reason' => null,
             'cancelled_at' => null,
+            'can' => ['withdraw' => false],
         ]], $response->json('data'));
         // 勤怠と報酬（勤怠の行の金額 9,600 円）・ワーカーの氏名は出ない
         $body = json_encode($response->json(), JSON_UNESCAPED_UNICODE);
@@ -728,6 +738,264 @@ class WorkerApplicationTest extends TestCase
             ->assertJsonPath('data.2.confirmed_transport_allowance', 500);
     }
 
+    // ---- 取り下げ（F-34。POST /api/worker/applications/{application}/withdraw。docs/01 の 4.5 の withdrawAsWorker()、6.11） ----
+
+    public function test_応募中の自分の応募を取り下げると200で状態が取り下げになりcan_withdrawがfalse(): void
+    {
+        $application = $this->application();
+
+        $this->actingAsWorker($this->worker)
+            ->postJson("/api/worker/applications/{$application->id}/withdraw")
+            ->assertOk()
+            ->assertExactJson(['data' => [
+                'id' => $application->id,
+                'job_posting' => [
+                    'id' => $application->job_posting_id,
+                    'job_title' => 'ピッキング',
+                    'work_date' => '2026-10-05',
+                    'start_time' => '09:00',
+                    'end_time' => '17:00',
+                    'location' => ['id' => $this->tokyo->id, 'name' => '東京倉庫'],
+                ],
+                'status' => ['value' => 'withdrawn', 'label' => '取り下げ'],
+                'applied_at' => '2026-10-01T10:00:00+09:00',
+                'confirmed_at' => null,
+                'confirmed_hourly_wage' => null,
+                'confirmed_transport_allowance' => null,
+                'cancel_reason' => null,
+                'cancelled_at' => null,
+                'can' => ['withdraw' => false],
+            ]]);
+
+        $this->assertSame(ApplicationStatus::Withdrawn, $application->fresh()->status);
+    }
+
+    public function test_取り下げた応募は管理者の応募一覧に取り下げで出る(): void
+    {
+        $application = $this->application();
+
+        $this->actingAsWorker($this->worker)
+            ->postJson("/api/worker/applications/{$application->id}/withdraw")
+            ->assertOk();
+
+        // 管理者の応募一覧（F-10）に「取り下げ」で出て、管理者の操作はどれもできない（docs/01 の 6.5）
+        $this->switchToAdmin()
+            ->getJson("/api/job-postings/{$application->job_posting_id}/applications")
+            ->assertOk()
+            ->assertJsonPath('data.*.id', [$application->id])
+            ->assertJsonPath('data.0.worker.name', '山田太郎')
+            ->assertJsonPath('data.0.status', ['value' => 'withdrawn', 'label' => '取り下げ'])
+            ->assertJsonPath('data.0.can', ['confirm' => false, 'reject' => false, 'cancel' => false, 'attend' => false]);
+    }
+
+    public function test_確定した応募は取り下げられず422で状態は変わらない(): void
+    {
+        $confirmed = $this->application(state: ApplicationStatus::Confirmed);
+
+        $this->assertWithdrawRejected($confirmed, '応募中の応募だけ取り下げられます。');
+    }
+
+    public function test_却下とキャンセルの応募は取り下げられず422(): void
+    {
+        $rejected = $this->application(['work_date' => '2026-10-05'], state: ApplicationStatus::Rejected);
+        $cancelled = $this->application(['work_date' => '2026-10-06'], state: ApplicationStatus::Cancelled);
+
+        $this->assertWithdrawRejected($rejected, '応募中の応募だけ取り下げられます。');
+        $this->assertWithdrawRejected($cancelled, '応募中の応募だけ取り下げられます。');
+    }
+
+    public function test_取り下げ済みの応募をもう一度取り下げると422(): void
+    {
+        $withdrawn = $this->application(state: ApplicationStatus::Withdrawn);
+
+        $this->assertWithdrawRejected($withdrawn, 'この応募はすでに取り下げられています。');
+    }
+
+    public function test_締切の募集と勤務日が過ぎた募集の応募中も取り下げられる(): void
+    {
+        // 取り下げに期限はない（docs/01 の 4.5）。締切は新規応募の受付停止だけで、勤務日が過ぎていても応募中なら取り下げられる
+        $closed = $this->application(['status' => JobPostingStatus::Closed]);
+        $past = $this->application(['work_date' => '2026-09-30']);
+        $closedAndPast = $this->application(['status' => JobPostingStatus::Closed, 'work_date' => '2026-09-20']);
+
+        $this->actingAsWorker($this->worker);
+        foreach ([$closed, $past, $closedAndPast] as $application) {
+            $this->postJson("/api/worker/applications/{$application->id}/withdraw")
+                ->assertOk()
+                ->assertJsonPath('data.status', ['value' => 'withdrawn', 'label' => '取り下げ'])
+                ->assertJsonPath('data.can.withdraw', false);
+            $this->assertSame(ApplicationStatus::Withdrawn, $application->fresh()->status);
+        }
+    }
+
+    public function test_中止された募集に残った応募中も取り下げられる(): void
+    {
+        // docs/01 の 4.5「締切・中止の募集…の応募中も取り下げられる」。中止の連動（F-07）を通らずに応募中が残った形をファクトリで作る
+        $application = $this->application(['status' => JobPostingStatus::Cancelled]);
+
+        $this->actingAsWorker($this->worker)
+            ->postJson("/api/worker/applications/{$application->id}/withdraw")
+            ->assertOk()
+            ->assertJsonPath('data.status', ['value' => 'withdrawn', 'label' => '取り下げ'])
+            ->assertJsonPath('data.can.withdraw', false);
+
+        $this->assertSame(ApplicationStatus::Withdrawn, $application->fresh()->status);
+    }
+
+    public function test_サービスは読み直した最新の状態で判定し手元のモデルが古くても確定を取り下げにしない(): void
+    {
+        // 手元のモデルは応募中のまま、DB では管理者が先に確定した（同時の操作）。lockFresh() で読み直した状態で 422 にする
+        $application = $this->application();
+        $stale = Application::query()->findOrFail($application->id);
+        Application::query()->whereKey($application->id)->update(['status' => ApplicationStatus::Confirmed->value]);
+
+        try {
+            app(ApplicationService::class)->withdrawAsWorker($stale, $this->worker);
+            $this->fail('DomainException が投げられるはず');
+        } catch (DomainException $e) {
+            $this->assertSame('応募中の応募だけ取り下げられます。', $e->getMessage());
+        }
+
+        $this->assertSame(ApplicationStatus::Confirmed, $application->fresh()->status);
+    }
+
+    public function test_同じ企業のほかのワーカーの応募は404で状態は変わらない(): void
+    {
+        // 持ち主の確認は withdrawAsWorker() の入口（docs/01 の 12 章）。ほかのワーカーの応募の有無と状態を明かさないよう、
+        // 取り下げられない状態（確定・却下・キャンセル・取り下げ済み）でも 422 の文言ではなく、どれも同じ 404 にする
+        $other = Worker::factory()->registered()->create(['name' => '佐藤花子']);
+
+        $this->actingAsWorker($this->worker);
+        foreach (ApplicationStatus::cases() as $state) {
+            $factory = match ($state) {
+                ApplicationStatus::Applied => Application::factory(),
+                ApplicationStatus::Confirmed => Application::factory()->confirmed(),
+                ApplicationStatus::Rejected => Application::factory()->rejected(),
+                ApplicationStatus::Cancelled => Application::factory()->cancelled(),
+                ApplicationStatus::Withdrawn => Application::factory()->withdrawn(),
+            };
+            $othersApplication = $factory->create(['job_posting_id' => $this->posting()->id, 'worker_id' => $other->id]);
+
+            $this->postJson("/api/worker/applications/{$othersApplication->id}/withdraw")
+                ->assertNotFound()
+                ->assertExactJson(['message' => '見つかりませんでした。', 'errors' => []]);
+
+            $this->assertSame($state, $othersApplication->fresh()->status, "{$state->value} の応募の状態が変わった");
+        }
+    }
+
+    public function test_他社の応募の取り下げは404(): void
+    {
+        $othersApplication = CurrentCompany::runAs(Company::factory()->create()->id, fn () => Application::factory()->create());
+
+        // 本番のリクエストは企業が空の状態で始まるので、setUp の企業を消してから本物のトークンで叩く
+        $token = $this->workerToken($this->worker);
+        Context::forget('company_id');
+
+        $this->withToken($token)
+            ->postJson("/api/worker/applications/{$othersApplication->id}/withdraw")
+            ->assertNotFound()
+            ->assertExactJson(['message' => '見つかりませんでした。', 'errors' => []]);
+
+        // assertDatabaseHas はクエリビルダで読む（Eloquent のグローバルスコープが効かない）ので、他社の行の状態も確かめられる
+        $this->assertDatabaseHas('applications', ['id' => $othersApplication->id, 'status' => ApplicationStatus::Applied->value]);
+    }
+
+    public function test_存在しない応募の取り下げは404(): void
+    {
+        $this->actingAsWorker($this->worker)
+            ->postJson('/api/worker/applications/999999/withdraw')
+            ->assertNotFound()
+            ->assertExactJson(['message' => '見つかりませんでした。', 'errors' => []]);
+    }
+
+    public function test_無効にされたワーカーの取り下げは401で状態は変わらない(): void
+    {
+        $application = $this->application();
+        // 守りは本物のトークンで確かめる（Sanctum::actingAs は guard の provider の確認を通らない。docs/01 の 5.3）
+        $token = $this->workerToken($this->worker);
+        $this->worker->update(['is_active' => false]);
+        Context::forget('company_id');
+
+        $this->withToken($token)
+            ->postJson("/api/worker/applications/{$application->id}/withdraw")
+            ->assertUnauthorized()
+            ->assertExactJson(['message' => AuthenticateWorker::DISABLED_MESSAGE, 'errors' => []]);
+
+        $this->assertDatabaseHas('applications', ['id' => $application->id, 'status' => ApplicationStatus::Applied->value]);
+    }
+
+    public function test_管理者のcookieとトークンなしでは取り下げられず401で状態は変わらない(): void
+    {
+        // 管理者は取り下げられない（docs/01 の 4.1。取り下げはワーカー本人だけ）。5.3 の「入れないことの確認」
+        $application = $this->application();
+        Context::forget('company_id');
+
+        $this->actingAsAdmin()
+            ->postJson("/api/worker/applications/{$application->id}/withdraw")
+            ->assertUnauthorized()
+            ->assertExactJson(['message' => 'Unauthenticated.']);
+        $this->forgetAuthenticatedUsers();
+
+        $this->postJson("/api/worker/applications/{$application->id}/withdraw")
+            ->assertUnauthorized()
+            ->assertExactJson(['message' => 'Unauthenticated.']);
+
+        $this->assertDatabaseHas('applications', ['id' => $application->id, 'status' => ApplicationStatus::Applied->value]);
+    }
+
+    public function test_自分の応募一覧のcan_withdrawは応募中のときだけtrue(): void
+    {
+        $applied = $this->application(['work_date' => '2026-10-05']);
+        $confirmed = $this->application(['work_date' => '2026-10-06'], state: ApplicationStatus::Confirmed);
+        $rejected = $this->application(['work_date' => '2026-10-07'], state: ApplicationStatus::Rejected);
+        $cancelled = $this->application(['work_date' => '2026-10-08'], state: ApplicationStatus::Cancelled);
+        $withdrawn = $this->application(['work_date' => '2026-10-09'], state: ApplicationStatus::Withdrawn);
+
+        $this->actingAsWorker($this->worker)
+            ->getJson('/api/worker/applications')
+            ->assertOk()
+            ->assertJsonPath('data.*.id', [$applied->id, $confirmed->id, $rejected->id, $cancelled->id, $withdrawn->id])
+            ->assertJsonPath('data.*.can', [
+                ['withdraw' => true],
+                ['withdraw' => false],
+                ['withdraw' => false],
+                ['withdraw' => false],
+                ['withdraw' => false],
+            ]);
+    }
+
+    public function test_自分の応募一覧を取り下げで絞り込める(): void
+    {
+        $kept = $this->application(['work_date' => '2026-10-05']);
+        $toWithdraw = $this->application(['work_date' => '2026-10-06']);
+
+        $this->actingAsWorker($this->worker)
+            ->postJson("/api/worker/applications/{$toWithdraw->id}/withdraw")
+            ->assertOk();
+
+        $this->getJson('/api/worker/applications?status=withdrawn')
+            ->assertOk()
+            ->assertJsonPath('data.*.id', [$toWithdraw->id])
+            ->assertJsonPath('data.0.status', ['value' => 'withdrawn', 'label' => '取り下げ']);
+        $this->getJson('/api/worker/applications?status=applied')
+            ->assertOk()
+            ->assertJsonPath('data.*.id', [$kept->id]);
+    }
+
+    public function test_取り下げた募集にもう一度応募すると二重の422(): void
+    {
+        // UNIQUE (job_posting_id, worker_id) なので、取り下げた募集には再応募できない（docs/01 の 3 章・4.5）
+        $application = $this->application();
+
+        $this->actingAsWorker($this->worker)
+            ->postJson("/api/worker/applications/{$application->id}/withdraw")
+            ->assertOk();
+
+        $this->assertRejected($application->jobPosting, 'この募集にはすでに応募しています。', expectedCount: 1);
+        $this->assertSame(ApplicationStatus::Withdrawn, $application->fresh()->status);
+    }
+
     /**
      * 自分（$this->worker）の応募を、明示した募集に作る。$state をファクトリの状態に振り分ける（$reason はキャンセルのときだけ使う）
      *
@@ -743,6 +1011,7 @@ class WorkerApplicationTest extends TestCase
             ApplicationStatus::Confirmed => Application::factory()->confirmed(),
             ApplicationStatus::Rejected => Application::factory()->rejected(),
             ApplicationStatus::Cancelled => Application::factory()->cancelled($reason),
+            ApplicationStatus::Withdrawn => Application::factory()->withdrawn(),
         };
 
         return $factory->create([
@@ -776,6 +1045,21 @@ class WorkerApplicationTest extends TestCase
 
         $this->assertSame($before, Application::query()->count());
         $this->assertSame($expectedCount, Application::query()->where('worker_id', $this->worker->id)->count());
+    }
+
+    /**
+     * 自分の応募の取り下げが 422（文言どおり・errors は空）で拒否され、状態が変わらないこと
+     */
+    private function assertWithdrawRejected(Application $application, string $message): void
+    {
+        $before = $application->fresh()->status;
+
+        $this->actingAsWorker($this->worker)
+            ->postJson("/api/worker/applications/{$application->id}/withdraw")
+            ->assertUnprocessable()
+            ->assertExactJson(['message' => $message, 'errors' => []]);
+
+        $this->assertSame($before, $application->fresh()->status);
     }
 
     /**

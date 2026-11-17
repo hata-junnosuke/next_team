@@ -2,7 +2,7 @@
 // 一覧のバッジ・行を押せるか、詳細のボタンの文言・押せるかを、この 1 つの値から決める。
 //
 // Step 7 から、API の値だけで決める（docs/01 の 7A.4。CLAUDE.md の絶対ルール 1）:
-// 1. my_application（自分の応募）があれば「応募済み」。文言はその status.label（応募中・確定・却下など）をそのまま出す
+// 1. my_application（自分の応募）があれば「応募済み」。文言はその status.label（応募中・確定・却下・取り下げなど）をそのまま出す
 // 2. can.apply が true なら「応募できる」
 // 3. どちらでもなく、remaining が 0 なら「満員」、そうでなければ「応募できない」（締切・中止・勤務日が過ぎた など）
 // 「応募できるか」の条件（募集中・今日以降・残り枠・自分の応募がない）は API がまとめて can.apply にしているので、
@@ -29,7 +29,9 @@ sealed class ApplyStatus {
   // JobPosting(can: JobPostingCan(apply: true)): 入れ子の値が true のときだけ当たる。
   // _: どれにも当たらなかったとき（default）。
   static ApplyStatus of(JobPosting job) => switch (job) {
-    JobPosting(myApplication: final my?) => ApplyApplied(label: my.status.label),
+    JobPosting(myApplication: final my?) => ApplyApplied(
+      label: my.status.label,
+    ),
     JobPosting(can: JobPostingCan(apply: true)) => const ApplyAvailable(),
     JobPosting(remaining: 0) => const ApplyFull(),
     _ => const ApplyUnavailable(),
@@ -42,7 +44,7 @@ final class ApplyAvailable extends ApplyStatus {
   const ApplyAvailable();
 }
 
-// 応募済み。label は API の my_application.status.label（応募中・確定・却下・キャンセル）。
+// 応募済み。label は API の my_application.status.label（応募中・確定・却下・キャンセル・取り下げ）。
 final class ApplyApplied extends ApplyStatus {
   const ApplyApplied({required this.label});
 

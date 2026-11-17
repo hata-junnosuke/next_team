@@ -18,7 +18,7 @@ use Illuminate\Database\Seeder;
  * 開発用のデータ（make fresh）。Rails の db/seeds.rb に相当。
  *
  * - 自社: 管理者 admin@example.com / password、拠点 4、ワーカー 7（うち無効 1、ワーカーアプリに登録済み 1: worker@example.com / password）、
- *   今日以降の募集（募集中・締切・中止）と応募（応募中・確定・却下・キャンセル）、先月と今日の勤怠（月次集計・深夜跨ぎの例）
+ *   今日以降の募集（募集中・締切・中止）と応募（応募中・確定・却下・キャンセル・取り下げ）、先月と今日の勤怠（月次集計・深夜跨ぎの例）
  * - 他社: 管理者 other@example.com / password と拠点・ワーカー・募集・勤怠を少し（分離の手動確認用。自社の画面に出ないこと）
  * - 企業コード（ワーカーのログインに使う）は、自社 NEXT22・他社 XYZ789 に固定する（make fresh や worktree ごとの DB でも同じ値でログインできるように）。
  *   creating はコードが入っていれば作らない。開発用のデータだけの決めごとで、本番の企業は今までどおり乱数で作る
@@ -103,9 +103,12 @@ class DatabaseSeeder extends Seeder
         Application::factory()->for($tomorrow)->for($ito)->cancelled(CancelReason::Worker)->create();
 
         // 3 日後・募集中・定員 1: 応募中 2 → 1 人承認すると、もう 1 人は「定員に達しているため承認できません。」
+        // 取り下げ 1（F-34。募集の詳細で「取り下げ」のバッジと、操作のボタンが出ないことを確かめる。
+        // worker@example.com の よてい の確認を邪魔しないよう、アプリに登録していないワーカーにする）
         $full = $this->posting($shinjuku, $today->addDays(3), ['job_title' => '品出し', 'capacity' => 1, 'hourly_wage' => 1250, 'transport_allowance' => 0]);
         Application::factory()->for($full)->for($sato)->create();
         Application::factory()->for($full)->for($tanaka)->create();
+        Application::factory()->for($full)->for($ito)->withdrawn()->create();
 
         // 5 日後・締切: 確定 1・応募中 1 → 締切後も応募中は承認できる（F-07）
         $closed = JobPosting::factory()->closed()->for($ikebukuro)->create([

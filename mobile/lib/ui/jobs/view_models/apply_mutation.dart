@@ -15,6 +15,9 @@ import 'package:flutter_riverpod/experimental/mutation.dart';
 import '../../../config/dependencies.dart';
 import '../../../data/services/api_error.dart';
 import '../../../domain/models/worker_application.dart';
+// よてい（schedule）の Provider。読んだ値は使わず、応募の後に invalidate するためだけに import する
+// （機能をまたいで状態を共有しない。docs/01 の 7A.1。Step 8 の issue #51 の Q3）。
+import '../../schedule/view_models/my_applications_provider.dart';
 import 'job_detail_provider.dart';
 import 'job_list_provider.dart';
 
@@ -34,7 +37,7 @@ final applyMutation = Mutation<WorkerApplication>(label: 'apply');
 // 流れ:
 // 1. 送信中か、もう成功していたら何もしない（2 回押しても 1 回しか送らない。ボタンも押せなくしているが、念のため）
 // 2. applyMutation(id).run(...) の中で API に送る。run は始まると Pending、終わると Success / Error にする
-// 3. 成功したら、その募集の詳細と、一覧のすべての絞り込みを invalidate して API から取り直す
+// 3. 成功したら、その募集の詳細と、一覧のすべての絞り込みと、よてい（Step 8）を invalidate して API から取り直す
 //    422（二重応募・満員・締切など）と 404（募集が見えなくなった）のときも、画面の値が古いので取り直す
 //    （応答で手元の値を書き換えない。残り枠をアプリで計算することになるため。7A.4 の「残り枠」）
 //
@@ -72,9 +75,16 @@ Future<void> applyToJobPosting(MutationTarget target, int jobPostingId) async {
 // その募集の詳細と、一覧（すべての絞り込み）を捨てて、次に読まれたときに API から取り直させる。
 // jobListProvider は引数（日付のチップ, 拠点）つきの Provider。引数を付けずに invalidate すると、
 // どの組（「今日」×「渋谷店」など）で読んでいたものも全部捨てる（React の queryClient.invalidateQueries({ queryKey: ['jobs'] })）。
+//
+// Step 8 から、よてい（myApplicationsProvider）も捨てる。応募した予定は よてい の「応募中」に増えるので、
+// 前に開いた よてい の一覧（キャッシュ）が残っていると、戻ったときに古い一覧が出てしまう。
+// これも引数（タブ）なしで捨てるので、「確定」「応募中」の両方を捨てる（どのタブに影響するかをアプリで考えない）。
+// よてい の画面が今見えていなければ（watch されていなければ）、捨てるだけで取りには行かない。次に開いたときに取る。
+// 状態を jobs と schedule で共有するのではなく、それぞれが API から取り直すだけにしている（issue #51 の Q3）。
 void _refresh(MutationTarget target, int jobPostingId) {
   target.container
     // .. はカスケード: 同じ相手に続けてメソッドを呼ぶ（Ruby の tap、JavaScript のメソッドチェーンに近い）。
     ..invalidate(jobDetailProvider(jobPostingId))
-    ..invalidate(jobListProvider);
+    ..invalidate(jobListProvider)
+    ..invalidate(myApplicationsProvider);
 }

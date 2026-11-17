@@ -64,7 +64,7 @@ class Application extends Model
      * 3. $attributes は「その状態に付随する列」をちょうど全部渡す。欠け・余分は呼び出し側のバグなので LogicException
      *    - Confirmed: confirmed_at / confirmed_hourly_wage / confirmed_transport_allowance（確定時に募集の値をコピーして固定）
      *    - Cancelled: cancel_reason / cancelled_at
-     *    - Rejected: なし
+     *    - Rejected / Withdrawn: なし（取り下げの日時の列は持たない。docs/01 の 4.3）
      *
      * 例: transitionTo(ApplicationStatus::Cancelled, ['cancel_reason' => CancelReason::Company, 'cancelled_at' => now()])
      *
@@ -92,7 +92,7 @@ class Application extends Model
         $required = match ($next) {
             ApplicationStatus::Confirmed => ['confirmed_at', 'confirmed_hourly_wage', 'confirmed_transport_allowance'],
             ApplicationStatus::Cancelled => ['cancel_reason', 'cancelled_at'],
-            ApplicationStatus::Applied, ApplicationStatus::Rejected => [],
+            ApplicationStatus::Applied, ApplicationStatus::Rejected, ApplicationStatus::Withdrawn => [],
         };
 
         $missing = array_filter($required, fn (string $column) => ($attributes[$column] ?? null) === null);

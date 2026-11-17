@@ -15,6 +15,7 @@ use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 
@@ -168,8 +169,32 @@ class ApplicationService
     }
 
     /**
+     * ワーカー本人の取り下げ（F-34。docs/01 の 4.5・6.11）。応募中だけを取り下げにする。期限はない
+     * （締切・中止の募集や、勤務日が過ぎた募集の応募中も取り下げられる）。付随する列はない。
+     * 他社の応募はルートモデルバインディング（グローバルスコープ）で先に 404。同じ企業のほかのワーカーの応募は、
+     * ロックして読み直した後に持ち主を確かめて 404 にする（ほかのワーカーの応募の有無を明かさない。docs/01 の 12 章。Policy は作らない）。
+     */
+    public function withdrawAsWorker(Application $application, Worker $worker): Application
+    {
+        return DB::transaction(function () use ($application, $worker) {
+            $locked = self::lockFresh($application);
+
+            // is() は外部キーの値と相手の主キーを比べるだけでクエリを出さない（PDO が返す ID の型にも頼らない）
+            if (! $locked->worker()->is($worker)) {
+                // WorkerPortalService::findPosting() と同じ形。例外ハンドラが「見つかりませんでした。」の 404 にする
+                throw (new ModelNotFoundException)->setModel(Application::class, [$application->id]);
+            }
+
+            $this->assertCanTransition($locked, ApplicationStatus::Withdrawn);
+            $application->transitionTo(ApplicationStatus::Withdrawn);
+
+            return $application;
+        });
+    }
+
+    /**
      * 応募できるワーカー（docs/01 の API 契約（募集）の applicable-workers）。有効で、まだこの募集に応募していない自社のワーカー。
-     * 却下・キャンセル済みの応募があるワーカーも、UNIQUE (job_posting_id, worker_id) で再応募できないので出さない。
+     * 却下・キャンセル・取り下げ済みの応募があるワーカーも、UNIQUE (job_posting_id, worker_id) で再応募できないので出さない。
      *
      * @return Collection<int, Worker>
      */
@@ -232,20 +257,27 @@ class ApplicationService
             return;
         }
 
+        // 内側の match に default を置かない。遷移表で許可される組（応募中から）はここに来ないので枝がなく、
+        // 状態を足したのに文言を足し忘れたら UnhandledMatchError（500）で気づける
         throw new DomainException(match ($next) {
             ApplicationStatus::Confirmed => match ($current) {
                 ApplicationStatus::Confirmed => 'この応募はすでに確定しています。',
                 ApplicationStatus::Rejected => '却下された応募は承認できません。',
-                default => 'キャンセルされた応募は承認できません。',
+                ApplicationStatus::Withdrawn => '取り下げられた応募は承認できません。',
+                ApplicationStatus::Cancelled => 'キャンセルされた応募は承認できません。',
             },
             ApplicationStatus::Rejected => match ($current) {
                 ApplicationStatus::Confirmed => '確定した応募は却下できません。',
                 ApplicationStatus::Rejected => 'この応募はすでに却下されています。',
-                default => 'キャンセルされた応募は却下できません。',
+                ApplicationStatus::Withdrawn => '取り下げられた応募は却下できません。',
+                ApplicationStatus::Cancelled => 'キャンセルされた応募は却下できません。',
             },
             ApplicationStatus::Cancelled => $current === ApplicationStatus::Cancelled
                 ? 'この応募はすでにキャンセルされています。'
-                : '確定済みの応募だけキャンセルできます。',
+                : '確定済みの応募だけキャンセルできます。', // 取り下げた応募もこの文言（docs/01 の 6.5）
+            ApplicationStatus::Withdrawn => $current === ApplicationStatus::Withdrawn
+                ? 'この応募はすでに取り下げられています。'
+                : '応募中の応募だけ取り下げられます。',
             ApplicationStatus::Applied => '応募中には戻せません。',
         });
     }

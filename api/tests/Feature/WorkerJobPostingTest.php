@@ -357,6 +357,24 @@ class WorkerJobPostingTest extends TestCase
             ->assertJsonPath('data.can.apply', false);
     }
 
+    public function test_取り下げた募集の詳細はmy_applicationが取り下げでcan_applyがfalse(): void
+    {
+        // 取り下げは UNIQUE (job_posting_id, worker_id) の行を残すので再応募できない（docs/01 の 4.5・6.11）。
+        // 募集中・今日以降・残り枠ありでも、自分の応募があるので can.apply は false
+        $posting = $this->posting();
+        $mine = Application::factory()->create(['job_posting_id' => $posting->id, 'worker_id' => $this->worker->id]);
+
+        $this->actingAsWorker($this->worker)
+            ->postJson("/api/worker/applications/{$mine->id}/withdraw")
+            ->assertOk();
+
+        $this->getJson("/api/worker/job-postings/{$posting->id}")
+            ->assertOk()
+            ->assertJsonPath('data.status', ['value' => 'open', 'label' => '募集中'])
+            ->assertJsonPath('data.my_application', ['id' => $mine->id, 'status' => ['value' => 'withdrawn', 'label' => '取り下げ']])
+            ->assertJsonPath('data.can.apply', false);
+    }
+
     public function test_募集中で今日の募集は応募がなくても詳細を見られる(): void
     {
         $today = $this->posting(['work_date' => '2026-10-01', 'start_time' => '09:00']);

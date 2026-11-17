@@ -7,7 +7,7 @@
 
 ## ルール
 
-1. **業務ルールと検証をアプリに書かない**。定員・二重応募・状態遷移・応募できるかは API が判定し、アプリは 422 の `message` を表示する（docs/01 の 7A.4）。残り枠は計算せず `remaining` を表示する。応募のボタンと「応募済み」「満員」の表示は、API の `can.apply`・`my_application`・`remaining` だけで出し分ける（Step 7 から。Step 3〜6 の偽データの画面は学習のためアプリで判定していた）
+1. **業務ルールと検証をアプリに書かない**。定員・二重応募・状態遷移・応募できるかは API が判定し、アプリは 422 の `message` を表示する（docs/01 の 7A.4）。残り枠は計算せず `remaining` を表示する。応募のボタンと「応募済み」「満員」の表示は、API の `can.apply`・`my_application`・`remaining` だけで出し分ける（Step 7 から。Step 3〜6 の偽データの画面は学習のためアプリで判定していた）。取り下げのボタンは `can.withdraw` だけで出し分け、状態の値（`applied` など）で分岐しない（Step 8）
 2. **`api/` のコードを読まない**。境界は docs/01 の 6.11 と 7A だけ。形がずれていたらアプリで吸収せず報告する
 3. **パッケージは docs/01 の 1 章の表にあるものだけ**を、表の「いつ」の Step から使う。足したくなったら、メリットとデメリットの表を作って人に確認する。バージョンは導入時に固定し、`pubspec.lock` をコミットする
 4. API は `data/services/` の `ApiClient` だけが `dio` で呼ぶ（`dio` を import するのは `data/services/` の `ApiClient` と `AuthInterceptor` だけ）。レスポンスはモデルの `fromJson` で型にしてから使う（Step 6 から）。モデルは Step 7 から `freezed` + `json_serializable` で生成し（`build.yaml` で `checked: true`）、生成した `fromJson` の失敗（`CheckedFromJsonException`）は `data/services/api_client.dart` の `parseModel()` で `FormatException` にそろえる（docs/01 の 7A.4）。生成物（`*.freezed.dart` `*.g.dart`）もコミットする
@@ -84,4 +84,4 @@ lib/
   data/services/            ApiClient・AuthInterceptor・TokenStorage・ApiError・device_name（Step 6）
 ```
 
-依存の向き: `routing → widgets → view_models → config → data → domain`（一方通行。widgets は config と data を直接読まない）。`routing` は `redirect` でログインの状態（`authRepositoryProvider`）を読むためだけに `config` も使う（Step 6）。`ui` は `domain` のモデルと `utils` を直接使ってよい。`routing` と `widgets` は `ui/core/ui` も使う。`main.dart` は起動前の検査と復元のために `config` と `data/services`（`apiBaseUrl`）を使う。`view_models` は、失敗を `on ApiError` で受け止めて、その `statusCode`・`message`・`errors` を読むためだけに `data/services/api_error.dart` を import してよい（docs/01 の 7A.1）。`view_models` には Provider のほか、Riverpod の mutation（`Mutation`）と、それを動かす送信の関数、およびそれらだけが使う private な関数も置く（Step 7 の応募の `apply_mutation.dart`）
+依存の向き: `routing → widgets → view_models → config → data → domain`（一方通行。widgets は config と data を直接読まない）。`routing` は `redirect` でログインの状態（`authRepositoryProvider`）を読むためだけに `config` も使う（Step 6）。`ui` は `domain` のモデルと `utils` を直接使ってよい。`routing` と `widgets` は `ui/core/ui` も使う。`main.dart` は起動前の検査と復元のために `config` と `data/services`（`apiBaseUrl`）を使う。`view_models` は、失敗を `on ApiError` で受け止めて、その `statusCode`・`message`・`errors` を読むためだけに `data/services/api_error.dart` を import してよい（docs/01 の 7A.1）。`view_models` には Provider のほか、Riverpod の mutation（`Mutation`）と、それを動かす送信の関数、およびそれらだけが使う private な関数も置く（Step 7 の応募の `apply_mutation.dart`）。ある機能の `view_models` は、`ref.invalidate` に渡すためだけに、別の機能の `view_models` の Provider を import してよい（読んだ値は使わない。機能をまたいで状態を共有しない。Step 8 の issue #51 の Q3。docs/01 の 7A.1）

@@ -13,6 +13,8 @@ export const statusTones = {
     confirmed: "green",
     rejected: "gray",
     cancelled: "red",
+    // 取り下げはワーカー本人だけが行う（issue #51）。却下と同じく終わった応募なので灰色
+    withdrawn: "gray",
   },
   // CancelReason
   cancelReason: { company: "amber", worker: "gray" },

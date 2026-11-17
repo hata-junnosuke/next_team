@@ -181,7 +181,7 @@ INDEX: `(company_id, work_date)`、`(company_id, status)`、`(location_id)`。
 | company_id | FK | NOT NULL |
 | job_posting_id | FK → job_postings | NOT NULL、restrictOnDelete |
 | worker_id | FK → workers | NOT NULL、restrictOnDelete |
-| status | string | NOT NULL、default `applied`（`applied` / `confirmed` / `rejected` / `cancelled`） |
+| status | string | NOT NULL、default `applied`（`applied` / `confirmed` / `rejected` / `cancelled` / `withdrawn`。`withdrawn` はワーカー Step 8 で足した。CHECK 制約のない string の列なので、マイグレーションは要らない） |
 | confirmed_at | datetime | NULL |
 | confirmed_hourly_wage | unsigned int | NULL（確定時に募集の値をコピーして固定） |
 | confirmed_transport_allowance | unsigned int | NULL（同上） |
@@ -295,7 +295,7 @@ INDEX: `(company_id, created_at)`。`*_type` には morph map の短い名前が
 | Enum | 値 → ラベル |
 |---|---|
 | `JobPostingStatus` | `open` 募集中 / `closed` 締切 / `cancelled` 中止 |
-| `ApplicationStatus` | `applied` 応募中 / `confirmed` 確定 / `rejected` 却下 / `cancelled` キャンセル |
+| `ApplicationStatus` | `applied` 応募中 / `confirmed` 確定 / `rejected` 却下 / `cancelled` キャンセル / `withdrawn` 取り下げ（ワーカー Step 8） |
 | `CancelReason` | `company` 企業都合 / `worker` ワーカー都合 |
 | `NotificationKind`（P4） | `application_confirmed` 確定通知 / `posting_cancelled` 中止通知 / `shift_reminder` 前日リマインド / `export_ready` 出力完了 / `worker_invitation` 招待（ワーカー Step 5） |
 | `NotificationStatus`（P4） | `pending` 送信待ち / `sent` 送信済み / `failed` 失敗 |
@@ -306,10 +306,12 @@ INDEX: `(company_id, created_at)`。`*_type` には morph map の短い名前が
 状態遷移（F-14）は `ApplicationStatus::canTransitionTo(self $next): bool` の **1 箇所** に置きます。
 
 ```
-applied   → confirmed / rejected
+applied   → confirmed / rejected / withdrawn
 confirmed → cancelled
-rejected / cancelled → （終端）
+rejected / cancelled / withdrawn → （終端）
 ```
+
+`withdrawn`（取り下げ）はワーカー Step 8 で足した。取り下げられるのはワーカー本人だけで（`ApplicationService::withdrawAsWorker()`）、管理者の API には取り下げの操作がない。期限はない。
 
 `JobPostingStatus::canTransitionTo()` も同じ形です: `open → closed / cancelled`、`closed → cancelled`。
 
@@ -342,7 +344,7 @@ final class CurrentCompany
 ### 4.3 モデル（`app/Models/`）
 
 - `#[Fillable([...])]` 属性を使い、**`company_id` と `status` は入れない**
-- `Application::transitionTo(ApplicationStatus $next, array $attributes = []): void` が `status` を変える唯一の入口。遷移できなければ `DomainException`。`JobPosting::transitionTo()` も同じ
+- `Application::transitionTo(ApplicationStatus $next, array $attributes = []): void` が `status` を変える唯一の入口。遷移できなければ `DomainException`。`JobPosting::transitionTo()` も同じ。遷移先ごとに付随する列を決めている（確定は `confirmed_at`・`confirmed_hourly_wage`・`confirmed_transport_allowance`、キャンセルは `cancel_reason`・`cancelled_at`）。却下と取り下げ（ワーカー Step 8）に付随する列はない（取り下げの日時の列は足さない）
 - `Application` の `$attributes = ['status' => 'applied']`、`JobPosting` の `$attributes = ['status' => 'open']`（`create()` 直後のメモリ上の値を DB の既定値と揃える。第2弾の教訓）
 - cast は `casts()` メソッド。日付は `immutable_date` / `immutable_datetime`
 - morph map を `AppServiceProvider::boot()` で強制する（P4）:
@@ -384,6 +386,7 @@ final class CurrentCompany
 | | `findPosting(Worker $w, JobPosting $p): JobPosting`（募集中かつ今日以降、または自分の応募がある募集だけ。ほかは `ModelNotFoundException`（404）） | | |
 | | `applications(Worker $w, ?ApplicationStatus $status, int $perPage): LengthAwarePaginator`（自分の応募だけ。勤務日が過ぎた・却下・キャンセルも含む。勤務日 → 開始時刻 → 応募の id の昇順。並びの列は `JobPosting` の副問い合わせで取る（join しないので企業のスコープが効く）） | | |
 | `ApplicationService` | `applyAsWorker(JobPosting $p, Worker $w): Application`（ワーカー Step 5。**判定と例外は `applyAsWorker` が自分で投げ、行を作る処理だけを `apply()` と共有する**（`apply()` の文言は管理者向けで `errors.worker_id` に入るため）。**判定はこの順**: 無効（`AuthenticateWorker::DISABLED_MESSAGE` の 422。ミドルウェアを通った後に無効にされたとき）→ 締切・中止 → 勤務日が過ぎた → 二重（却下・キャンセルの後の再応募も二重。UNIQUE (job_posting_id, worker_id)）→ 残り枠（自分の確定で満員の募集に「残り枠がない」と出さないため、二重を先に見る）。募集の行をロックした後に確定数を（ロックなしで）数え、`JobPosting::remainingFrom()` が 0 なら拒否する（親の行ロックで 1 本ずつになる。数える側でロックを取ると MySQL のギャップロックでデッドロックしうる）。同時に 2 回押したときの UNIQUE 違反も「この募集にはすでに応募しています。」にする。勤務日は日付だけで比べる（今日の勤務は開始後も応募できる。F-30 の「今日以降」と同じ読み）） | | 募集が締め切られているため応募できません。／募集が中止されたため応募できません。／勤務日が過ぎた募集には応募できません。／残り枠がないため応募できません。／この募集にはすでに応募しています。（どれも `errors` は空。ワーカーの画面には `worker_id` の入力欄がないため） |
+| | `withdrawAsWorker(Application $a, Worker $w): Application`（ワーカー Step 8。F-34。トランザクションの中で応募を `lockForUpdate()` で読み直し（`reject()` と同じ）、`worker_id` が `$w` でなければ `ModelNotFoundException`（404。他社の応募はルートモデルバインディングで先に 404）。そのあと遷移できるかを確かめて `transitionTo(Withdrawn)`。期限はない（締切・中止の募集や、勤務日が過ぎた募集の応募中も取り下げられる）） | 取り下げた後 | 応募中の応募だけ取り下げられます。（確定・却下・キャンセル）／この応募はすでに取り下げられています。（どちらも `errors` は空） |
 | `NotificationLogService`（P4） | `claim(NotificationKind $k, Model $recipient, Model $subject): ?NotificationLog`（宛先のアドレスは $recipient->email から決める。宛先・対象が未保存・company_id なし・他社なら LogicException。P4-01 で決定） | 送ってよいなら行、送信済みなら `null` | |
 | | `markSent(NotificationLog $l): void` / `markFailed(NotificationLog $l, ?Throwable $e): void`（送信済みなら何もしない） | | |
 | | `markFailedByKey(string $dedupeKey, ?Throwable $e): bool`（ジョブの `failed()` 用。行があれば failed にして `true`（送信済みなら変えないが `true`）、行がなければ何もせず `false`。`false` なら呼び出し側がまだ送るべき対象かを確かめて `recordFailure()`）/ `static dedupeKey(NotificationKind, Model $subject): string` | | |
@@ -573,7 +576,7 @@ sequenceDiagram
 
 `JobPostingResource`: `{id, location: {id, name}, job_title, work_date, start_time, end_time, capacity, hourly_wage, transport_allowance, status: {value, label}, applications_count, confirmed_count, can: {edit, close, cancel, apply}}`
 
-`applications_count` は却下・キャンセルを含む全件の応募数、`confirmed_count` は確定の数（P2-03 で決定）。`can.edit` は中止以外、`can.apply` は募集中のときだけ（`JobPostingStatus::isEditable()` / `acceptsApplications()` の 1 箇所）。
+`applications_count` は却下・キャンセル・取り下げ（ワーカー Step 8）を含む全件の応募数、`confirmed_count` は確定の数（P2-03 で決定）。`can.edit` は中止以外、`can.apply` は募集中のときだけ（`JobPostingStatus::isEditable()` / `acceptsApplications()` の 1 箇所）。
 
 複製（duplicate）: 勤務日は元の募集と別の日（同じ日は 422）。元の時給が今の最低賃金未満なら 422。
 
@@ -591,9 +594,9 @@ sequenceDiagram
 
 `ApplicationResource`: `{id, worker: {id, name}, status: {value, label}, confirmed_at, confirmed_hourly_wage, confirmed_transport_allowance, cancel_reason: {value, label} | null, cancelled_at, attendance: AttendanceResource | null, can: {confirm, reject, cancel, attend}}`
 
-422 の文言（P2-04 で決定。遷移できないときはすべて 422）: 応募は「締め切られた募集には応募できません。」「中止された募集には応募できません。」「無効のワーカーは応募できません。」（`errors.worker_id`）「このワーカーはすでにこの募集に応募しています。」（`errors.worker_id`）。承認は「この応募はすでに確定しています。」「却下された応募は承認できません。」「キャンセルされた応募は承認できません。」「中止された募集の応募は承認できません。」「定員に達しているため承認できません。」。却下は「確定した応募は却下できません。」「この応募はすでに却下されています。」「キャンセルされた応募は却下できません。」。キャンセルは「確定済みの応募だけキャンセルできます。」「この応募はすでにキャンセルされています。」。業務ルール違反は `errors` が空（`worker_id` のものを除く）。入力の検証エラー（`worker_id` / `reason`）は項目のキーに入る。
+422 の文言（P2-04 で決定。遷移できないときはすべて 422）: 応募は「締め切られた募集には応募できません。」「中止された募集には応募できません。」「無効のワーカーは応募できません。」（`errors.worker_id`）「このワーカーはすでにこの募集に応募しています。」（`errors.worker_id`）。承認は「この応募はすでに確定しています。」「却下された応募は承認できません。」「キャンセルされた応募は承認できません。」「取り下げられた応募は承認できません。」「中止された募集の応募は承認できません。」「定員に達しているため承認できません。」。却下は「確定した応募は却下できません。」「この応募はすでに却下されています。」「キャンセルされた応募は却下できません。」「取り下げられた応募は却下できません。」。キャンセルは「確定済みの応募だけキャンセルできます。」（取り下げた応募もこの文言）「この応募はすでにキャンセルされています。」。取り下げ（ワーカー Step 8）の 2 つは 4.5 の `withdrawAsWorker()`。業務ルール違反は `errors` が空（`worker_id` のものを除く）。入力の検証エラー（`worker_id` / `reason`）は項目のキーに入る。
 
-`can` は「状態として可能か」だけを返します（定員は見ない）。画面はこれでボタンを出し分け、定員エラーは 422 のメッセージで表示します。
+`can` は「状態として可能か」だけを返します（定員は見ない）。画面はこれでボタンを出し分け、定員エラーは 422 のメッセージで表示します。取り下げた応募（`withdrawn`）の `can` はすべて `false` です。
 
 ### 6.6 勤怠・報酬（F-15、F-16）
 
@@ -664,7 +667,7 @@ sequenceDiagram
 
 （P5-01 で決定）新しい順（created_at → id の降順）でページング。`kind` / `status` は Enum で検証（不正は 422、空は絞り込まない）。`recipient.email` は記録時の `recipient_email`（実際に送った先）、`recipient.name` と label の名前は今の値（名前を直したら新しい名前で出る）。`subject.label` は応募が「{職種} {勤務日} / {ワーカー名}」、集計出力が「{月} の月次集計」、招待（ワーカー Step 5）が「{ワーカー名} への招待」（type の label は「招待」）。宛先・対象の行が消えていたら `name` は記録時のアドレス、`label` は「削除された応募」などを返す（招待の行はあるがワーカーが読めないときは「削除されたワーカー への招待」）。
 
-### 6.11 ワーカー用 API（F-26〜F-33。ワーカー Step 5。docs/05 の付録 A）
+### 6.11 ワーカー用 API（F-26〜F-34。ワーカー Step 5、取り下げは Step 8。docs/05 の付録 A）
 
 ワーカーアプリ（`mobile/`）とだけ結ぶ契約です。共通の形（6.1）はそのまま使います。**業務ルールの判定はすべて API が行い、アプリは 422 の `message` を表示するだけ**です。
 
@@ -678,9 +681,10 @@ sequenceDiagram
 | GET | `/api/worker/locations` | | 一覧（ページなし）`{id, name}`（絞り込みの選択肢。自社の拠点すべて） | F-30 |
 | GET | `/api/worker/job-postings/{id}` | | 200 `WorkerJobPostingResource`。募集中かつ今日以降、または自分の応募がある募集だけ。ほかは 404 | F-31 |
 | POST | `/api/worker/job-postings/{id}/applications` | | 201 `WorkerApplicationResource` | F-32 |
-| GET | `/api/worker/applications` | `status`（`applied` / `confirmed` / `rejected` / `cancelled`。空は絞り込まない。それ以外は 422）`page` `per_page` | 一覧（ページあり。自分の応募だけ。勤務日 → 開始時刻 → 応募の id の昇順） | F-33 |
+| GET | `/api/worker/applications` | `status`（`applied` / `confirmed` / `rejected` / `cancelled` / `withdrawn`。空は絞り込まない。それ以外は 422）`page` `per_page` | 一覧（ページあり。自分の応募だけ。勤務日 → 開始時刻 → 応募の id の昇順） | F-33 |
+| POST | `/api/worker/applications/{id}/withdraw` | （本文なし） | 200 `WorkerApplicationResource`（`job_posting.location` を含む。Step 8） | F-34 |
 
-表の `{id}` は、ルートでは `{job_posting}`（ルートモデルバインディング。URL の形は同じ）。register の `password` は 8〜255 文字（issue #37 の決定 Q7。bcrypt は先頭 72 バイトだけを使う）。
+表の `{id}` は、ルートでは `{job_posting}` と `{application}`（ルートモデルバインディング。URL の形は同じ。他社の ID はグローバルスコープで 404）。register の `password` は 8〜255 文字（issue #37 の決定 Q7。bcrypt は先頭 72 バイトだけを使う）。
 
 失敗（共通の 401 のほか）:
 
@@ -691,6 +695,7 @@ sequenceDiagram
 | `GET job-postings/{id}` | 404（他社・存在しない・条件を満たさない募集） |
 | `POST job-postings/{id}/applications` | 404（他社・存在しない募集）、422（4.5 の `applyAsWorker()` の 5 つと、ミドルウェアの後に無効にされたとき） |
 | `GET applications` | 422（`status` が Enum にない値） |
+| `POST applications/{id}/withdraw` | 404（他社・存在しない応募と、同じ企業のほかのワーカーの応募。Policy は作らない。12 章）、422（4.5 の `withdrawAsWorker()` の 2 つ。`errors` は空）。無効にされたワーカーは `worker` ミドルウェアで 401（5.3）。ミドルウェアを通った直後に無効にされたときは、応募（`applyAsWorker()`）と違って取り下げを止めない（本人が自分の応募中を取り消すだけで、定員や確定を増やさないため） |
 
 `WorkerMeResource`: `{id, name, email, company: {id, name, code}}`（`email` は小文字で保存したメール。アプリは `company.code` を覚えておき、次のログインの入力欄に入れておく）
 
@@ -699,7 +704,7 @@ sequenceDiagram
 - `remaining` は 4.6 の残り枠。`can.apply` は「募集中 かつ 勤務日が今日以降 かつ 残り枠 > 0 かつ 自分の応募がない」（`can` は表示の出し分けにだけ使い、可否の最終判定は 422）
 - **ほかのワーカーの氏名・応募数・応募の内訳は返さない**（`applications_count` も返さない。管理者用の `JobPostingResource` とは別の Resource にする）
 
-`WorkerApplicationResource`: `{id, job_posting: {id, job_title, work_date, start_time, end_time, location: {id, name}}, status: {value, label}, applied_at, confirmed_at, confirmed_hourly_wage, confirmed_transport_allowance, cancel_reason: {value, label} | null, cancelled_at}`（`applied_at` は応募の `created_at`。勤怠と報酬は返さない。後の弾で決める）
+`WorkerApplicationResource`: `{id, job_posting: {id, job_title, work_date, start_time, end_time, location: {id, name}}, status: {value, label}, applied_at, confirmed_at, confirmed_hourly_wage, confirmed_transport_allowance, cancel_reason: {value, label} | null, cancelled_at, can: {withdraw}}`（`applied_at` は応募の `created_at`。勤怠と報酬は返さない。後の弾で決める。`can.withdraw` は Step 8 で足した。「状態として取り下げられるか」（応募中なら `true`）だけを返し、アプリはこれでボタンを出し分ける。管理者向けの `can`（`confirm` など）は返さない）
 
 422 の文言:
 
@@ -710,6 +715,8 @@ sequenceDiagram
 | ログイン: 企業コード・メール・パスワードのどれかが誤り | 企業コード・メールアドレス・パスワードのいずれかが正しくありません。 | `email` |
 | ログイン: 無効ワーカー（パスワードは合っている） | このアカウントは現在利用できません。管理者にお問い合わせください。 | `email` |
 | 応募 | 4.5 の `applyAsWorker()` の 5 つ | 空 |
+| 取り下げ: 応募中でない（確定・却下・キャンセル） | 応募中の応募だけ取り下げられます。 | 空 |
+| 取り下げ: 取り下げ済み | この応募はすでに取り下げられています。 | 空 |
 | 入力の検証 | Laravel の既定（日本語） | 項目のキー |
 
 401 の文言: 未ログイン・トークンが無効は `{"message": "Unauthenticated."}`（6.1 と同じ）。無効にされたワーカーは 5.3 の文言。アプリはどちらもトークンを消してログイン画面に戻る。
@@ -846,10 +853,10 @@ mobile/
     │   ├── core/ui/              複数の画面で使う Widget（scaffold_with_nav_bar.dart、Step 6 から error_banner.dart）
     │   ├── core/themes/          テーマ（theme.dart）
     │   ├── jobs/                 さがす（view_models/ 状態（Riverpod の Provider と、Step 7 の応募の mutation apply_mutation.dart）、widgets/ 画面と Widget（Step 7 から apply_confirm_dialog.dart））
-    │   ├── schedule/             よてい（自分の応募）
+    │   ├── schedule/             よてい（自分の応募。Step 8: view_models/ に my_applications_provider.dart と取り下げの mutation withdraw_mutation.dart、widgets/ に schedule_screen.dart・schedule_list_tile.dart・withdraw_confirm_dialog.dart）
     │   ├── notices/              おしらせ（Step 10 まで中身なし）
     │   └── account/              マイページ・ログイン・初回登録（Step 6）
-    ├── domain/models/            モデル（Step 7 から freezed: JobPosting・JobPostingPage・LabeledValue・WorkerApplication・WorkerMe）と値の定義（DateFilter・ApplyStatus）
+    ├── domain/models/            モデル（Step 7 から freezed: JobPosting・JobPostingPage・LabeledValue・WorkerApplication（Step 8 から can）・WorkerMe）と値の定義（DateFilter・ApplyStatus、Step 8 から ScheduleTab）
     └── data/
         ├── repositories/         リポジトリ（JobRepository と、Step 7 からの実装 api_job_repository.dart。Step 6 から auth_repository.dart）
         └── services/             Step 6: api_client.dart（ApiClient（dio）と、Step 7 からトップレベルの関数 parseModel()）・AuthInterceptor・TokenStorage・ApiError（Step 7 から freezed）・device_name.dart
@@ -863,11 +870,11 @@ mobile/
 - `config/dependencies.dart` は、どの実装を使うかを決める Provider（`jobRepositoryProvider`。Step 4）と、その生成物。差し替えはこの Provider の 1 行だけ。Riverpod を `data/` に持ち込まないために、`data/` の外に置く
 - `ui/<機能>/view_models/` は、その機能の画面の状態を持つ Riverpod の Provider（`@riverpod` の関数と Notifier）と、その生成物（`*.g.dart`）だけ。リポジトリは `config/dependencies.dart` の Provider 経由で使う。公式の ViewModel に当たる（公式は ChangeNotifier が前提なので、Riverpod の Provider を当てはめている。React の hooks のフォルダに近い）。Provider でない部品（変換の関数など）は置かず、`domain/models/` か `utils/` に置く（Riverpod の mutation と、それを動かす送信の関数、およびそれらだけが使う private な関数は置いてよい。Step 7 の応募の `apply_mutation.dart`）。例外は、その Provider の状態の型（`typedef`。ログインと初回登録の `AuthFormState`）と、その Provider だけが使う private なメソッド。`data/services/api_error.dart` の `ApiError` は、失敗を `on ApiError` で受け止めて、その `statusCode`・`message`・`errors` を読むためだけに import してよい（Step 6）
 - `ui/<機能>/widgets/` は画面（`<機能>_screen.dart`）と Widget だけ。`view_models/` の Provider を `ref.watch` / `ref.read` で読む。`config/` と `data/` を直接読まない（1 件の取得も `jobDetailProvider(id)` のような引数つきの Provider を通す）
-- 機能をまたいで使う状態は `view_models/` に置かない。Step 4 の偽の応募済み `appliedJobsProvider` は Step 7 で消し、「応募済み」は API の `my_application`（あればその `status.label`）で出す（issue #48）。Step 8 で jobs と schedule が同じ状態を使うようになったら、状態の持ち主を `data/repositories/` のリポジトリ（Riverpod を知らない）にし、それを返す Provider を `config/dependencies.dart` に置いて、jobs と schedule の `view_models/` がそれぞれ読む（公式の「共有する状態はリポジトリに持つ」。issue #35 の Q4=A）
+- 機能をまたいで使う状態は `view_models/` に置かない。Step 4 の偽の応募済み `appliedJobsProvider` は Step 7 で消し、「応募済み」は API の `my_application`（あればその `status.label`）で出す（issue #48）。Step 8（issue #51 の Q3）では jobs と schedule の間で状態を共有しない。どちらも API から取り直すだけにし、応募の後は よてい の Provider（`myApplicationsProvider`）も、取り下げの後は さがす の詳細と一覧の Provider（`jobDetailProvider`・`jobListProvider`）も `invalidate` する。**そのためだけに、ある機能の `view_models/` が別の機能の `view_models/` の Provider を import してよい**（`ref.invalidate` に渡すだけ。読んだ値を使わない）。状態を本当に共有するときは、持ち主を `data/repositories/` のリポジトリ（Riverpod を知らない）にし、それを返す Provider を `config/dependencies.dart` に置く（公式の「共有する状態はリポジトリに持つ」。issue #35 の Q4=A）
 - `ui/core/` は複数の画面で使う Widget（`ui/`）とテーマ（`themes/`）だけ。状態は置かない
 - **ログインの状態**（Step 6。issue #46 の Q1）は `data/repositories/auth_repository.dart` の `AuthRepository` が持つ。`ChangeNotifier`（Flutter の `foundation`。Riverpod ではない）を継承し、トークンの有無が変わったら `notifyListeners()` する。go_router は `refreshListenable` でこれを聞き、`redirect` で行き先を決める（公式の compass_app と同じ形）。`AuthRepository` は `config/dependencies.dart` の `authRepositoryProvider` が 1 つだけ作り（`keepAlive`）、`ApiClient`（`apiClientProvider`）と `TokenStorage`（`tokenStorageProvider`）を渡す。画面は `ui/account/view_models/` の Provider を通して使う
 - `device_name`（ログインと初回登録で送るトークンの名前。issue #46 の Q3）は `data/services/device_name.dart` が `dart:io` の `Platform`（`operatingSystem` と `operatingSystemVersion`）から作る（例: `ios Version 18.2 (Build 22C150)`。255 文字で切る）。パッケージは足さない
-- 依存の向きは一方通行: `main.dart → app.dart・config・data/services`（`config` は起動前の `restore()`、`data/services` は `apiBaseUrl` の検査のためだけ。Step 6）、`app.dart → routing・ui/core/themes`、`routing → ui/*/widgets・ui/core/ui・config`（`config` は `redirect` でログインの状態を読むためだけ。Step 6）、`ui/*/widgets → ui/*/view_models・ui/core/ui`、`ui/*/view_models → config → data → domain`（`ui` は `domain` のモデルと `utils` を使ってよい。`view_models` は上の `ApiError` の例外がある）。`domain` は誰にも依存しない
+- 依存の向きは一方通行: `main.dart → app.dart・config・data/services`（`config` は起動前の `restore()`、`data/services` は `apiBaseUrl` の検査のためだけ。Step 6）、`app.dart → routing・ui/core/themes`、`routing → ui/*/widgets・ui/core/ui・config`（`config` は `redirect` でログインの状態を読むためだけ。Step 6）、`ui/*/widgets → ui/*/view_models・ui/core/ui`、`ui/*/view_models → config → data → domain`（`ui` は `domain` のモデルと `utils` を使ってよい。`view_models` は上の `ApiError` の例外と、別の機能の `view_models` の Provider を `invalidate` のためだけに import してよい例外（Step 8）がある）。`domain` は誰にも依存しない
 - 公式のサンプルにある `main_development.dart` / `main_staging.dart`（環境ごとの入口）と `testing/`（テスト用の偽物）は、今は作らない。接続先は `--dart-define`（7A.2）で切り替え、テスト用の置き場は Step 9 で決める
 - テストは Step 9 から `mobile/test/`（`lib/` と同じ形。`rules/common/testing.md`）
 
@@ -888,7 +895,7 @@ mobile/
 |---|---|---|---|---|
 | `/jobs` | 募集一覧（さがす） | さがす | 3（偽データ）→ 7 | `GET /api/worker/job-postings`、`GET /api/worker/locations` |
 | `/jobs/:id` | 募集の詳細・応募 | さがす | 3 → 7 | `GET /api/worker/job-postings/{id}`、`POST /api/worker/job-postings/{id}/applications` |
-| `/schedule` | 自分の応募（よてい） | よてい | 3（空）→ 8 | `GET /api/worker/applications` |
+| `/schedule` | 自分の応募（よてい。確定・応募中の 2 タブと取り下げ） | よてい | 3（空）→ 8 | `GET /api/worker/applications`、`POST /api/worker/applications/{id}/withdraw` |
 | `/notices` | おしらせ | おしらせ | 3（空）→ 10 | （Step 10 で決める） |
 | `/account` | マイページ・ログアウト | マイページ | 3（空）→ 6 | `GET /api/worker/me`、`POST /api/worker/logout` |
 | `/login` | ログイン | タブの外 | 6 | `POST /api/worker/login` |
@@ -903,7 +910,7 @@ mobile/
 |---|---|
 | 業務ルールと検証 | **アプリに書かない**（CLAUDE.md の絶対ルール 1）。定員・二重応募・状態遷移・応募できるかは API が判定し、アプリは 422 の `message` を表示する。入力欄の下には `errors` の同じキーの文言を出す。ボタンを出すかどうかは `can.apply` を見る |
 | 残り枠 | API の `remaining` をそのまま出す（Step 7 から。Step 3〜6 の偽データの画面だけは、満員・応募済みを学習のためアプリで判定していた）。応募のボタンと「応募済み」「満員」の表示は `my_application`・`can.apply`・`remaining` だけで出し分ける |
-| 状態の文言 | API が返す `{value, label}` の `label` を出す。色だけアプリが持つ（web の `lib/status.ts` と同じ考え方） |
+| 状態の文言 | API が返す `{value, label}` の `label` を出す。色だけアプリが持つ（web の `lib/status.ts` と同じ考え方）。`status.value` で操作の可否を分けない: 取り下げのボタンは `can.withdraw` だけで出し分ける（Step 8）。よていのタブ（確定・応募中）は API の `status` の絞り込みに渡す値として使う |
 | API の呼び出し | `dio` を import するのは `data/services/` だけ（`ApiClient` と、それに差し込む `AuthInterceptor`）。API を呼ぶのは `ApiClient` だけで（web の `lib/api.ts` と同じ。Step 6）、リポジトリは `ApiClient` を通す。リダイレクトは追わない（`followRedirects: false`） |
 | レスポンスの型 | JSON を `Map` のまま使わず、モデルの `fromJson` で型に変えてから使う（Step 3〜6 は手書き、Step 7 から `freezed` + `json_serializable`）。形が合わなければ例外にして、契約のずれとして報告する（web で zod の parse が落ちるのと同じ）。生成した `fromJson` は `build.yaml` の `checked: true` で、形が違うと `CheckedFromJsonException`（どのキーで失敗したかを持つ）を投げる。リポジトリ（と `ApiClient`）は生成した `fromJson` を直に呼ばず、`data/services/api_client.dart` の `parseModel()` を通して呼び、`CheckedFromJsonException` を `FormatException` にそろえる（issue #48 の Q1） |
 | 401 | トークンを消して `/login` へ戻す（`AuthInterceptor`。インターセプタは画面を移さず、ログインの状態を未ログインにするだけで、行き先は `redirect` が決める）。ログイン画面に出す文言（issue #46 の Q4）: 応答に `errors` があれば `message`（無効にされたワーカーの 5.3 の文言）、なければ「もう一度ログインしてください。」（`Unauthenticated.` は英語なので出さない） |
@@ -979,6 +986,17 @@ mobile/
 | `Feature/WorkerApplicationTest.php` | 応募できる（管理者の応募一覧に応募中で出る）／残り枠 0・締切・中止・勤務日が過ぎた・二重は 422（文言は 4.5 のもの。`errors` は空）／残り枠 0 でも管理者の代行入力（F-09）はできる／**無効にされたワーカーの応募は 401 で、応募は作られない**／自分の応募だけが並び、状態で絞れる。キャンセルは理由区分（企業都合）が出る／**他社の募集への応募は 404** |
 | `Feature/WorkerAcceptanceScenarioTest.php` | 要件 4.8 の動線（docs/05 の付録 A.3）を API 経由で 1 本。キューは sync のまま `Mail::fake()` で「届く」を確かめ、招待コードは送られた `WorkerInvitationMail` から取る。勤務日は `travelTo()` で今日を固定して決める |
 
+ワーカー Step 8（issue #51。取り下げ）で足す・直すテスト:
+
+| ファイル | 守るもの |
+|---|---|
+| `Unit/ApplicationStatusTest.php` | 応募中 → 取り下げだけが許可。取り下げは終端。全 25 組の遷移可否、禁止の 21 組で `DomainException` と DB が変わらないこと、許可の 4 組。ラベル「取り下げ」と Enum の値の集合（4.1） |
+| `Feature/ApplicationTest.php` | 取り下げた応募は管理者が承認・却下・キャンセルできない（6.5 の文言）。管理者の応募一覧に「取り下げ」で出て `can` はすべて `false` |
+| `Feature/WorkerApplicationTest.php` | 本人の応募中だけ取り下げられる（200、`can.withdraw` が `false` に）。確定・却下・キャンセル・取り下げ済みは 422（6.11 の文言、`errors` は空）。締切・勤務日が過ぎた募集の応募中も取り下げられる。**同じ企業のほかのワーカーの応募と他社の応募は 404**。無効にされたワーカーは 401。一覧の `can.withdraw` と `withdrawn` の絞り込み。取り下げた募集への再応募は二重の 422 |
+| `Feature/WorkerJobPostingTest.php` | 取り下げた募集の詳細は `my_application` が取り下げで `can.apply` が `false` |
+| `Feature/RouteMiddlewareTest.php` | 新しいルートの登録とミドルウェア、他社・存在しない ID の 404 |
+| `Feature/WorkerAcceptanceScenarioTest.php` | 付録 A.3 の 7（取り下げ → 管理者の一覧に「取り下げ」、同じ募集への応募は 422） |
+
 ## 10. 担当と所有ファイル
 
 並列に作業するのは P2（api）と P3（web）だけです。基盤は直列で作り、確定したらロックします。
@@ -1041,6 +1059,16 @@ B と C の境界: C の `AttendanceService::save()` は B の `Application`（�
 - `tester` は使わない（mobile のテストは Step 9 から。そのときに担当を決める）
 - `mobile/` は Step 9 まで `make verify` と CI に入らない。`flutter analyze` の 0 件は手元の出力を PR に貼って示す
 
+### 10.8 ワーカー Step 8（issue #51。予定・取り下げ）
+
+api は直列（T2 → T3 → T4）。T3 の後は api の T4・web の T5・mobile（リード）がファイルを重ねずに進める。
+
+| 担当 | 所有ファイル |
+|---|---|
+| api（`implementer-api`） | `app/Enums/ApplicationStatus.php`、`app/Models/Application.php`（遷移の付随列の `match` とコメントだけ）、`app/Services/ApplicationService.php`（遷移の判定と `withdrawAsWorker()`）、`database/factories/ApplicationFactory.php`（`withdrawn()`）、`database/seeders/DatabaseSeeder.php`（画面の確認用に、取り下げた応募を 1 件。T2）、`tests/Feature/DomainFoundationTest.php`（遷移の総当たりを 25 組に。T2）、`routes/api.php`（ワーカーのグループに 1 行）、`app/Http/Controllers/Worker/ApplicationController.php`、`app/Http/Resources/Worker/WorkerApplicationResource.php`、`tests/Unit/ApplicationStatusTest.php`、`tests/Feature/{ApplicationTest,WorkerApplicationTest,WorkerJobPostingTest,RouteMiddlewareTest,WorkerAuthTest,WorkerAcceptanceScenarioTest}.php`（`WorkerAuthTest` は 5.3 の「入れないことの確認」の手書きのルートの一覧に取り下げを足す。T3） |
+| web（`implementer-web`） | `lib/status.ts`（応募の状態の色に `withdrawn` を足すだけ） |
+| mobile（リード） | `lib/data/repositories/{job_repository,api_job_repository}.dart`、`lib/domain/models/worker_application.dart` と生成物、`lib/domain/models/schedule_tab.dart`、`lib/ui/schedule/view_models/{my_applications_provider,withdraw_mutation}.dart` と生成物、`lib/ui/schedule/widgets/{schedule_screen,schedule_list_tile,withdraw_confirm_dialog}.dart`、`lib/ui/jobs/view_models/apply_mutation.dart` |
+
 ---
 
 ## 11. フェーズ（P0〜P6 の区切り）
@@ -1067,7 +1095,7 @@ B と C の境界: C の `AttendanceService::save()` は B の `Application`（�
 | 5 | ワーカーの認証とワーカー用 API | `api/`、`web/`（WA） | 3.1・3.2・4.2・4.5・5.1・5.3・6.3・6.10・6.11・8・9.4・10.6 |
 | 6 | アプリでログイン | `mobile/` | 5.3・6.11・7A.2〜7A.4 |
 | 7 | 本物の API で検索・応募 | `mobile/` | 6.11・7A.4 |
-| 8 | 予定・取り下げ・キャンセル（要件 4.8 と F-14 を先に改訂。docs/00 の決定 63） | `api/` `mobile/` | Step 8 の issue で足す |
+| 8 | 予定・取り下げ（issue #51。要件 4.8 と F-14 を先に改訂。ワーカー都合のキャンセルは入れない。docs/00 の決定 63・69） | `api/` `web/` `mobile/` | 3.1・4.1・4.3・4.5・6.5・6.11・7A.1・7A.4・9.4・10.8 |
 | 9 | mobile のテスト（`make verify` と CI に入れる） | `mobile/test/`、`Makefile`、CI、Stop フック | Step 9 の issue で足す |
 | 10 | プッシュ通知（要件の外の学習。決定 59） | `api/` `mobile/` | Step 10 の issue で足す |
 
@@ -1091,7 +1119,7 @@ B と C の境界: C の `AttendanceService::save()` は B の `Application`（�
 | ワーカーの認証を管理者と分ける（ワーカー Step 5） | ワーカーは Sanctum の API トークン、guard `worker`。管理者の guard `sanctum` は provider を `users` に絞り、`company` ミドルウェアでも `User` かを確かめる | スマホアプリでは Cookie と CSRF を前提にできない。`auth:sanctum` はトークンの持ち主のモデルを問わないので、絞らないとワーカーのトークンで管理者の API に入れてしまう。provider だけに頼らず、ミドルウェアでも型を確かめて 2 重に守る |
 | ログインの識別子を「企業コード ＋ `email`」に（ワーカー Step 5） | `email` を小文字で保存し、UNIQUE `(company_id, email)`。メールがそのままログインの識別子になる（同じ企業に同じメールのワーカーが 2 人いると、招待とログインがどちらのものか決まらない） | 同じ人が別の企業で働くなら別のアカウントにする（docs/00 の決定 68）。全社で一意にすると、メールの変更の 422 で他社の登録状況が分かり、先取りで他社の初回登録を塞げてしまう（T3 の security-reviewer の指摘で決定 64 から変えた） |
 | 招待コードを HMAC と暗号化の 2 本で持つ（ワーカー Step 5） | `code_hash`（HMAC、UNIQUE）で引き、`code`（`encrypted` cast）はメールにだけ使う | bcrypt では入力から行を引けない。ジョブに生のコードを渡さずに済む（ペイロードに秘密を入れない） |
-| ワーカーの応募の持ち主の確認（ワーカー Step 5） | 今回は Policy を作らない。応募の一覧は `worker_id` で絞り、応募 ID を受け取る API を作らない | 決定 24 と同じ。応募 ID を受け取る取り下げ・キャンセル（docs/05 の Step 8）を足すときに、Policy を使うかを決める |
+| ワーカーの応募の持ち主の確認（ワーカー Step 5。Step 8 で決着） | Policy を作らない。応募の一覧は `worker_id` で絞る。応募 ID を受け取る取り下げ（Step 8）は、他社の ID をルートモデルバインディング（グローバルスコープ）で 404、同じ企業のほかのワーカーの応募を `ApplicationService::withdrawAsWorker()` の入口（応募をロックして読み直した後）で 404 にする（`WorkerPortalService::findPosting()` と同じ形） | 決定 24 と同じ。応募 ID を受け取る API は今は取り下げの 1 本だけで、持ち主の確認をサービスの 1 箇所に置ける。404 にするのは、ほかのワーカーの応募の有無を明かさないため（issue #51 の Q2） |
 | `/horizon` `/telescope` の入口を「ローカル かつ ログイン済み管理者」に（P4-01b で 2 章の表を更新） | `HorizonServiceProvider` / `TelescopeServiceProvider` の `authorization()` を上書き | 2 章の表は Telescope を「ローカルのみ」と書いていたが、パッケージの既定（親の `authorization()`）は「ローカル環境 または Gate」で、ローカルなら未ログインでも通る。`rules/common/security.md`（ログイン済み管理者・ローカル環境に限定）に合わせ、両方とも「ログイン済み かつ Gate（ローカル）」にした。テストは `api/tests/Feature/HorizonAccessTest.php` |
 
 ---

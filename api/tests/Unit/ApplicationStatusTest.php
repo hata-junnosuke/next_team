@@ -30,6 +30,16 @@ class ApplicationStatusTest extends TestCase
         $this->assertFalse(ApplicationStatus::Applied->canTransitionTo(ApplicationStatus::Applied));
     }
 
+    public function test_応募中から取り下げへ遷移できる(): void
+    {
+        $this->assertTrue(ApplicationStatus::Applied->canTransitionTo(ApplicationStatus::Withdrawn));
+
+        // 取り下げられるのは応募中だけ（F-34）。確定・却下・キャンセルからは取り下げられない
+        $this->assertFalse(ApplicationStatus::Confirmed->canTransitionTo(ApplicationStatus::Withdrawn));
+        $this->assertFalse(ApplicationStatus::Rejected->canTransitionTo(ApplicationStatus::Withdrawn));
+        $this->assertFalse(ApplicationStatus::Cancelled->canTransitionTo(ApplicationStatus::Withdrawn));
+    }
+
     public function test_確定からキャンセルへ遷移できる(): void
     {
         $this->assertTrue(ApplicationStatus::Confirmed->canTransitionTo(ApplicationStatus::Cancelled));
@@ -38,9 +48,9 @@ class ApplicationStatusTest extends TestCase
         $this->assertFalse(ApplicationStatus::Confirmed->canTransitionTo(ApplicationStatus::Confirmed));
     }
 
-    public function test_却下とキャンセルからはどこへも遷移できない(): void
+    public function test_却下とキャンセルと取り下げからはどこへも遷移できない(): void
     {
-        foreach ([ApplicationStatus::Rejected, ApplicationStatus::Cancelled] as $terminal) {
+        foreach ([ApplicationStatus::Rejected, ApplicationStatus::Cancelled, ApplicationStatus::Withdrawn] as $terminal) {
             foreach (ApplicationStatus::cases() as $next) {
                 $this->assertFalse(
                     $terminal->canTransitionTo($next),
@@ -72,7 +82,7 @@ class ApplicationStatusTest extends TestCase
     public function test_状態と理由区分のラベルは日本語(): void
     {
         $this->assertSame(
-            ['applied' => '応募中', 'confirmed' => '確定', 'rejected' => '却下', 'cancelled' => 'キャンセル'],
+            ['applied' => '応募中', 'confirmed' => '確定', 'rejected' => '却下', 'cancelled' => 'キャンセル', 'withdrawn' => '取り下げ'],
             array_combine(
                 array_column(ApplicationStatus::cases(), 'value'),
                 array_map(fn (ApplicationStatus $s) => $s->label(), ApplicationStatus::cases()),
@@ -90,14 +100,14 @@ class ApplicationStatusTest extends TestCase
     }
 
     /**
-     * 応募の遷移表（docs/01 の Enum、myteam-domain-rules）を「許可される組」だけ書き、残りは全部禁止として 4 × 4 = 16 組を総当たりする。
+     * 応募の遷移表（docs/01 の Enum、myteam-domain-rules）を「許可される組」だけ書き、残りは全部禁止として 5 × 5 = 25 組を総当たりする。
      * 実装の canTransitionTo() とは独立に、仕様の表をここに直接書く（実装を写さない）
      *
      * @return iterable<string, array{ApplicationStatus, ApplicationStatus, bool}>
      */
     public static function applicationTransitionPairs(): iterable
     {
-        $allowed = ['applied>confirmed', 'applied>rejected', 'confirmed>cancelled'];
+        $allowed = ['applied>confirmed', 'applied>rejected', 'applied>withdrawn', 'confirmed>cancelled'];
 
         foreach (ApplicationStatus::cases() as $from) {
             foreach (ApplicationStatus::cases() as $to) {
@@ -108,7 +118,7 @@ class ApplicationStatusTest extends TestCase
     }
 
     #[DataProvider('applicationTransitionPairs')]
-    public function test_応募の全16組の遷移可否が遷移表どおり(ApplicationStatus $from, ApplicationStatus $to, bool $expected): void
+    public function test_応募の全25組の遷移可否が遷移表どおり(ApplicationStatus $from, ApplicationStatus $to, bool $expected): void
     {
         $this->assertSame($expected, $from->canTransitionTo($to));
     }
@@ -138,7 +148,7 @@ class ApplicationStatusTest extends TestCase
 
     public function test_enumの値の集合はdocs01の4_1と一致する(): void
     {
-        $this->assertSame(['applied', 'confirmed', 'rejected', 'cancelled'], array_column(ApplicationStatus::cases(), 'value'));
+        $this->assertSame(['applied', 'confirmed', 'rejected', 'cancelled', 'withdrawn'], array_column(ApplicationStatus::cases(), 'value'));
         $this->assertSame(['open', 'closed', 'cancelled'], array_column(JobPostingStatus::cases(), 'value'));
         $this->assertSame(['company', 'worker'], array_column(CancelReason::cases(), 'value'));
     }
@@ -199,7 +209,7 @@ class ApplicationStatusTest extends TestCase
         return match ($next) {
             ApplicationStatus::Confirmed => ['confirmed_at' => now(), 'confirmed_hourly_wage' => 1300, 'confirmed_transport_allowance' => 500],
             ApplicationStatus::Cancelled => ['cancel_reason' => CancelReason::Company, 'cancelled_at' => now()],
-            ApplicationStatus::Applied, ApplicationStatus::Rejected => [],
+            ApplicationStatus::Applied, ApplicationStatus::Rejected, ApplicationStatus::Withdrawn => [],
         };
     }
 
@@ -212,11 +222,12 @@ class ApplicationStatusTest extends TestCase
             ApplicationStatus::Confirmed => $factory->confirmed()->create(),
             ApplicationStatus::Rejected => $factory->rejected()->create(),
             ApplicationStatus::Cancelled => $factory->cancelled()->create(),
+            ApplicationStatus::Withdrawn => $factory->withdrawn()->create(),
         };
     }
 
     /**
-     * 遷移表で禁止の 13 組（16 組 − 許可の 3 組）
+     * 遷移表で禁止の 21 組（25 組 − 許可の 4 組）
      *
      * @return iterable<string, array{ApplicationStatus, ApplicationStatus}>
      */
@@ -230,7 +241,7 @@ class ApplicationStatusTest extends TestCase
     }
 
     #[DataProvider('forbiddenApplicationTransitions')]
-    public function test_transition_toは禁止の13組すべてで_domain_exceptionを投げdbを変えない(ApplicationStatus $from, ApplicationStatus $to): void
+    public function test_transition_toは禁止の21組すべてで_domain_exceptionを投げdbを変えない(ApplicationStatus $from, ApplicationStatus $to): void
     {
         $application = self::makeApplicationIn($from);
         $before = $application->fresh()->getAttributes();
@@ -258,7 +269,7 @@ class ApplicationStatusTest extends TestCase
     }
 
     #[DataProvider('allowedApplicationTransitions')]
-    public function test_transition_toは許可の3組で状態と付随列を保存する(ApplicationStatus $from, ApplicationStatus $to): void
+    public function test_transition_toは許可の4組で状態と付随列を保存する(ApplicationStatus $from, ApplicationStatus $to): void
     {
         $application = self::makeApplicationIn($from);
 
@@ -285,5 +296,41 @@ class ApplicationStatusTest extends TestCase
 
         $this->assertSame(ApplicationStatus::Applied, $applied->fresh()->status);
         $this->assertNull($applied->fresh()->confirmed_hourly_wage);
+    }
+
+    // ---- tester 追加（issue #51 T2）----
+
+    public function test_取り下げに付随する列はなく列を渡すと_logic_exceptionで状態を変えない(): void
+    {
+        // docs/01 の 4.3: 取り下げに付随する列はない（取り下げの日時の列も持たない）
+        foreach (['cancelled_at' => now(), 'cancel_reason' => CancelReason::Worker, 'confirmed_at' => now()] as $column => $value) {
+            $applied = Application::factory()->create();
+
+            try {
+                $applied->transitionTo(ApplicationStatus::Withdrawn, [$column => $value]);
+                $this->fail("{$column} を渡しても LogicException にならない");
+            } catch (LogicException $e) {
+                $this->assertNotInstanceOf(DomainException::class, $e);
+            }
+
+            $fresh = $applied->fresh();
+            $this->assertSame(ApplicationStatus::Applied, $fresh->status, $column);
+            $this->assertNull($fresh->{$column}, $column);
+        }
+    }
+
+    public function test_取り下げは付随列なしで保存され確定とキャンセルの列は空のまま(): void
+    {
+        $applied = Application::factory()->create();
+
+        $applied->transitionTo(ApplicationStatus::Withdrawn);
+
+        $fresh = $applied->fresh();
+        $this->assertSame(ApplicationStatus::Withdrawn, $fresh->status);
+        $this->assertNull($fresh->confirmed_at);
+        $this->assertNull($fresh->confirmed_hourly_wage);
+        $this->assertNull($fresh->confirmed_transport_allowance);
+        $this->assertNull($fresh->cancel_reason);
+        $this->assertNull($fresh->cancelled_at);
     }
 }

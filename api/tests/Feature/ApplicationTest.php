@@ -131,6 +131,104 @@ class ApplicationTest extends TestCase
             ->assertJsonPath('message', 'キャンセルされた応募は承認できません。');
     }
 
+    public function test_取り下げられた応募は承認できない(): void
+    {
+        $withdrawn = Application::factory()->withdrawn()->create();
+
+        $this->actingAsAdmin()
+            ->postJson("/api/applications/{$withdrawn->id}/confirm")
+            ->assertUnprocessable()
+            ->assertExactJson(['message' => '取り下げられた応募は承認できません。', 'errors' => []]);
+
+        $fresh = $withdrawn->fresh();
+        $this->assertSame(ApplicationStatus::Withdrawn, $fresh->status);
+        $this->assertNull($fresh->confirmed_at);
+        $this->assertNull($fresh->confirmed_hourly_wage);
+    }
+
+    public function test_取り下げられた応募は却下もキャンセルもできない(): void
+    {
+        $withdrawn = Application::factory()->withdrawn()->create();
+
+        $this->actingAsAdmin()
+            ->postJson("/api/applications/{$withdrawn->id}/reject")
+            ->assertUnprocessable()
+            ->assertExactJson(['message' => '取り下げられた応募は却下できません。', 'errors' => []]);
+        // キャンセルは既存の文言のまま（docs/01 の 6.5）
+        $this->postJson("/api/applications/{$withdrawn->id}/cancel", ['reason' => 'company'])
+            ->assertUnprocessable()
+            ->assertExactJson(['message' => '確定済みの応募だけキャンセルできます。', 'errors' => []]);
+
+        $fresh = $withdrawn->fresh();
+        $this->assertSame(ApplicationStatus::Withdrawn, $fresh->status);
+        $this->assertNull($fresh->cancel_reason);
+        $this->assertNull($fresh->cancelled_at);
+    }
+
+    public function test_取り下げられた応募は管理者の応募一覧に取り下げで出てcanはすべてfalse(): void
+    {
+        $posting = JobPosting::factory()->create();
+        $withdrawn = Application::factory()->for($posting)->withdrawn()->create();
+
+        $this->actingAsAdmin()
+            ->getJson("/api/job-postings/{$posting->id}/applications")
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $withdrawn->id)
+            ->assertJsonPath('data.0.status', ['value' => 'withdrawn', 'label' => '取り下げ'])
+            ->assertJsonPath('data.0.attendance', null)
+            ->assertJsonPath('data.0.can', ['confirm' => false, 'reject' => false, 'cancel' => false, 'attend' => false]);
+    }
+
+    // ---- tester 追加（issue #51 T2）: 取り下げが既存の管理者の操作に与える影響 ----
+
+    public function test_取り下げは定員に影響しない(): void
+    {
+        $posting = JobPosting::factory()->create(['capacity' => 1]);
+        Application::factory()->for($posting)->withdrawn()->count(2)->create();
+        $applied = Application::factory()->for($posting)->create();
+
+        $this->actingAsAdmin()->postJson("/api/applications/{$applied->id}/confirm")->assertOk();
+
+        $this->assertSame(1, $posting->confirmedApplications()->count());
+    }
+
+    public function test_取り下げたワーカーは同じ募集に管理者の代行でも応募できずapplicable_workersにも出ない(): void
+    {
+        // F-34「取り下げた募集にはもう応募できない（却下・キャンセルの後と同じく二重応募として扱う）」
+        $posting = JobPosting::factory()->create();
+        $worker = Worker::factory()->create(['name' => 'あ取り下げ済み']);
+        $available = Worker::factory()->create(['name' => 'い候補']);
+        Application::factory()->for($posting)->for($worker)->withdrawn()->create();
+
+        $this->actingAsAdmin()
+            ->postJson("/api/job-postings/{$posting->id}/applications", ['worker_id' => $worker->id])
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'このワーカーはすでにこの募集に応募しています。')
+            ->assertJsonPath('errors.worker_id', ['このワーカーはすでにこの募集に応募しています。']);
+        $this->assertSame(1, Application::query()->count());
+
+        $this->getJson("/api/job-postings/{$posting->id}/applicable-workers")
+            ->assertOk()
+            ->assertExactJson(['data' => [['id' => $available->id, 'name' => 'い候補']]]);
+    }
+
+    public function test_募集を中止しても取り下げた応募は取り下げのまま変わらない(): void
+    {
+        $posting = JobPosting::factory()->create();
+        $withdrawn = Application::factory()->for($posting)->withdrawn()->create();
+        $applied = Application::factory()->for($posting)->create();
+
+        $this->actingAsAdmin()->postJson("/api/job-postings/{$posting->id}/cancel")->assertOk();
+
+        $fresh = $withdrawn->fresh();
+        $this->assertSame(ApplicationStatus::Withdrawn, $fresh->status);
+        $this->assertNull($fresh->cancel_reason);
+        $this->assertNull($fresh->cancelled_at);
+        // 応募中は今までどおり却下になる
+        $this->assertSame(ApplicationStatus::Rejected, $applied->fresh()->status);
+    }
+
     public function test_確定時に時給と交通費が固定され確定日時が記録される(): void
     {
         Carbon::setTestNow('2026-10-05 10:30:00');
