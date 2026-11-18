@@ -4,7 +4,7 @@
 
 .PHONY: help up down ps api-serve web-dev horizon schedule fresh \
         api-test api-pint api-pint-test api-routes web-typecheck web-lint web-format web-format-check web-build \
-        verify verify-full worktree-env dev-stop ports mobile-analyze mobile-run sim-paste dev-up dev-down dev-status
+        verify verify-full worktree-env dev-stop ports mobile-analyze mobile-test mobile-run sim-paste dev-up dev-down dev-status
 
 help: ## ターゲット一覧
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -69,6 +69,10 @@ verify-full: verify web-format-check web-build ## + 整形チェックと本番�
 MOBILE_DEVICE ?= iPhone
 mobile-analyze: ## flutter analyze（警告 0 件がコミットの条件）
 	cd mobile && flutter analyze
+
+mobile-test: ## flutter test（mobile/test。Step 9 から。docs/01 の 7A.1）
+	cd mobile && flutter test
+
 # 環境をそろえる・アプリを起動するのは scripts/dev.sh（場所でポートを決める。main 8002/3002、issue #N 8100+N/3100+N、review 8012/3012）
 mobile-run: ## 環境（dev-up）をそろえ、シミュレータを起動して、その場所の API につないでアプリを起動（r でホットリロード、q で終了）
 	@MOBILE_DEVICE="$(MOBILE_DEVICE)" scripts/dev.sh mobile
