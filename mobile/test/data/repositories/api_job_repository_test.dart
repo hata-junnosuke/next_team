@@ -114,11 +114,13 @@ void main() {
   group('自分の応募（Step 8）', () {
     test('自分の応募はタブの status と per_page=100 で GET し、data の配列を WorkerApplication の一覧にする', () async {
       api.respond('GET', '/api/worker/applications', {
-        'data': [
-          workerApplicationJson(id: 1),
-          workerApplicationJson(id: 2),
-        ],
-        'meta': {'current_page': 1, 'last_page': 1, 'per_page': 100, 'total': 2},
+        'data': [workerApplicationJson(id: 1), workerApplicationJson(id: 2)],
+        'meta': {
+          'current_page': 1,
+          'last_page': 1,
+          'per_page': 100,
+          'total': 2,
+        },
       });
 
       final applications = await repository.fetchMyApplications(
