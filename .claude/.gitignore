@@ -1,6 +1,7 @@
 .loop-count
 .subagent-loop-count
 .dirty-web
+.dirty-mobile
 .verify-green
 .running/
 .subagent-loop-count.*
