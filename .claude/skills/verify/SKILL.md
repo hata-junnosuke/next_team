@@ -17,10 +17,11 @@ allowed-tools: Bash(make:*), Bash(git diff:*), Bash(git status:*)
 ### quick（既定）
 1. 変更ファイルが `api/` にあれば: Pint が赤なら `make api-pint`、対応するテストクラスを `make api-test FILTER=<クラス名>`
 2. 変更ファイルが `web/` にあれば: `make web-typecheck` と `make web-lint`
-3. 結果を「api: Pint 緑/赤、テスト N 件 緑/赤（失敗名）／ web: 型 緑/赤、ESLint 緑/赤」の 1 行で報告
+3. 変更ファイルが `mobile/` にあれば: `make mobile-analyze` と `make mobile-test`
+4. 結果を「api: Pint 緑/赤、テスト N 件 緑/赤（失敗名）／ web: 型 緑/赤、ESLint 緑/赤 ／ mobile: analyze 緑/赤、テスト N 件 緑/赤（失敗名）」の 1 行で報告
 
 ### pre-commit
-1. `make verify`（api の Pint と全テスト、web の型と ESLint をすべて）
+1. `make verify`（api の Pint と全テスト、web の型と ESLint、mobile の flutter analyze と flutter test をすべて）
 2. `security-reviewer` を起動し、`重大` がないことを確認
 3. 全部緑なら「コミット可」と報告。赤なら失敗一覧を `build-error-resolver` に渡す
 
@@ -33,4 +34,4 @@ allowed-tools: Bash(make:*), Bash(git diff:*), Bash(git status:*)
 6. 総括: 「画面の確認項目: テストで担保 N / 要手動確認 M」「テスト N 件緑」「型・ESLint・ビルド 緑」「重大指摘 0」
 
 ## Stop フックとの関係
-このスキルは人が任意に呼ぶ検証。セッション終了時には Stop フック（`.claude/hooks/verify-loop.sh`）が api の Pint + PHPUnit と、web に変更があれば tsc + ESLint を **強制的に** 回し、赤なら差し戻す。つまり「/verify を忘れても終われない」。`next build` だけは遅いので Stop フックでは回さず、full でだけ回す。差し戻された場合は reason の失敗一覧を `build-error-resolver` に渡し、直してから再度終了する。5 回で打ち切られたら人に報告する。
+このスキルは人が任意に呼ぶ検証。セッション終了時には Stop フック（`.claude/hooks/verify-loop.sh`）が api の Pint + PHPUnit と、web に変更があれば tsc + ESLint、mobile に変更があれば flutter analyze + flutter test を **強制的に** 回し、赤なら差し戻す。つまり「/verify を忘れても終われない」。`next build` だけは遅いので Stop フックでは回さず、full でだけ回す。差し戻された場合は reason の失敗一覧を `build-error-resolver` に渡し、直してから再度終了する。5 回で打ち切られたら人に報告する。

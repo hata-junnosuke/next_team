@@ -33,7 +33,7 @@ planner, implementer-api, implementer-web, tester, spec-reviewer, code-reviewer,
 
 ## よく使うコマンド（`make help` で一覧）
 ```bash
-make verify                       # Stop フック相当（api: Pint + 全テスト / web: 型 + ESLint）
+make verify                       # Stop フック相当（api: Pint + 全テスト / web: 型 + ESLint / mobile: flutter analyze + flutter test）
 make api-test FILTER=Foo          # 部分テスト
 make api-pint                     # 整形
 make web-typecheck && make web-lint
@@ -44,8 +44,9 @@ make api-serve                    # http://localhost:8002
 make web-dev                      # http://localhost:3002
 make horizon                      # キューワーカー
 make ports                        # 8002 / 3002 を誰が使っているか
-make mobile-analyze               # flutter analyze（issue #31 の T6 で足す。Step 9 までは verify に入らない）
-make mobile-run                   # dev-up とシミュレータをそろえ、その場所の API につないで mobile/ を起動（同上）
+make mobile-analyze               # flutter analyze（issue #31 の T6 で足す。issue #50 から verify・CI に入る）
+make mobile-test                  # flutter test（mobile/test。issue #50 から verify・CI に入る。Stop フックは mobile/ に変更があるときだけ）
+make mobile-run                   # dev-up とシミュレータをそろえ、その場所の API につないで mobile/ を起動（issue #31 の T6 で足す）
 ```
 
 ## この人と働くときの約束

@@ -859,7 +859,15 @@ mobile/
     ├── domain/models/            モデル（Step 7 から freezed: JobPosting・JobPostingPage・LabeledValue・WorkerApplication（Step 8 から can）・WorkerMe）と値の定義（DateFilter・ApplyStatus、Step 8 から ScheduleTab）
     └── data/
         ├── repositories/         リポジトリ（JobRepository と、Step 7 からの実装 api_job_repository.dart。Step 6 から auth_repository.dart）
-        └── services/             Step 6: api_client.dart（ApiClient（dio）と、Step 7 からトップレベルの関数 parseModel()）・AuthInterceptor・TokenStorage・ApiError（Step 7 から freezed）・device_name.dart
+        └── services/             Step 6: api_client.dart（ApiClient（dio）と、Step 7 からトップレベルの関数 parseModel()。Step 9 からテスト用の省略可の引数 httpClientAdapter）・AuthInterceptor・TokenStorage・ApiError（Step 7 から freezed）・device_name.dart
+└── test/                         テスト（Step 9。issue #50）。lib/ と同じ形
+    ├── fakes/                    手書きの偽物（fake_api_client.dart・fake_http_adapter.dart・fake_job_repository.dart）
+    ├── helpers/                  API と同じ形の JSON を作る関数（json_fixtures.dart）と、Provider のテストの入れ物（provider_container.dart）
+    ├── domain/models/            fromJson と表示の出し分け（job_posting・worker_application・apply_status・date_filter）
+    ├── data/                     repositories/（api_job_repository・auth_repository）、services/（api_client・api_error・auth_interceptor・token_storage）
+    ├── ui/                       jobs/view_models/（job_list_provider・location_filter_provider・apply_mutation）、jobs/widgets/（job_detail_screen・job_list_screen）、schedule/view_models/（withdraw_mutation）、account/（view_models/login_view_model・widgets/login_screen）
+    ├── routing/router_test.dart  redirect（Widget テスト）
+    └── utils/format_test.dart
 ```
 
 - `domain/models/` はモデル（`JobPosting`）と、画面に依存しない値の定義（`DateFilter` の enum、`ApplyStatus` の sealed class など）。Flutter（`package:flutter`）も Riverpod も import しない。Step 7 からモデルは `freezed` + `json_serializable` で生成する（`@freezed` と生成した `fromJson`。生成物の `*.freezed.dart` `*.g.dart` もコミットする）。import してよいパッケージは `freezed_annotation` と `json_annotation` だけ。`toJson` は使わないので作らない（`build.yaml`）
@@ -876,7 +884,7 @@ mobile/
 - `device_name`（ログインと初回登録で送るトークンの名前。issue #46 の Q3）は `data/services/device_name.dart` が `dart:io` の `Platform`（`operatingSystem` と `operatingSystemVersion`）から作る（例: `ios Version 18.2 (Build 22C150)`。255 文字で切る）。パッケージは足さない
 - 依存の向きは一方通行: `main.dart → app.dart・config・data/services`（`config` は起動前の `restore()`、`data/services` は `apiBaseUrl` の検査のためだけ。Step 6）、`app.dart → routing・ui/core/themes`、`routing → ui/*/widgets・ui/core/ui・config`（`config` は `redirect` でログインの状態を読むためだけ。Step 6）、`ui/*/widgets → ui/*/view_models・ui/core/ui`、`ui/*/view_models → config → data → domain`（`ui` は `domain` のモデルと `utils` を使ってよい。`view_models` は上の `ApiError` の例外と、別の機能の `view_models` の Provider を `invalidate` のためだけに import してよい例外（Step 8）がある）。`domain` は誰にも依存しない
 - 公式のサンプルにある `main_development.dart` / `main_staging.dart`（環境ごとの入口）と `testing/`（テスト用の偽物）は作らない。接続先は `--dart-define`（7A.2）で切り替え、テスト用の偽物は `mobile/test/fakes/` に置く（issue #50 の Q4）
-- **テスト**（Step 9。issue #50 の Q1〜Q4）は `mobile/test/` に書き、`make mobile-test`（`flutter test`）で回す。置き場所は `lib/` と同じ形（`lib/data/repositories/auth_repository.dart` のテストは `test/data/repositories/auth_repository_test.dart`）。偽物は `test/fakes/`、API と同じ形の JSON を作る関数は `test/helpers/` に置く。規約は `rules/common/testing.md`
+- **テスト**（Step 9。issue #50 の Q1〜Q4）は `mobile/test/` に書き、`make mobile-test`（`flutter test`）で回す。置き場所は `lib/` と同じ形（`lib/data/repositories/auth_repository.dart` のテストは `test/data/repositories/auth_repository_test.dart`）。偽物は `test/fakes/`、API と同じ形の JSON を作る関数と Provider のテストの入れ物（`ProviderContainer.test`）は `test/helpers/` に置く。規約は `rules/common/testing.md`
   - 偽物は手書きにし、パッケージ（mockito・mocktail など）を足さない（Q1）。偽のリポジトリは `implements JobRepository`、偽の `ApiClient` は `implements ApiClient` で書き、呼ばれた回数と引数を記録する
   - dio の層（`ApiClient` のエラーの変換と `AuthInterceptor`）は、`ApiClient` のコンストラクタの省略可の名前付き引数で `HttpClientAdapter` を差し込み、手書きの偽アダプタで応答を返す（Q2。省略すれば今と同じ）。`dio` を import してよいのは、`lib/data/services/` に加えて、`test/data/services/` と `test/fakes/fake_http_adapter.dart` だけ
   - Provider は `ProviderContainer.test` の `overrides` で `jobRepositoryProvider`（か `authRepositoryProvider`）だけを差し替える。`flutter_secure_storage` は `FlutterSecureStorage.setMockInitialValues` で、本物の Keychain に触れない
@@ -888,7 +896,7 @@ mobile/
 | 接続先 | `--dart-define=API_BASE_URL=...` で渡し、コードでは `String.fromEnvironment('API_BASE_URL')` で読む。既定値は置かない（渡し忘れに気づけるように、**Step 6 で `ApiClient` を作ってから**は空なら起動時にエラーを出す。API を使わない Step 3〜5 では渡さなくても起動できる） |
 | iOS シミュレータ | `http://localhost:8002`（Mac の API にそのまま届く。issue の worktree から `make mobile-run` すると、その worktree の API `http://localhost:{8100 + 番号}` につなぐ）。App Transport Security の例外は要らない（Info.plist に足していない。issue #46 の T6 で確認。13 章の 10） |
 | Android エミュレータ | `http://10.0.2.2:8002`（エミュレータから見た Mac の localhost） |
-| 起動 | `make mobile-run`（issue #46 から `scripts/dev.sh`。Redis・Mailpit・API・管理画面・Horizon・スケジューラ（`make dev-up` と同じ）とシミュレータをそろえ、起動済みのものはそのまま使う。そのあと `flutter run -d iPhone --dart-define=API_BASE_URL=<その場所の API>`。ポートは場所で決まる（main 8002/3002、issue #N の worktree 8100+N/3100+N、review 8012/3012）。止めるのは `make dev-down`。`-d` は機種名の前方一致で、`MOBILE_DEVICE=` で変えられる）。静的解析は `make mobile-analyze`（`flutter analyze`）。**この 2 つは Step 3 で足す**。`make mobile-test` と、`make verify`・CI・Stop フックへの組み込みは Step 9 |
+| 起動 | `make mobile-run`（issue #46 から `scripts/dev.sh`。Redis・Mailpit・API・管理画面・Horizon・スケジューラ（`make dev-up` と同じ）とシミュレータをそろえ、起動済みのものはそのまま使う。そのあと `flutter run -d iPhone --dart-define=API_BASE_URL=<その場所の API>`。ポートは場所で決まる（main 8002/3002、issue #N の worktree 8100+N/3100+N、review 8012/3012）。止めるのは `make dev-down`。`-d` は機種名の前方一致で、`MOBILE_DEVICE=` で変えられる）。静的解析は `make mobile-analyze`（`flutter analyze`）。**この 2 つは Step 3 で足す**。`make mobile-test` と、`make verify`・CI・Stop フックへの組み込みは Step 9（issue #50）で足した |
 | 秘密 | `--dart-define` に秘密を入れない（ビルドに埋め込まれる。`rules/common/security.md`） |
 | リリースの接続先 | `https://` だけ（`main.dart` がリリースのビルドで `http` なら止める）。dio は `dart:io` で通信するので iOS の ATS が効かず、平文の `http` を止めてくれない（13 章の 10。issue #46 のレビュー） |
 
@@ -1060,7 +1068,7 @@ B と C の境界: C の `AttendanceService::save()` は B の `Application`（�
 
 - レビューは `spec-reviewer` ∥ `code-reviewer`（`mobile/CLAUDE.md` をプロンプトで渡す）。トークンの扱いを変えたステップ（Step 6）は `security-reviewer` も
 - mobile のテスト（`mobile/test/`。Step 9 から）もリードが書く。`tester` は使わない（issue #50）
-- `mobile/` は Step 9 まで `make verify` と CI に入らない。`flutter analyze` の 0 件は手元の出力を PR に貼って示す
+- Step 9（issue #50）から、`make verify`・CI に `make mobile-analyze`（`flutter analyze`）と `make mobile-test`（`flutter test`）が入る。Stop フックは `mobile/` に変更があるときだけ回す（flutter がない環境では飛ばして知らせる）。合否は CI で見るので、`flutter analyze` の出力を PR に貼るのはやめる。Step 9 で触った `Makefile` の `verify`、`.github/workflows/ci.yml`、`.claude/hooks/`（人の承認つき）は、mobile のステップでもリードが直してよい
 
 ### 10.8 ワーカー Step 8（issue #51。予定・取り下げ）
 
@@ -1099,7 +1107,7 @@ api は直列（T2 → T3 → T4）。T3 の後は api の T4・web の T5・mob
 | 6 | アプリでログイン | `mobile/` | 5.3・6.11・7A.2〜7A.4 |
 | 7 | 本物の API で検索・応募 | `mobile/` | 6.11・7A.4 |
 | 8 | 予定・取り下げ（issue #51。要件 4.8 と F-14 を先に改訂。ワーカー都合のキャンセルは入れない。docs/00 の決定 63・69） | `api/` `web/` `mobile/` | 3.1・4.1・4.3・4.5・6.5・6.11・7A.1・7A.4・9.4・10.8 |
-| 9 | mobile のテスト（`make verify` と CI に入れる） | `mobile/test/`、`Makefile`、CI、Stop フック | Step 9 の issue で足す |
+| 9 | mobile のテスト（`make verify`・CI・Stop フックに入れる。issue #50） | `mobile/test/`、`Makefile`、CI、Stop フック | 7A.1・7A.2・10.7 |
 | 10 | プッシュ通知（要件の外の学習。決定 59） | `api/` `mobile/` | Step 10 の issue で足す |
 
 ---
