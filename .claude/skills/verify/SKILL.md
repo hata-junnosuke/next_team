@@ -1,6 +1,6 @@
 ---
 name: verify
-description: 検証コマンド。quick（変更したスタックの整形と変更分のテスト）/ pre-commit（+ 全テスト + 型 + ESLint + security-reviewer）/ full（+ 本番ビルド + ルート一覧 + 画面の確認項目の整理）の 3 段階。コミット前・エピック完了時・Stop フックに差し戻されたときに使う
+description: 検証コマンド。quick（変更したスタックの整形と変更分のテスト）/ pre-commit（+ 全テスト + 型 + ESLint + flutter analyze・flutter test + security-reviewer）/ full（+ 本番ビルド + ルート一覧 + 画面の確認項目の整理）の 3 段階。コミット前・エピック完了時・Stop フックに差し戻されたときに使う
 argument-hint: [quick|pre-commit|full]（省略時 quick）
 allowed-tools: Bash(make:*), Bash(git diff:*), Bash(git status:*)
 ---
@@ -17,12 +17,13 @@ allowed-tools: Bash(make:*), Bash(git diff:*), Bash(git status:*)
 ### quick（既定）
 1. 変更ファイルが `api/` にあれば: Pint が赤なら `make api-pint`、対応するテストクラスを `make api-test FILTER=<クラス名>`
 2. 変更ファイルが `web/` にあれば: `make web-typecheck` と `make web-lint`
-3. 結果を「api: Pint 緑/赤、テスト N 件 緑/赤（失敗名）／ web: 型 緑/赤、ESLint 緑/赤」の 1 行で報告
+3. 変更ファイルが `mobile/` にあれば: `make mobile-analyze` と `make mobile-test`
+4. 結果を「api: Pint 緑/赤、テスト N 件 緑/赤（失敗名）／ web: 型 緑/赤、ESLint 緑/赤 ／ mobile: analyze 緑/赤、テスト N 件 緑/赤（失敗名）」の 1 行で報告
 
 ### pre-commit
-1. `make verify`（api の Pint と全テスト、web の型と ESLint をすべて）
+1. `make verify`（api の Pint と全テスト、web の型と ESLint、mobile の flutter analyze と flutter test をすべて。flutter のない環境では mobile が赤になる。CI は flutter を入れて回す）
 2. `security-reviewer` を起動し、`重大` がないことを確認
-3. 全部緑なら「コミット可」と報告。赤なら失敗一覧を `build-error-resolver` に渡す
+3. 全部緑なら「コミット可」と報告。赤なら api・web の失敗一覧を `build-error-resolver` に渡す。mobile（analyze・test）の赤は書いたリードが直す（`.claude/rules/common/agents.md`）
 
 ### full
 1. pre-commit を実行
@@ -30,7 +31,7 @@ allowed-tools: Bash(make:*), Bash(git diff:*), Bash(git status:*)
 3. `make api-routes` を出し、`docs/01` の API 契約のエンドポイントと一致すること、`register` / `password.*` / `two-factor.*` が **出ない** こと（Fortify の features が空）を確認
 4. issue の完了条件にある画面の確認項目を並べ、テストで担保されている項目はテスト名を、人の目視が必要な項目は「要手動確認」を書く
 5. `docs/01` の必須のテストファイル 6 本がすべて存在し緑であることを明記
-6. 総括: 「画面の確認項目: テストで担保 N / 要手動確認 M」「テスト N 件緑」「型・ESLint・ビルド 緑」「重大指摘 0」
+6. 総括: 「画面の確認項目: テストで担保 N / 要手動確認 M」「api テスト N 件緑」「mobile: analyze 緑・テスト N 件緑」「型・ESLint・ビルド 緑」「重大指摘 0」
 
 ## Stop フックとの関係
-このスキルは人が任意に呼ぶ検証。セッション終了時には Stop フック（`.claude/hooks/verify-loop.sh`）が api の Pint + PHPUnit と、web に変更があれば tsc + ESLint を **強制的に** 回し、赤なら差し戻す。つまり「/verify を忘れても終われない」。`next build` だけは遅いので Stop フックでは回さず、full でだけ回す。差し戻された場合は reason の失敗一覧を `build-error-resolver` に渡し、直してから再度終了する。5 回で打ち切られたら人に報告する。
+このスキルは人が任意に呼ぶ検証。セッション終了時には Stop フック（`.claude/hooks/verify-loop.sh`）が api の Pint + PHPUnit と、web に変更があれば tsc + ESLint、mobile に変更があれば flutter analyze + flutter test を **強制的に** 回し、赤なら差し戻す（flutter がない環境では mobile だけ飛ばして systemMessage で知らせ、緑の指紋を残さない。そのときは `make mobile-analyze` と `make mobile-test` を手元か CI で確かめる）。つまり「/verify を忘れても終われない」。`next build` だけは遅いので Stop フックでは回さず、full でだけ回す。差し戻された場合は reason の失敗一覧を `build-error-resolver` に渡し（`## mobile:` の失敗は書いたリードが直す）、直してから再度終了する。5 回で打ち切られたら人に報告する。

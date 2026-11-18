@@ -2,6 +2,7 @@
 # Stop フック = 検証ループ（最内ループ）。
 #   api: Pint → PHPUnit            （常に回す。速いので毎回）
 #   web: tsc --noEmit → ESLint     （web/ に変更があるときだけ。next build は遅いので /verify full に任せる）
+#   mobile: flutter analyze → flutter test（mobile/ に変更があるときだけ。flutter がない環境では飛ばす。Step 9 の issue #50）
 #   受け入れ条件（必須テストファイル 6 本の存在。常に検査する）
 #   赤なら {"decision":"block","reason":"..."} で Claude を止めずに修正させる。
 #   ハードストップ: 最大 MAX 回（.claude/.loop-count）。上限に達したら素通しして人に報告させる。
@@ -11,7 +12,7 @@
 #   false = ユーザー起点の新しい終了。カウンタを 0 に戻す
 #   ※ true で即 exit すると 1 周しか回らないので、そうしない。
 #
-# web は「変更があるときだけ」検査する（判断材料は git status と .claude/.dirty-web）
+# web は「変更があるときだけ」検査する（判断材料は git status と .claude/.dirty-web）。mobile も同じ（git status と .claude/.dirty-mobile）
 # 差し戻しの履歴はファイルに残さない（issue #8）。チームの合否と履歴は CI（.github/workflows/ci.yml）と PR で見る
 #
 # 変更がなければ検査しない（issue #8）:
@@ -39,13 +40,14 @@ format_pint() {
 ROOT="${CLAUDE_PROJECT_DIR:-$PWD}"
 COUNTER="$ROOT/.claude/.loop-count"
 DIRTY_WEB="$ROOT/.claude/.dirty-web"
+DIRTY_MOBILE="$ROOT/.claude/.dirty-mobile"
 GREEN="$ROOT/.claude/.verify-green"
 MAX=5
 INPUT="$(cat)"
 ACTIVE="$(printf '%s' "$INPUT" | jq -r '.stop_hook_active // false')"
 cd "$ROOT" || exit 0
 
-# (0) どちらのスタックも依存未導入なら素通し
+# (0) api と web のどちらも依存未導入なら素通し（mobile だけの環境は対象外。mobile は api と同じ worktree で使う前提）
 HAS_API=0; [ -x api/vendor/bin/pint ] && [ -f api/vendor/bin/phpunit ] && HAS_API=1
 HAS_WEB=0; [ -x web/node_modules/.bin/tsc ] && HAS_WEB=1
 if [ "$HAS_API" = 0 ] && [ "$HAS_WEB" = 0 ]; then
@@ -95,6 +97,28 @@ if [ "$HAS_WEB" = 1 ]; then
   fi
 fi
 
+# mobile を検査するか: flutter があり、編集の印がある / git が mobile/ の変更を報告している
+#   flutter を入れていない環境（mobile を触らない人）では飛ばす。変更があるのに飛ばしたときは
+#   SKIPPED_MOBILE=1 にして、最後に systemMessage で知らせ、緑の指紋は残さない（(0.5) と同じく黙って通さない）
+CHECK_MOBILE=0
+SKIPPED_MOBILE=0
+if [ -d mobile ]; then
+  MOBILE_CHANGED=0
+  [ -f "$DIRTY_MOBILE" ] && MOBILE_CHANGED=1
+  if [ "$MOBILE_CHANGED" = 0 ] && git rev-parse --git-dir >/dev/null 2>&1; then
+    [ -n "$(git status --short -- mobile 2>/dev/null | head -1)" ] && MOBILE_CHANGED=1
+  fi
+  if [ "$MOBILE_CHANGED" = 1 ]; then
+    if command -v flutter >/dev/null 2>&1; then CHECK_MOBILE=1; else SKIPPED_MOBILE=1; fi
+  fi
+fi
+
+# 絞り込んだ行が空なら、出力の末尾を代わりに出す（pub get の失敗など、決まった形の行が出ない失敗でも原因が見えるように）
+pick_or_tail() {
+  local picked="$1" all="$2"
+  if [ -n "$picked" ]; then printf '%s' "$picked"; else printf '%s' "$all" | grep -vE '^\s*$' | tail -20; fi
+}
+
 # (1) ユーザー起点の終了ならカウンタをリセット
 [ "$ACTIVE" = "true" ] || echo 0 > "$COUNTER"
 COUNT="$(cat "$COUNTER" 2>/dev/null || echo 0)"
@@ -129,6 +153,18 @@ $(printf '%s' "$LINT_OUT" | grep -vE '^\s*$' | head -30)
 
 "
 fi
+if [ "$CHECK_MOBILE" = 1 ]; then
+  # 指摘の行（"  info • … • lib/x.dart:1:2 • rule"）だけを出す
+  ANALYZE_OUT="$(cd mobile && flutter analyze 2>&1)" || FAIL="${FAIL}## mobile: flutter analyze 失敗（make mobile-analyze で再現）
+$(pick_or_tail "$(printf '%s' "$ANALYZE_OUT" | grep -E ' • ' | head -30)" "$ANALYZE_OUT")
+
+"
+  # 失敗したテストの名前（"00:01 +3 -1: <ファイル>: <テスト名> [E]"）と、期待値と実際の値の行を出す
+  FLUTTER_TEST_OUT="$(cd mobile && flutter test 2>&1)" || FAIL="${FAIL}## mobile: flutter test 失敗（make mobile-test で再現）
+$(pick_or_tail "$(printf '%s' "$FLUTTER_TEST_OUT" | grep -E '\[E\]$|^\s*(Expected|Actual|Which):|Some tests failed|Error:' | sed -E 's/^[0-9:]+ \+[0-9]+( ~[0-9]+)?( -[0-9]+)?: //' | head -40)" "$FLUTTER_TEST_OUT")
+
+"
+fi
 
 # 受け入れ条件（必須テストファイル）。ファイル名は docs/01_技術仕様_next.md の必須テストファイルの契約
 require() { [ -f "$1" ] || FAIL="${FAIL}## 受け入れ条件: $1 がありません（$2）
@@ -152,5 +188,13 @@ fi
 
 # (5) 成功。検査を始めた時点の指紋を残す（検査中に変わっていれば次の終了で検査し直す）
 rm -f "$COUNTER" "$DIRTY_WEB"
+# mobile の印は、mobile を検査して緑だったときだけ消す（flutter がなく飛ばしたときは残す）
+[ "$CHECK_MOBILE" = 1 ] && rm -f "$DIRTY_MOBILE"
+# mobile を飛ばしたときは緑の指紋を残さず（flutter を入れた後の終了で検査し直す）、飛ばしたことを知らせる
+if [ "$SKIPPED_MOBILE" = 1 ]; then
+  rm -f "$GREEN"
+  jq -n '{systemMessage:"検証ループ: mobile/ に変更がありますが、flutter が見つからないため mobile の検査（flutter analyze・flutter test）を飛ばしました。make mobile-analyze と make mobile-test を手元で回すか、CI で確かめてください。"}'
+  exit 0
+fi
 [ -n "$FP" ] && printf '%s\n' "$FP" > "$GREEN"
 exit 0

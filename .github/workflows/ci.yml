@@ -1,4 +1,4 @@
-# CI: PR ごとに make verify（api: Pint チェック + PHPUnit / web: tsc + ESLint）を回す。
+# CI: PR ごとに make verify（api: Pint チェック + PHPUnit / web: tsc + ESLint / mobile: flutter analyze + flutter test）を回す。
 # Stop フック（.claude/hooks/verify-loop.sh）は手元の速い合否、CI はチームの関門（main のブランチ保護で必須にする）。
 # Rails でいえば GitHub Actions で rspec と rubocop を回すのと同じ。
 # テストは api/phpunit.xml で SQLite（:memory:）・array キャッシュ・sync キューに固定しているので、Redis も .env も要らない。
@@ -59,6 +59,19 @@ jobs:
       - name: npm ci
         run: npm ci --no-audit --no-fund
         working-directory: web
+
+      # mobile/（ワーカーアプリ）の flutter analyze と flutter test のため（Step 9。issue #50 の Q3）。
+      # 手元と同じバージョンに固定する（mobile/pubspec.lock の Dart SDK と合わせる）。cache で SDK を使い回す。
+      # https://github.com/subosito/flutter-action
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.47.8'
+          cache: true
+
+      - name: flutter pub get
+        run: flutter pub get
+        working-directory: mobile
 
       - name: make verify
         run: make verify

@@ -10,7 +10,7 @@
 | テストの網羅を確認 | `tester` | 実装は直さない。`api/tests/` だけ書く |
 | レビュー | `spec-reviewer` ∥ `code-reviewer` ∥ `security-reviewer` を並列 | 読み取り専用。`mobile/` は `spec-reviewer` ∥ `code-reviewer`（Dart の作法は `mobile/CLAUDE.md` をプロンプトで渡す）。トークンの扱いを変えたときは `security-reviewer` も |
 | マイグレーション確定前・集計実装後・非同期のテーブル追加後 | `database-reviewer` | ロック可否を判定 |
-| テスト・Pint・型・ESLint が赤 | `build-error-resolver` | 最小差分。`mobile/` の `flutter analyze` が赤のときは、書いたリードが直す |
+| テスト・Pint・型・ESLint が赤 | `build-error-resolver` | 最小差分。`mobile/` の `flutter analyze`・`flutter test` が赤のときは、書いたリードが直す |
 
 - **レビュアーは書かない、実装者はレビューしない**（作る役と確認する役の分離）。`mobile/` はリードが書くので、リードの自己確認をレビューの代わりにしない。`mobile/` もステップの機能がそろったら、PR の前に `spec-reviewer` ∥ `code-reviewer` を通す
 - 所有ファイル以外を触る必要が出たら、リードに報告して止まる。契約に関わるならリードが人に相談する

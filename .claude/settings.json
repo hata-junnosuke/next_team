@@ -16,6 +16,8 @@
       "Bash(make web-format:*)",
       "Bash(make web-format-check)",
       "Bash(make web-build)",
+      "Bash(make mobile-analyze)",
+      "Bash(make mobile-test)",
       "Bash(make verify:*)",
       "Bash(make fresh)",
       "Bash(make worktree-env:*)",

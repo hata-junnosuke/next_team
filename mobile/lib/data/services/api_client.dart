@@ -60,9 +60,15 @@ class ApiClient {
   // _ で始まる名前はこのファイルの外から見えない（Dart の private。TypeScript の private / # に近い）。
   // interceptors: 毎回はさむ処理の一覧（AuthInterceptor など）。外から渡すので、ApiClient はトークンを知らない。
   // const [] は「渡されなかったときの空の一覧」。
+  // httpClientAdapter: テストだけが渡す差し替え口（Step 9。issue #50 の Q2）。dio が実際に通信する部品で、
+  // テストでは手書きの偽物（test/fakes/fake_http_adapter.dart）を渡し、ネットワークに出ずに決まった応答を返す。
+  // 省略すれば（アプリはいつも省略する）dio の既定の部品のままで、今までと同じに動く。
+  // Laravel で言うと Http::fake() が差し替える「送信の部品」、web で言うと fetch を差し替える所に当たる。
+  // https://pub.dev/documentation/dio/latest/dio/HttpClientAdapter-class.html
   ApiClient({
     required String baseUrl,
     List<Interceptor> interceptors = const [],
+    HttpClientAdapter? httpClientAdapter,
   }) : _dio = Dio(
         BaseOptions(
           baseUrl: baseUrl,
@@ -81,6 +87,8 @@ class ApiClient {
       ) {
     // 初期化リストの後の { } はコンストラクタの本体。_dio ができてから動く。
     _dio.interceptors.addAll(interceptors);
+    // 渡されたときだけ差し替える（null なら dio の既定のまま）。
+    if (httpClientAdapter != null) _dio.httpClientAdapter = httpClientAdapter;
   }
 
   final Dio _dio;
