@@ -61,10 +61,10 @@ web-format-check: ## Prettier の整形チェック
 web-build: ## 本番ビルド（遅いので Stop フックでは回さない。/verify full で回す）
 	cd web && npm run build
 
-verify: api-pint-test api-test web-typecheck web-lint ## Stop フック相当を手で回す
+verify: api-pint-test api-test web-typecheck web-lint mobile-analyze mobile-test ## Stop フック相当を手で回す（CI も同じ。mobile は Step 9 の issue #50 から）
 verify-full: verify web-format-check web-build ## + 整形チェックと本番ビルド
 
-# --- mobile（ワーカーアプリ。Step 9 までは verify に入れない。docs/01 の 7A.2） ---
+# --- mobile（ワーカーアプリ。Step 9 の issue #50 から mobile-analyze と mobile-test を verify に入れる。docs/01 の 7A.2） ---
 # 機種は名前の前方一致で選ぶ（flutter devices の名前）。別の機種なら make mobile-run MOBILE_DEVICE="iPhone 17 Pro"
 MOBILE_DEVICE ?= iPhone
 mobile-analyze: ## flutter analyze（警告 0 件がコミットの条件）
