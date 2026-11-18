@@ -1,7 +1,12 @@
 # テスト（常時適用）
 
-- 自動テストは `api/tests/` だけ。`web/` のテストは書かない。web は tsc と ESLint、それと issue に書いた画面の確認項目を人が確かめる
-- `mobile/` のテストは docs/05 の Step 9 から `mobile/test/` に書く（ユニット・Provider・Widget）。それまでは `flutter analyze` が 0 件であること（出力を PR に貼る）と、issue に書いた画面の確認項目を人がシミュレータで確かめる
+- 自動テストは `api/tests/` と `mobile/test/`（下）だけ。`web/` のテストは書かない。web は tsc と ESLint、それと issue に書いた画面の確認項目を人が確かめる
+- `mobile/` のテストは docs/05 の Step 9（issue #50）から `mobile/test/` に書き（ユニット・リポジトリ・Provider・Widget）、`make mobile-test` で回す。書くのはリード（`tester` は使わない）。画面の確認項目は今までどおり人がシミュレータで確かめる
+  - 偽物は手書き（`implements JobRepository` / `ApiClient`、dio は偽の `HttpClientAdapter`）で `test/fakes/` に置く。モック用のパッケージを足さない（docs/01 の 7A.1）
+  - 本物のネットワークにも Keychain にも触れない（`ApiClient` は偽物か偽のアダプタ、`flutter_secure_storage` は `FlutterSecureStorage.setMockInitialValues`）
+  - 期待値を `DateTime.now()` に頼らない（今日を引数で渡す。真夜中に赤になるのを避ける）
+  - エラーになる Provider は、テストの中で再試行を切る（`ProviderContainer.test(retry: (_, _) => null)` など）。再試行のタイマーが残ってテストが落ちるのを避ける
+  - `skip:` でテストを飛ばさない。`mobile/test` にも `print` と `debugPrint` を書かない
 - 必須のテストファイル 6 本（`docs/01_技術仕様_next.md` の必須のテストファイル。Stop フックが常に存在を検査する）
   - 動線: `Feature/ApplicationTest.php`（定員超過）、`Unit/PayrollCalculatorTest.php`（報酬計算）、`Unit/ApplicationStatusTest.php`（状態遷移）、`Feature/AcceptanceScenarioTest.php`（動線 10 ステップ）
   - 非同期: `Feature/NotificationIdempotencyTest.php`（二重送信しない）、`Feature/FailedJobTest.php`（失敗の記録と再実行）
