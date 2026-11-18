@@ -136,6 +136,7 @@ void main() {
 
     final fresh = ProviderContainer.test(
       overrides: [authRepositoryProvider.overrideWithValue(repository)],
+      retry: (_, _) => null,
     );
 
     // build() で takeSignOutReason() を読み、最初の state の message にする。

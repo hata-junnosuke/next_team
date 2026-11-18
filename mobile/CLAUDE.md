@@ -10,9 +10,9 @@
 1. **業務ルールと検証をアプリに書かない**。定員・二重応募・状態遷移・応募できるかは API が判定し、アプリは 422 の `message` を表示する（docs/01 の 7A.4）。残り枠は計算せず `remaining` を表示する。応募のボタンと「応募済み」「満員」の表示は、API の `can.apply`・`my_application`・`remaining` だけで出し分ける（Step 7 から。Step 3〜6 の偽データの画面は学習のためアプリで判定していた）。取り下げのボタンは `can.withdraw` だけで出し分け、状態の値（`applied` など）で分岐しない（Step 8）
 2. **`api/` のコードを読まない**。境界は docs/01 の 6.11 と 7A だけ。形がずれていたらアプリで吸収せず報告する
 3. **パッケージは docs/01 の 1 章の表にあるものだけ**を、表の「いつ」の Step から使う。足したくなったら、メリットとデメリットの表を作って人に確認する。バージョンは導入時に固定し、`pubspec.lock` をコミットする
-4. API は `data/services/` の `ApiClient` だけが `dio` で呼ぶ（`dio` を import するのは `data/services/` の `ApiClient` と `AuthInterceptor` だけ）。レスポンスはモデルの `fromJson` で型にしてから使う（Step 6 から）。モデルは Step 7 から `freezed` + `json_serializable` で生成し（`build.yaml` で `checked: true`）、生成した `fromJson` の失敗（`CheckedFromJsonException`）は `data/services/api_client.dart` の `parseModel()` で `FormatException` にそろえる（docs/01 の 7A.4）。生成物（`*.freezed.dart` `*.g.dart`）もコミットする
+4. API は `data/services/` の `ApiClient` だけが `dio` で呼ぶ（`lib/` の中で `dio` を import するのは `data/services/` の `ApiClient` と `AuthInterceptor` だけ。テストでは `test/data/services/` と `test/fakes/fake_http_adapter.dart` も。docs/01 の 7A.1）。レスポンスはモデルの `fromJson` で型にしてから使う（Step 6 から）。モデルは Step 7 から `freezed` + `json_serializable` で生成し（`build.yaml` で `checked: true`）、生成した `fromJson` の失敗（`CheckedFromJsonException`）は `data/services/api_client.dart` の `parseModel()` で `FormatException` にそろえる（docs/01 の 7A.4）。生成物（`*.freezed.dart` `*.g.dart`）もコミットする
 5. トークン・パスワード・招待コードをログに出さない。`print` は `flutter analyze` が止める（`avoid_print`）。`debugPrint` は止まらないので、使わない（`rules/common/security.md`）
-6. `make mobile-analyze`（`flutter analyze`）が `No issues found!` でなければコミットしない。テストは Step 9 から `mobile/test/` に書く
+6. `make mobile-analyze`（`flutter analyze`）が `No issues found!` で、`make mobile-test`（`flutter test`）が緑でなければコミットしない。テストは Step 9（issue #50）から `mobile/test/` に書く（`rules/common/testing.md`）
 
 ## 進め方（まとめて実装し、解説を 1 枚の HTML に。docs/05 の 1 章）
 

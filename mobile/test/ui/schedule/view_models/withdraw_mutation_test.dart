@@ -61,12 +61,12 @@ void main() {
     await withdrawApplication(container, application);
 
     expect(repository.withdrawCalls, [9]);
-    // 詳細は「応募の id」ではなく「その募集の id（3）」で取り直す。
-    expect(repository.jobPostingCalls.last, 3);
     expect(
       container.read(withdrawMutation(application.id)),
       isA<MutationSuccess<Object?>>(),
     );
+    // 詳細は募集の id（3）で listen しているので、detail が 2 になれば「応募の id（9）」ではなく
+    // 「その募集の id（3）」で取り直したと分かる。
     expect(await fetchCounts(), (schedule: 2, detail: 2, list: 2));
   });
 

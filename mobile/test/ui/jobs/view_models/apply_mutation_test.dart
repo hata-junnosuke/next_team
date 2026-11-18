@@ -102,7 +102,7 @@ void main() {
   test('422 は MutationError になり、詳細と一覧と よてい を取り直す', () async {
     repository.applyError = const ApiError(
       statusCode: 422,
-      message: '定員に達しているため応募できません。',
+      message: '残り枠がないため応募できません。',
     );
 
     // 失敗は投げ直す（画面がスナックバーなどで受けられるように）。
@@ -116,6 +116,21 @@ void main() {
       isA<MutationError<Object?>>(),
     );
     // 422 は「画面の値が古い」（満員になった・もう応募している）ので、取り直して最新の状態を出す（docs/01 の 7A.1）。
+    expect(await fetchCounts(), (detail: 2, list: 2, schedule: 2));
+  });
+
+  test('404 も詳細と一覧と よてい を取り直す', () async {
+    // 応募しようとした募集が見えなくなった（中止・締切など）。画面の値が古いので取り直す（docs/01 の 7A.1）。
+    repository.applyError = const ApiError(
+      statusCode: 404,
+      message: '見つかりません。',
+    );
+
+    await expectLater(
+      applyToJobPosting(container, _jobId),
+      throwsA(isA<ApiError>()),
+    );
+
     expect(await fetchCounts(), (detail: 2, list: 2, schedule: 2));
   });
 

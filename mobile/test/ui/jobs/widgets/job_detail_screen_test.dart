@@ -106,7 +106,7 @@ void main() {
   testWidgets('422 ならサーバの message をボタンの上に出す', (tester) async {
     repository.applyError = const ApiError(
       statusCode: 422,
-      message: '定員に達しているため応募できません。',
+      message: '残り枠がないため応募できません。',
     );
     await pumpDetail(tester);
 
@@ -121,7 +121,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // アプリは文言を作らず、API の message をそのまま出す（docs/01 の 7A.4）。
-    expect(find.text('定員に達しているため応募できません。'), findsOneWidget);
+    expect(find.text('残り枠がないため応募できません。'), findsOneWidget);
     expect(find.text('応募しました'), findsNothing);
   });
 

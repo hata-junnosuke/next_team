@@ -843,23 +843,23 @@ mobile/
 ├── analysis_options.yaml         flutter_lints ＋ 厳しめのルール（strict-casts / strict-raw-types / strict-inference、avoid_print など）
 ├── pubspec.yaml / pubspec.lock   依存（Rails の Gemfile / Gemfile.lock）
 ├── build.yaml                    コード生成の設定（Step 7。json_serializable の checked・snake_case・toJson を作らない）
-└── lib/
-    ├── main.dart                 起動する。その前に API_BASE_URL の検査と、保存したログインの状態の復元をする（Step 6）
-    ├── app.dart                  MaterialApp.router とテーマ（Next.js の app/layout.tsx）
-    ├── routing/router.dart       go_router の定義（Next.js の app/ フォルダの構造）
-    ├── config/dependencies.dart  どの実装を使うかを決める Provider（jobRepositoryProvider）。Step 6 から apiClientProvider・tokenStorageProvider・authRepositoryProvider
-    ├── utils/format.dart         日付・時刻・金額の表示の形（web の lib/format.ts）
-    ├── ui/
-    │   ├── core/ui/              複数の画面で使う Widget（scaffold_with_nav_bar.dart、Step 6 から error_banner.dart）
-    │   ├── core/themes/          テーマ（theme.dart）
-    │   ├── jobs/                 さがす（view_models/ 状態（Riverpod の Provider と、Step 7 の応募の mutation apply_mutation.dart）、widgets/ 画面と Widget（Step 7 から apply_confirm_dialog.dart））
-    │   ├── schedule/             よてい（自分の応募。Step 8: view_models/ に my_applications_provider.dart と取り下げの mutation withdraw_mutation.dart、widgets/ に schedule_screen.dart・schedule_list_tile.dart・withdraw_confirm_dialog.dart）
-    │   ├── notices/              おしらせ（Step 10 まで中身なし）
-    │   └── account/              マイページ・ログイン・初回登録（Step 6）
-    ├── domain/models/            モデル（Step 7 から freezed: JobPosting・JobPostingPage・LabeledValue・WorkerApplication（Step 8 から can）・WorkerMe）と値の定義（DateFilter・ApplyStatus、Step 8 から ScheduleTab）
-    └── data/
-        ├── repositories/         リポジトリ（JobRepository と、Step 7 からの実装 api_job_repository.dart。Step 6 から auth_repository.dart）
-        └── services/             Step 6: api_client.dart（ApiClient（dio）と、Step 7 からトップレベルの関数 parseModel()。Step 9 からテスト用の省略可の引数 httpClientAdapter）・AuthInterceptor・TokenStorage・ApiError（Step 7 から freezed）・device_name.dart
+├── lib/
+│   ├── main.dart                 起動する。その前に API_BASE_URL の検査と、保存したログインの状態の復元をする（Step 6）
+│   ├── app.dart                  MaterialApp.router とテーマ（Next.js の app/layout.tsx）
+│   ├── routing/router.dart       go_router の定義（Next.js の app/ フォルダの構造）
+│   ├── config/dependencies.dart  どの実装を使うかを決める Provider（jobRepositoryProvider）。Step 6 から apiClientProvider・tokenStorageProvider・authRepositoryProvider
+│   ├── utils/format.dart         日付・時刻・金額の表示の形（web の lib/format.ts）
+│   ├── ui/
+│   │   ├── core/ui/              複数の画面で使う Widget（scaffold_with_nav_bar.dart、Step 6 から error_banner.dart）
+│   │   ├── core/themes/          テーマ（theme.dart）
+│   │   ├── jobs/                 さがす（view_models/ 状態（Riverpod の Provider と、Step 7 の応募の mutation apply_mutation.dart）、widgets/ 画面と Widget（Step 7 から apply_confirm_dialog.dart））
+│   │   ├── schedule/             よてい（自分の応募。Step 8: view_models/ に my_applications_provider.dart と取り下げの mutation withdraw_mutation.dart、widgets/ に schedule_screen.dart・schedule_list_tile.dart・withdraw_confirm_dialog.dart）
+│   │   ├── notices/              おしらせ（Step 10 まで中身なし）
+│   │   └── account/              マイページ・ログイン・初回登録（Step 6）
+│   ├── domain/models/            モデル（Step 7 から freezed: JobPosting・JobPostingPage・LabeledValue・WorkerApplication（Step 8 から can）・WorkerMe）と値の定義（DateFilter・ApplyStatus、Step 8 から ScheduleTab）
+│   └── data/
+│       ├── repositories/         リポジトリ（JobRepository と、Step 7 からの実装 api_job_repository.dart。Step 6 から auth_repository.dart）
+│       └── services/             Step 6: api_client.dart（ApiClient（dio）と、Step 7 からトップレベルの関数 parseModel()。Step 9 からテスト用の省略可の引数 httpClientAdapter）・AuthInterceptor・TokenStorage・ApiError（Step 7 から freezed）・device_name.dart
 └── test/                         テスト（Step 9。issue #50）。lib/ と同じ形
     ├── fakes/                    手書きの偽物（fake_api_client.dart・fake_http_adapter.dart・fake_job_repository.dart）
     ├── helpers/                  API と同じ形の JSON を作る関数（json_fixtures.dart）と、Provider のテストの入れ物（provider_container.dart）
@@ -922,7 +922,7 @@ mobile/
 | 業務ルールと検証 | **アプリに書かない**（CLAUDE.md の絶対ルール 1）。定員・二重応募・状態遷移・応募できるかは API が判定し、アプリは 422 の `message` を表示する。入力欄の下には `errors` の同じキーの文言を出す。ボタンを出すかどうかは `can.apply` を見る |
 | 残り枠 | API の `remaining` をそのまま出す（Step 7 から。Step 3〜6 の偽データの画面だけは、満員・応募済みを学習のためアプリで判定していた）。応募のボタンと「応募済み」「満員」の表示は `my_application`・`can.apply`・`remaining` だけで出し分ける |
 | 状態の文言 | API が返す `{value, label}` の `label` を出す。色だけアプリが持つ（web の `lib/status.ts` と同じ考え方）。`status.value` で操作の可否を分けない: 取り下げのボタンは `can.withdraw` だけで出し分ける（Step 8）。よていのタブ（確定・応募中）は API の `status` の絞り込みに渡す値として使う |
-| API の呼び出し | `dio` を import するのは `data/services/` だけ（`ApiClient` と、それに差し込む `AuthInterceptor`）。API を呼ぶのは `ApiClient` だけで（web の `lib/api.ts` と同じ。Step 6）、リポジトリは `ApiClient` を通す。リダイレクトは追わない（`followRedirects: false`） |
+| API の呼び出し | `lib/` の中で `dio` を import するのは `data/services/` だけ（テストの例外は 7A.1 の「テスト」の箇条。`ApiClient` と、それに差し込む `AuthInterceptor`）。API を呼ぶのは `ApiClient` だけで（web の `lib/api.ts` と同じ。Step 6）、リポジトリは `ApiClient` を通す。リダイレクトは追わない（`followRedirects: false`） |
 | レスポンスの型 | JSON を `Map` のまま使わず、モデルの `fromJson` で型に変えてから使う（Step 3〜6 は手書き、Step 7 から `freezed` + `json_serializable`）。形が合わなければ例外にして、契約のずれとして報告する（web で zod の parse が落ちるのと同じ）。生成した `fromJson` は `build.yaml` の `checked: true` で、形が違うと `CheckedFromJsonException`（どのキーで失敗したかを持つ）を投げる。リポジトリ（と `ApiClient`）は生成した `fromJson` を直に呼ばず、`data/services/api_client.dart` の `parseModel()` を通して呼び、`CheckedFromJsonException` を `FormatException` にそろえる（issue #48 の Q1） |
 | 401 | トークンを消して `/login` へ戻す（`AuthInterceptor`。インターセプタは画面を移さず、ログインの状態を未ログインにするだけで、行き先は `redirect` が決める）。ログイン画面に出す文言（issue #46 の Q4）: 応答に `errors` があれば `message`（無効にされたワーカーの 5.3 の文言）、なければ「もう一度ログインしてください。」（`Unauthenticated.` は英語なので出さない） |
 | トークン | `flutter_secure_storage` にだけ置く。iOS の Keychain は `unlocked_this_device`（バックアップから別の端末に移さない）。ログに出さない（`rules/common/security.md`）。`Authorization` は送り先が `API_BASE_URL` と同じ scheme・host・port のときだけ付ける（`AuthInterceptor`）。**残るリスク**（issue #46 のレビュー。受け入れる）: iOS の Keychain はアプリを消しても残るので、入れ直した直後は前のトークンでログインした状態で始まる（失効していれば最初の API の 401 でログイン画面に戻る）。消すにはアプリの領域に「初回起動の印」を置くパッケージが要るので、Step 6 ではしない |

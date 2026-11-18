@@ -44,12 +44,11 @@ void main() {
     httpClientAdapter: adapter,
   );
 
-  // 401 の応答。errors があるのは「無効にされたワーカー」（5.3）、ないのは「トークンが無効」。
+  // 401 の応答。errors のキーがあるのは「無効にされたワーカー」（5.3。errors は空の {}）、ないのは「トークンが無効」。
+  // 契約どおり errors を空にしておく。「errors が空でないか」で判定するように変えると、このテストが赤になる。
   const disabled = FakeResponse(401, {
     'message': 'このアカウントは現在利用できません。管理者にお問い合わせください。',
-    'errors': {
-      'email': ['このアカウントは現在利用できません。管理者にお問い合わせください。'],
-    },
+    'errors': <String, dynamic>{},
   });
   const unauthenticated = FakeResponse(401, {'message': 'Unauthenticated.'});
 

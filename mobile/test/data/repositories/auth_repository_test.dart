@@ -99,6 +99,17 @@ void main() {
     expect(repository.takeSignOutReason(), isNull);
   });
 
+  test('理由のない expireSession は『もう一度ログインしてください。』にする', () async {
+    await storage.writeToken('old');
+    await repository.restore();
+
+    // errors のない 401（トークンが無効）。AuthInterceptor は理由を null で渡す（auth_interceptor_test.dart）。
+    // 英語の Unauthenticated. は出さず、決まりの日本語にする（docs/01 の 7A.4 の 401）。
+    await repository.expireSession(null);
+
+    expect(repository.takeSignOutReason(), 'もう一度ログインしてください。');
+  });
+
   test('restore はトークンがあればログイン済みにする', () async {
     await storage.writeToken('saved');
 

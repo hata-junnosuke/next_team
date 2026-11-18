@@ -5,6 +5,7 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:worker_app/config/dependencies.dart';
 import 'package:worker_app/domain/models/date_filter.dart';
 import 'package:worker_app/domain/models/job_posting_page.dart';
 import 'package:worker_app/ui/jobs/view_models/job_list_provider.dart';
@@ -42,6 +43,13 @@ void main() {
 
   test('リポジトリの例外は AsyncError になり、再試行しない', () async {
     repository.jobPostingsError = const FormatException('形が違います');
+    // このテストだけ、入れ物の既定を「1 ミリ秒後にすぐ再試行する」にする。
+    // Provider に retry の指定がなければ入れ物の既定が使われるので、lib/ の @Riverpod(retry: _noRetry) を
+    // 消すと 2 回目が呼ばれて赤になる（入れ物の既定を「再試行しない」にしたままだと、lib/ を消しても緑のままで何も守れない）。
+    container = ProviderContainer.test(
+      overrides: [jobRepositoryProvider.overrideWithValue(repository)],
+      retry: (_, _) => const Duration(milliseconds: 1),
+    );
     container.listen(allJobs, (_, _) {});
 
     await expectLater(
@@ -50,15 +58,17 @@ void main() {
     );
     expect(container.read(allJobs), isA<AsyncError<JobPostingPage>>());
 
-    // Riverpod の既定は「失敗したら 200 ミリ秒後から再試行」。jobListProvider は lib/ で再試行を切っている
-    // （画面の「再読み込み」で取り直す。Step 7）。待っても 2 回目が呼ばれないことを確かめる。
+    // jobListProvider は lib/ で再試行を切っている（画面の「再読み込み」で取り直す。Step 7）。
+    // 入れ物の既定なら 1 ミリ秒後に 2 回目が来るところを、少し待っても来ないことを確かめる。
     // ここは本物の時間で待つ（短い時間なので、テストが遅くなりすぎない）。
-    await Future<void>.delayed(const Duration(milliseconds: 500));
+    await Future<void>.delayed(const Duration(milliseconds: 100));
     expect(repository.jobPostingsCalls, hasLength(1));
   });
 
   test('拠点の id をリポジトリに渡し、すべてのときは日付を渡さない', () async {
-    await container.read(jobListProvider(DateFilter.all, 10).future);
+    final byLocation = jobListProvider(DateFilter.all, 10);
+    container.listen(byLocation, (_, _) {});
+    await container.read(byLocation.future);
 
     final query = repository.jobPostingsCalls.single;
     expect(query.locationId, 10);
