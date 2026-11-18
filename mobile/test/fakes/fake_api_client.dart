@@ -7,6 +7,8 @@
 // リポジトリは ApiClient の型しか知らないので、本物の代わりにこれを渡せる（リポジトリの差し替えの復習。Step 6〜7）。
 // https://dart.dev/language/classes#implicit-interfaces
 
+import 'dart:async';
+
 import 'package:worker_app/data/services/api_client.dart';
 
 // 記録した 1 件のリクエスト。
@@ -30,6 +32,11 @@ class FakeApiClient implements ApiClient {
   // Object?: 何でも入る型（null も）。TypeScript の unknown に近い。
   final Map<String, Object?> responses = {};
 
+  // 応答を止める「門」。Completer は「あとで自分で完了させる Future」（JavaScript で resolve を外に持ち出した Promise）。
+  // 門があると、どのリクエストも complete() されるまで返らない。「送信中」の場面を作るのに使う。
+  // https://api.dart.dev/dart-async/Completer-class.html
+  Completer<void>? gate;
+
   // 送られたリクエストを順に記録する（Http::assertSent の代わりに、テストで中身を見る）。
   final List<SentRequest> sent = [];
 
@@ -44,6 +51,8 @@ class FakeApiClient implements ApiClient {
     Map<String, dynamic>? query,
   }) async {
     sent.add(SentRequest('GET', path, query: query));
+    // ?.: 門がなければ（null なら）待たない。
+    await gate?.future;
     // as: 型を言い切る（TypeScript の as）。GET の応答は必ず Map なので、用意し忘れはテストの書き間違い。
     return _answer('GET', path) as Map<String, dynamic>;
   }
@@ -51,6 +60,7 @@ class FakeApiClient implements ApiClient {
   @override
   Future<Map<String, dynamic>?> post(String path, {Object? data}) async {
     sent.add(SentRequest('POST', path, data: data));
+    await gate?.future;
     return _answer('POST', path) as Map<String, dynamic>?;
   }
 
