@@ -11,7 +11,7 @@
   - 動線: `Feature/ApplicationTest.php`（定員超過）、`Unit/PayrollCalculatorTest.php`（報酬計算）、`Unit/ApplicationStatusTest.php`（状態遷移）、`Feature/AcceptanceScenarioTest.php`（動線 10 ステップ）
   - 非同期: `Feature/NotificationIdempotencyTest.php`（二重送信しない）、`Feature/FailedJobTest.php`（失敗の記録と再実行）
 - 業務ロジックの追加・変更にはテストを伴わせる。テストなしのサービス変更は差し戻し対象
-- 実行は `make api-test`（全体）/ `make api-test FILTER=<名前>`（部分）
+- api の実行は `make api-test`（全体）/ `make api-test FILTER=<名前>`（部分）。mobile は `make mobile-test`（1 ファイルだけなら `cd mobile && flutter test <ファイル>`）。ここから下の `TestCase`・fake・JSON の箇条は api のテストの決まり
 - `tests/TestCase.php` の `RefreshDatabase`、`$this->company` / `$this->admin`、`$this->actingAsAdmin()` を使う。HTTP は `getJson` / `postJson` など JSON 系
 - テストを通すためにテストを消す・スキップする・条件で逃げることを禁止
 - 他社データの分離は機能ごとに 1 本（404 になること）
